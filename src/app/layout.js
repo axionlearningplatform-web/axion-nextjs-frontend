@@ -4,6 +4,7 @@ import { AuthProvider } from "@/components/authProvider";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/themeProvider";
 import BaseLayout from "@/components/layout/BaseLayout";
+import { Suspense } from "react";
  const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -29,6 +30,7 @@ export default function RootLayout({ children }) {
       <head>
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
+        <Suspense fallback={<div>Loading...</div>}>
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
@@ -41,6 +43,7 @@ export default function RootLayout({ children }) {
             </BaseLayout>
           </AuthProvider>
         </ThemeProvider>
+        </Suspense>
       </body>
     </html>
   );
