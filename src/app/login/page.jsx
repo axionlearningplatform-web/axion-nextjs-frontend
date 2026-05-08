@@ -6,7 +6,7 @@ import { useAuth } from "@/components/authProvider"
 
 // -> url -> /login
 
-const LOGIN_URL = "/api/login/"
+const LOGIN_URL = "/api/login"
 
 export default function Page() {
   const auth = useAuth()
