@@ -10,20 +10,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import fetcher from "@/lib/fetcher"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 import useSWR from "swr"
 
 const QUESTIONS_API_URL = "/api/questions/"
-
-const fetcher = (...args) => fetch(...args).then(res => {
-    if (!res.ok) {
-        const error = new Error("An error occurred")
-        error.status = res.status
-        throw error
-    }
-    return res.json()
-})
 
 
 export default function QuestionTable() {

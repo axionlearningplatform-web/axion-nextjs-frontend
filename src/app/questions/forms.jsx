@@ -1,80 +1,108 @@
 "use client"
 
-import { GalleryVerticalEnd } from "lucide-react"
-import { LoginForm } from "@/components/login-form"
-import { useAuth } from "@/components/authProvider"
 import { useState } from "react"
-import { QuestionEditor } from "@/components/question-editor"
 
-// -> url -> /login
+import { QuestionEditor } from "@/components/question-editor"
 
 const QUESTIONS_API_URL = "/api/questions/"
 
 export default function Questions() {
-  const [message, setMessage] = useState('')
+
+  const [message, setMessage] = useState("")
   const [errors, setErrors] = useState({})
-  const [error, setError] = useState('')
   const [status, setStatus] = useState("idle")
-    
- async function handleSubmit(payload) {
 
-  setStatus("idle")
-  setErrors({})
-  setError('')
+  async function handleSubmit(payload) {
 
-const response = await fetch(QUESTIONS_API_URL, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify(payload),
-})
+    setErrors({})
+    setMessage("")
 
-if (response.ok) {
+    setStatus("loading")
 
-  setStatus("loading")
+    const response = await fetch(
+      QUESTIONS_API_URL,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      }
+    )
 
-  // grey loading state
-  setTimeout(() => {
+    const responseData = await response.json()
 
-    // green success state
-    setStatus("success")
-    setMessage("Question submitted")
+    if (response.ok) {
 
-    // disappear smoothly
-    setTimeout(() => {
-      setStatus("idle")
-    }, 2200)
+      setTimeout(() => {
 
-  }, 1500)
+        setStatus("success")
+        setMessage("Question submitted")
 
-} else {
+        setTimeout(() => {
 
-  const data = await response.json()
+          setStatus("idle")
+          setMessage("")
 
-  setErrors(data)
-  setError("Error saving question")
+        }, 2500)
 
-  setStatus("idle")
-}
- }
+      }, 1000)
 
- return (
-  <div className="flex min-h-svh flex-col items-center bg-muted p-6 md:p-10">
-    <div className="w-full max-w-7xl mx-auto flex flex-col gap-6">
-      <a
-        href="#"
-        className="text-center text-2xl font-extrabold">
-        Question Editor
-      </a>
+    } else {
+
+      console.log(responseData)
+
+      setErrors(responseData)
+
+      setTimeout(() => {
+
+        setStatus("error")
+        setMessage("Failed to submit")
+
+        setTimeout(() => {
+
+          setStatus("idle")
+          setMessage("")
+
+        }, 2200)
+
+      }, 800)
+    }
+  }
+
+  return (
+
+    <div className="flex min-h-svh flex-col items-center bg-muted p-6 md:p-10">
+
+      <div className="w-full max-w-7xl mx-auto flex flex-col gap-6">
+
+        <h1 className="text-center text-2xl font-extrabold">
+          Create Question
+        </h1>
+
         <QuestionEditor
+
+          submitLabel="Create Question"
+
+          statusLabels={{
+            loading: "Creating question...",
+            success: "Question created",
+            error: "Failed to create question",
+          }}
+
           onSubmit={handleSubmit}
+
           errors={errors}
+
           message={message}
+
           status={status}
+
           onClearErrors={() => setErrors({})}
         />
+
+      </div>
+
     </div>
-  </div>
- )
+  )
 }
