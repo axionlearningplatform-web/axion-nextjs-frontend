@@ -15,8 +15,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-muted p-6 md:p-10">
-      <div>{data && data.apiEndpoint}</div>
-         {<Questions/>}
+      {<Questions/>}
      </main>
   );
 }
