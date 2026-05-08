@@ -3,15 +3,13 @@ import { useAuth } from "@/components/authProvider"
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
-  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
 import fetcher from "@/lib/fetcher"
-import { useRouter } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { useEffect } from "react"
 import useSWR from "swr"
 
@@ -20,50 +18,83 @@ const QUESTIONS_API_URL = "/api/questions/"
 
 export default function QuestionTable() {
     const router = useRouter()
-    const {data, error, isLoading} = useSWR(QUESTIONS_API_URL, fetcher)
+    const params = useParams()
+    const subjectSlug = params?.slug
+    const {
+        data: subjects = [],
+        isLoading: subjectsLoading,
+    } = useSWR("/api/subjects/", fetcher)
+    const lockedSubject = subjects.find(
+        (subject) => subject.slug === subjectSlug
+    )
+    const questionsUrl = subjectSlug
+        ? lockedSubject
+            ? `${QUESTIONS_API_URL}?subject_id=${lockedSubject.id}`
+            : null
+        : QUESTIONS_API_URL
+    const {data, error, isLoading} = useSWR(questionsUrl, fetcher)
     const auth = useAuth()
     useEffect(()=> {
         if(error?.status === 401){
             auth.loginRequiredRedirect()
         }
     }, [auth, error])
-    if(error) return <div>failed to load</div>
-    if(isLoading) return <div>loading...</div>
+    if(error) return <div className="p-10 text-[#ffb4ab]">Failed to load questions</div>
+    if(subjectSlug && !subjectsLoading && !lockedSubject) {
+        return <div className="p-10 text-[#ffb4ab]">Subject not available for this user</div>
+    }
+    if(subjectsLoading || isLoading) return <div className="p-10 text-[#dac1b7]">Loading questions...</div>
   return (
-  <div className="flex justify-center">
-    <div className="w-full max-w-7xl">
-    <Table className="table-fixed border rounded-xl overflow-hidden">
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-25 font-extrabold">ID</TableHead>
-          <TableHead className="w-45 font-extrabold">Subject</TableHead>
-          <TableHead className="w-100 font-extrabold">Question</TableHead>
-          <TableHead className="w-30 font-extrabold">Marks</TableHead>
-          <TableHead className="w-50 font-extrabold">Created</TableHead>
+  <div className="mx-auto w-full max-w-7xl px-8 py-10">
+    <div className="mb-8">
+      <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#ffb595]">
+        {lockedSubject?.name || "Question Database"}
+      </p>
+      <h1 className="mt-2 text-3xl font-bold text-[#e5e2e1]">
+        Question Database
+      </h1>
+    </div>
+
+    <div className="rounded-2xl border border-[#54433c]/30 bg-[#1c1b1b]/80 p-3">
+    <Table className="border-separate border-spacing-y-2">
+      <TableHeader className="[&_tr]:border-0">
+        <TableRow className="border-0 hover:bg-transparent">
+          <TableHead className="w-20 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">ID</TableHead>
+          <TableHead className="w-48 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">Subject</TableHead>
+          <TableHead className="px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">Question</TableHead>
+          <TableHead className="w-32 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">Creator</TableHead>
+          <TableHead className="w-24 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">Marks</TableHead>
+          <TableHead className="w-36 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">Created</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {data.map((item, idx) => (
+        {data?.map((item) => (
         <TableRow
             key={item.id}
-            className="cursor-pointer hover:bg-muted/50 transition-colors"
-            onClick={() => router.push(`/questions/${item.id}`)}
+            className="cursor-pointer border-0 bg-[#201f1f] text-[#e5e2e1] shadow-sm transition-colors hover:bg-[#2a211e] [&>td:first-child]:rounded-l-xl [&>td:last-child]:rounded-r-xl"
+            onClick={() => router.push(lockedSubject ? `/subjects/${lockedSubject.slug}/questions/${item.id}` : `/questions/${item.id}`)}
         >
-            <TableCell>{item.id}</TableCell>
-            <TableCell>{item.subject}</TableCell>
-            <TableCell className="max-w-100">
+            <TableCell className="px-4 font-semibold text-[#ffb595]">{item.id}</TableCell>
+            <TableCell className="px-4 text-[#dac1b7]">{item.subject}</TableCell>
+            <TableCell className="max-w-[560px] px-4">
                 <div className="overflow-hidden text-ellipsis line-clamp-3 break-words">
                 {item.question_text}
             </div>
             </TableCell>
-            <TableCell>{item.marks}</TableCell>
-            <TableCell>
+            <TableCell className="px-4 text-[#dac1b7]">{item.creator_name || "Unknown"}</TableCell>
+            <TableCell className="px-4">{item.marks}</TableCell>
+            <TableCell className="px-4 text-[#dac1b7]">
                 {new Date(item.created_at).toLocaleDateString()}
             </TableCell>
         </TableRow>
         ))}
      </TableBody>
     </Table>
+    {data?.length === 0 && (
+      <div className="px-4 py-10 text-center text-sm text-[#a28c83]">
+        No questions in this subject yet.
+      </div>
+    )}
     </div>
   </div>
   )

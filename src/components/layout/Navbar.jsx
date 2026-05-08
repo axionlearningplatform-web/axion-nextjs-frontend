@@ -17,8 +17,9 @@ export default function Navbar({className}) {
         <BrandLink displayName={true} />
         {NavLinks.map((navLinkItem, idx)=>{
             const shouldHide = !auth.isAuthenticated &&navLinkItem.authRequired
+            const lacksPermission = navLinkItem.permission && !auth.can(navLinkItem.permission)
 
-            return shouldHide ? null : <Link
+            return shouldHide || lacksPermission ? null : <Link
                 href={navLinkItem.href}
                 key={`nav-links-a-${idx}`}
                 className="text-muted-foreground transition-colors hover:text-foreground"

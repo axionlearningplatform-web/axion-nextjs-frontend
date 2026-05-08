@@ -33,6 +33,10 @@ export default function Page() {
       : null,
     fetcher
   )
+  const { data: subjects = [] } = useSWR("/api/subjects/", fetcher)
+  const lockedSubject = subjects.find(
+    (subject) => subject.slug === params?.slug
+  )
 
   async function handleSubmit(payload) {
 
@@ -151,16 +155,18 @@ if (!data) {
 }
 
 return (
-  <div className="flex min-h-svh flex-col items-center bg-muted p-6 md:p-10">
+  <div className="flex min-h-svh flex-col items-center bg-blend-saturation p-6 md:p-10">
 
     <div className="w-full max-w-7xl mx-auto flex flex-col gap-6">
 
-      <h1 className="text-center text-2xl font-extrabold">
-        Edit Question
+      <h1 className="text-center font-serif text-3xl font-bold text-[#e5e2e1]">
+        Question Editor
       </h1>
 
      <QuestionEditor
   initialData={data}
+  subjects={subjects}
+  lockedSubject={lockedSubject}
 
   submitLabel="Save Changes"
 
@@ -187,4 +193,3 @@ return (
   </div>
 )
 }
-

@@ -1,11 +1,3 @@
-"use client"
-import Questions from "./questions/forms";
+import DashboardPage from "./dashboard/page";
 
-export default function Home() {
-
-  return (
-    <main className="min-h-screen bg-muted p-6 md:p-10">
-      {<Questions/>}
-     </main>
-  );
-}
+export default DashboardPage

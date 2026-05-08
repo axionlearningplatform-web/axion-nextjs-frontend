@@ -20,7 +20,15 @@ export default class ApiProxy {
         let status = 500
         try {
             const response = await fetch(endpoint, requestOptions)
-            data = await response.json()
+            const text = await response.text()
+            try {
+                data = text ? JSON.parse(text) : {}
+            } catch {
+                data = {
+                    message: "Backend returned a non-JSON response",
+                    raw: text,
+                }
+            }
             status = response.status
         } catch (error) {
             data = {message: "Cannot reach API server", error: error}
@@ -35,6 +43,17 @@ export default class ApiProxy {
         const headers = await ApiProxy.getHeaders(requireAuth)
         const requestOptions = {
             method: "PUT",
+            headers: headers,
+            body: jsonData
+        }
+        return await ApiProxy.handleFetch(endpoint, requestOptions)
+    }
+
+    static async patch(endpoint, object, requireAuth) {
+        const jsonData = JSON.stringify(object)
+        const headers = await ApiProxy.getHeaders(requireAuth)
+        const requestOptions = {
+            method: "PATCH",
             headers: headers,
             body: jsonData
         }

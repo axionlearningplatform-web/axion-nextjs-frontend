@@ -17,7 +17,19 @@ export async function POST(request){
         body: jsonData
     }
     const response = await fetch(DJANGO_API_LOGIN_URL, requestOptions)
-    const responseData = await response.json()
+
+    const text = await response.text()
+    let responseData = {}
+
+    try {
+        responseData = text ? JSON.parse(text) : {}
+    } catch {
+        responseData = {
+            detail: "Backend returned a non-JSON response.",
+            raw: text,
+        }
+    }
+
     if (response.ok){
         console.log("logged in")
         const {username, access, refresh} = responseData
@@ -29,5 +41,8 @@ export async function POST(request){
     //const cookieStore = await cookies()
     //const authToken = cookieStore.get("auth-token")
 
-    return NextResponse.json({"loggedIn": false, ... responseData}, {status: 400})
+    return NextResponse.json(
+        {"loggedIn": false, ... responseData},
+        {status: response.status || 400}
+    )
 }

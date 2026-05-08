@@ -15,21 +15,21 @@ import { Graph } from "./graphEditor"
 
 export function PreviewPanel({ subject, marks, questionText, math, hints, graph}) {
   return (
-    <Card className="self-start w-full">
+    <Card className="self-start w-full rounded-3xl border-[#54433c]/45 bg-[#151515] text-[#e5e2e1] shadow-2xl shadow-black/20">
       <CardHeader>
-        <CardTitle>Live Preview</CardTitle>
+        <CardTitle className="font-serif text-2xl font-semibold">Live Preview</CardTitle>
       </CardHeader>
 
      <CardContent className="flex flex-col gap-6">
 
         {/* Subject + Marks */}
-        <div className="flex justify-between text-sm text-muted-foreground">
+        <div className="flex justify-between text-sm text-[#a28c83]">
           <span>{subject || "Subject"}</span>
           <span>{marks} marks</span>
         </div>
 
         {/* Question */}
-        <div className="prose max-w-none text-base leading-relaxed">
+        <div className="prose prose-invert max-w-none text-base leading-relaxed text-[#e5e2e1]">
       <ReactMarkdown
         remarkPlugins={[remarkMath]}
         rehypePlugins={[rehypeKatex]}
@@ -40,13 +40,13 @@ export function PreviewPanel({ subject, marks, questionText, math, hints, graph}
 
         {/* Math */}
         {math && (
-          <div className="bg-muted p-4 rounded-md">
+          <div className="rounded-2xl border border-[#54433c]/35 bg-[#201f1f] p-4">
             <BlockMath math={math} />
           </div>
         )}
 
         {graph && (
-  <div className="p-4 border rounded-lg bg-muted/50">
+  <div className="rounded-2xl border border-[#54433c]/35 bg-[#201f1f] p-4">
       <Graph equation={graph} /> 
   </div>
 )}
@@ -59,10 +59,10 @@ export function PreviewPanel({ subject, marks, questionText, math, hints, graph}
             {hints.map((hint, i) => (
               <div
                 key={i}
-                className="text-sm bg-muted p-2 rounded-md flex justify-between"
+              className="flex justify-between rounded-xl bg-[#242424] p-3 text-sm"
               >
                 <span>{hint.text || "Hint..."}</span>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-[#a28c83]">
                   {hint.mark} mark
                 </span>
               </div>

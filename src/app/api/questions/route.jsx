@@ -1,4 +1,3 @@
-import { getToken } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import ApiProxy from "../proxy";
 import { DJANGO_API_ENDPOINT } from "@/config/defaults";
@@ -6,11 +5,11 @@ import { DJANGO_API_ENDPOINT } from "@/config/defaults";
 const DJANG_API_QUESTIONS_URL = `${DJANGO_API_ENDPOINT}/questions/`
 
 export async function GET(request) {
+    const { search } = new URL(request.url)
     const response = await ApiProxy.get(
-        DJANG_API_QUESTIONS_URL,
+        `${DJANG_API_QUESTIONS_URL}${search}`,
         true
     )
-    console.log(response)
 
     return NextResponse.json(
         response.data,

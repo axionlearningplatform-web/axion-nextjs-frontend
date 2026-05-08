@@ -8,37 +8,71 @@ const AuthContext = createContext(null);
 const LOGIN_REDIRECT_URL = "/"
 const LOGOUT_REDIRECT_URL = "/login"
 const LOGIN_REQUIRED_URL = "/login"
-const LOCAL_STORAGE_KEY = "is-logged-in"
-const LOCAL_USERNAME_KEY = "username"
+const ME_URL = "/api/me"
 
 
 export function AuthProvider({children}){
     const [isAuthenticated, setIsAuthenticated] = useState(false)
     const [username, setUsername] = useState("")
+    const [user, setUser] = useState(null)
+    const [memberships, setMemberships] = useState([])
+    const [subjectMemberships, setSubjectMemberships] = useState([])
+    const [activeRole, setActiveRole] = useState(null)
+    const [permissions, setPermissions] = useState([])
+    const [isLoading, setIsLoading] = useState(true)
     const router = useRouter()
     const pathname = usePathname()
     const searchParams = useSearchParams()
+
+    const applyUserContext = (context) => {
+        setUser(context)
+        setUsername(context?.display_name || context?.username || "")
+        setMemberships(context?.memberships || [])
+        setSubjectMemberships(context?.subject_memberships || [])
+        setActiveRole(context?.active_role || null)
+        setPermissions(context?.permissions || [])
+        setIsAuthenticated(Boolean(context?.is_authenticated))
+    }
+
+    const clearUserContext = () => {
+        setUser(null)
+        setUsername("")
+        setMemberships([])
+        setSubjectMemberships([])
+        setActiveRole(null)
+        setPermissions([])
+        setIsAuthenticated(false)
+    }
+
+    const refreshUser = async () => {
+        setIsLoading(true)
+        try {
+            const response = await fetch(ME_URL, {
+                cache: "no-store",
+            })
+            if (!response.ok) {
+                clearUserContext()
+                return null
+            }
+            const data = await response.json()
+            applyUserContext(data)
+            return data
+        } catch {
+            clearUserContext()
+            return null
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
     useEffect(() =>{
-        const storedAuthStatus = localStorage.getItem(LOCAL_STORAGE_KEY)
-        if(storedAuthStatus){
-            const storeAuthStatusInt = parseInt(storedAuthStatus)
-            setIsAuthenticated(storeAuthStatusInt===1)
-        }
-        const storedUN = localStorage.getItem(LOCAL_USERNAME_KEY)
-        if(storedUN){
-            setUsername(storedUN)
-        }
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        refreshUser()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    const login = (username) => {
-        setIsAuthenticated(true)
-        localStorage.setItem(LOCAL_STORAGE_KEY, "1")
-        if (username){
-            localStorage.setItem(LOCAL_USERNAME_KEY, `${username}`)
-            setUsername(username)
-        } else {
-            localStorage.removeItem(LOCAL_USERNAME_KEY)
-        }
+    const login = async () => {
+        await refreshUser()
         const nextUrl = searchParams.get("next")
         const invalidNextUrl = ['/login', '/logout']
         const nextUrlValid = nextUrl && nextUrl.startsWith("/") && !invalidNextUrl.includes(nextUrl)
@@ -51,21 +85,35 @@ export function AuthProvider({children}){
         }    
     }
     const logout = () => {
-        setIsAuthenticated(false)
-        localStorage.setItem(LOCAL_STORAGE_KEY, "0")
-          router.replace(LOGOUT_REDIRECT_URL)
+        clearUserContext()
+        router.replace(LOGOUT_REDIRECT_URL)
     }
     const loginRequiredRedirect = () => {
         //user is not logged in via API
-        setIsAuthenticated(false)
-        localStorage.setItem(LOCAL_STORAGE_KEY, "0")
+        clearUserContext()
         let loginWithNextURL = `${LOGIN_REQUIRED_URL}?next=${pathname}`
         if(LOGIN_REQUIRED_URL === pathname){
             loginWithNextURL = `${LOGIN_REQUIRED_URL}`
         }
         router.replace(loginWithNextURL)
     }
-    return <AuthContext.Provider value = {{isAuthenticated, login, logout, loginRequiredRedirect, username}}>
+    const can = (permission) => permissions.includes(permission)
+
+    return <AuthContext.Provider value = {{
+        isAuthenticated,
+        isLoading,
+        login,
+        logout,
+        loginRequiredRedirect,
+        refreshUser,
+        username,
+        user,
+        memberships,
+        subjectMemberships,
+        activeRole,
+        permissions,
+        can,
+    }}>
         {children}
     </AuthContext.Provider>
 }

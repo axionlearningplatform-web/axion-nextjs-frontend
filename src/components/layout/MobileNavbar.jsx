@@ -26,7 +26,8 @@ export default function MobileNavbar({className}) {
                     
                     {NavLinks.map((navLinkItem, idx) => {
                         const shouldHide = !auth.isAuthenticated && navLinkItem.authRequired
-                        return shouldHide ? null : (
+                        const lacksPermission = navLinkItem.permission && !auth.can(navLinkItem.permission)
+                        return shouldHide || lacksPermission ? null : (
                             <Link href={navLinkItem.href} key={`nav-links-b-${idx}`} className="text-muted-foreground hover:text-foreground">
                                 {navLinkItem.label}
                             </Link>

@@ -1,6 +1,7 @@
 import { cookies } from "next/headers"
 
 const TOKEN_AGE = 3600
+const REFRESH_TOKEN_AGE = 60 * 60 * 24 * 7
 const TOKEN_NAME = "auth-token"
 const TOKEN_REFRESH_NAME = "auth-refresh-token"
 
@@ -40,7 +41,7 @@ export async function setRefreshToken(authRefreshToken){
         httpOnly: true,
         sameSite: 'strict',
         secure: process.env.NODE_ENV !== 'development',
-        maxAge: TOKEN_AGE,
+        maxAge: REFRESH_TOKEN_AGE,
     })
 }
 

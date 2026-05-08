@@ -35,7 +35,7 @@ export default function Page() {
    }
     if (response.ok) {
      console.log("logged in")
-      auth.login(data?.username)
+      auth.login()
      } 
     }
 

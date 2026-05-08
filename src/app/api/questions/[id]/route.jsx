@@ -1,5 +1,6 @@
 import { DJANGO_API_ENDPOINT } from "@/config/defaults"
 import { NextResponse } from "next/server"
+import ApiProxy from "../../proxy"
 
 const DJANGO_API_QUESTIONS_URL =
   `${DJANGO_API_ENDPOINT}/questions/`
@@ -38,19 +39,9 @@ export async function GET(request, context) {
 
     console.log("FETCHING:", endpoint)
 
-    const response = await fetch(endpoint, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      cache: "no-store",
-    })
+    const response = await ApiProxy.get(endpoint, true)
 
-    const data = await parseResponse(response)
-
-    console.log("DJANGO RESPONSE:", data)
-
-    return NextResponse.json(data, {
+    return NextResponse.json(response.data, {
       status: response.status,
     })
 
@@ -84,19 +75,9 @@ export async function PATCH(request, context) {
 
     console.log("PATCHING:", endpoint)
 
-    const response = await fetch(endpoint, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    })
+    const response = await ApiProxy.patch(endpoint, body, true)
 
-    const data = await parseResponse(response)
-
-    console.log("PATCH RESPONSE:", data)
-
-    return NextResponse.json(data, {
+    return NextResponse.json(response.data, {
       status: response.status,
     })
 
@@ -130,15 +111,10 @@ export async function DELETE(
 
     console.log("DELETING:", endpoint)
 
-    const response = await fetch(
-      endpoint,
-      {
-        method: "DELETE",
-      }
-    )
+    const response = await ApiProxy.delete(endpoint, true)
 
     return NextResponse.json(
-      {},
+      response.data,
       {
         status: response.status,
       }

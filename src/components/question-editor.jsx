@@ -1,8 +1,11 @@
 "use client"
 
 import { useEffect, useState } from "react"
+
 import { cn } from "@/lib/utils"
+
 import { Button } from "@/components/ui/button"
+
 import { PreviewPanel } from "@/components/questionEditor/previewPanel"
 
 import {
@@ -23,6 +26,10 @@ import { Textarea } from "@/components/ui/textarea"
 
 export function QuestionEditor({
   initialData = null,
+
+  subjects = [],
+  lockedSubject = null,
+
   submitLabel = "Create Question",
 
   statusLabels = {
@@ -37,29 +44,50 @@ export function QuestionEditor({
   deleting = false,
 
   errors,
-  message,
   status,
+
   onClearErrors,
 }) {
 
   const [subject, setSubject] = useState("")
-  const [marks, setMarks] = useState("1")
-  const [questionText, setQuestionText] = useState("")
-  const [math, setMath] = useState("")
-  const [hints, setHints] = useState([{ text: "", mark: "1" }])
-  const [graph, setGraph] = useState("")
-  const [confirmDelete, setConfirmDelete] =
-  useState(false)
+  const [subjectId, setSubjectId] = useState("")
 
-  // PREFILL DATA
+  const [marks, setMarks] = useState("1")
+
+  const [questionText, setQuestionText] =
+    useState("")
+
+  const [math, setMath] = useState("")
+
+  const [hints, setHints] = useState([
+    {
+      text: "",
+      mark: "1",
+    },
+  ])
+
+  const [graph, setGraph] = useState("")
+
+  const [confirmDelete, setConfirmDelete] =
+    useState(false)
+
+  // PREFILL QUESTION DATA
   useEffect(() => {
 
     if (!initialData) return
 
     setSubject(initialData.subject || "")
-    setMarks(String(initialData.marks || "1"))
-    setQuestionText(initialData.question_text || "")
+
+    setMarks(
+      String(initialData.marks || "1")
+    )
+
+    setQuestionText(
+      initialData.question_text || ""
+    )
+
     setMath(initialData.latex || "")
+
     setGraph(initialData.graph || "")
 
     setHints(
@@ -68,12 +96,33 @@ export function QuestionEditor({
             text: hint.text || "",
             mark: String(hint.mark || "1"),
           }))
-        : [{ text: "", mark: "1" }]
+        : [
+            {
+              text: "",
+              mark: "1",
+            },
+          ]
     )
 
   }, [initialData])
 
+  // LOCKED SUBJECT SUPPORT
+  useEffect(() => {
+
+    if (!lockedSubject) return
+
+    setSubject(lockedSubject.name || "")
+
+    setSubjectId(
+      lockedSubject.id
+        ? String(lockedSubject.id)
+        : ""
+    )
+
+  }, [lockedSubject])
+
   const addHint = () => {
+
     setHints([
       ...hints,
       {
@@ -83,7 +132,11 @@ export function QuestionEditor({
     ])
   }
 
-  const updateHint = (index, field, value) => {
+  const updateHint = (
+    index,
+    field,
+    value
+  ) => {
 
     const newHints = [...hints]
 
@@ -93,7 +146,10 @@ export function QuestionEditor({
   }
 
   const removeHint = (index) => {
-    setHints(hints.filter((_, i) => i !== index))
+
+    setHints(
+      hints.filter((_, i) => i !== index)
+    )
   }
 
   const handleSubmit = (e) => {
@@ -102,9 +158,16 @@ export function QuestionEditor({
 
     const payload = {
       subject,
+      subject_id: subjectId
+        ? Number(subjectId)
+        : null,
+
       marks: Number(marks),
+
       question_text: questionText,
+
       latex: math,
+
       graph,
 
       hints: hints.map((hint) => ({
@@ -119,14 +182,23 @@ export function QuestionEditor({
   }
 
   return (
-    <div className="grid lg:grid-cols-2 gap-8">
+    <div className="grid gap-8 lg:grid-cols-2">
 
       {/* LEFT */}
       <div className="flex flex-col gap-6">
 
         <Card
           className={cn(
-            "w-full transition-colors",
+            `
+            w-full
+            rounded-3xl
+            border-[#54433c]/45
+            bg-[#151515]
+            text-[#e5e2e1]
+            shadow-2xl
+            shadow-black/20
+            transition-colors
+            `,
             errors?.question_text &&
               "border-destructive shadow-destructive/20"
           )}
@@ -134,72 +206,67 @@ export function QuestionEditor({
 
           <CardHeader>
 
-  <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between">
 
-    <CardTitle>
-      {submitLabel === "Save Changes"
-        ? "Edit Question"
-        : "Create Question"}
-    </CardTitle>
+              <CardTitle className="font-serif text-2xl font-semibold">
 
-    {/* DELETE BUTTON ONLY IN EDIT MODE */}
-    {onDelete && (
+                {submitLabel === "Save Changes"
+                  ? "Edit Question"
+                  : "Create Question"}
 
-      <div className="flex items-center gap-2">
+              </CardTitle>
 
-        {!confirmDelete ? (
+              {onDelete && (
 
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            onClick={() =>
-              setConfirmDelete(true)
-            }
-          >
-            Delete Question
-          </Button>
+                <div className="flex items-center gap-2">
 
-        ) : (
+                  {!confirmDelete ? (
 
-          <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      className="rounded-full"
+                      onClick={() =>
+                        setConfirmDelete(true)
+                      }
+                    >
+                      Delete Question
+                    </Button>
 
-            <span className="text-sm text-muted-foreground">
-              Are you sure?
-            </span>
+                  ) : (
 
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              disabled={deleting}
-              onClick={onDelete}
-            >
-              {deleting
-                ? "Deleting..."
-                : "Yes Delete"}
-            </Button>
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-full"
+                        onClick={() =>
+                          setConfirmDelete(false)
+                        }
+                      >
+                        Cancel
+                      </Button>
 
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                setConfirmDelete(false)
-              }
-            >
-              Cancel
-            </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        className="rounded-full"
+                        disabled={deleting}
+                        onClick={onDelete}
+                      >
+                        {deleting
+                          ? "Deleting..."
+                          : "Confirm Delete"}
+                      </Button>
+                    </>
+                  )}
 
-          </div>
-        )}
+                </div>
+              )}
 
-      </div>
-    )}
+            </div>
 
-  </div>
-
-</CardHeader>
+          </CardHeader>
 
           <CardContent className="relative flex flex-col gap-6">
 
@@ -215,23 +282,107 @@ export function QuestionEditor({
 
                   <Field>
 
-                    <FieldLabel>Subject</FieldLabel>
+                    <FieldLabel className="text-[#dac1b7]">
+                      Subject
+                    </FieldLabel>
 
-                    <Input
-                      value={subject}
-                      onChange={(e) =>
-                        setSubject(e.target.value)
-                      }
-                    />
+                    {lockedSubject ? (
+
+                      <Input
+                        value={lockedSubject.name}
+                        disabled
+                        className="
+                          rounded-full
+                          border-[#2a2a2a]
+                          bg-[#242424]
+                          text-[#a28c83]
+                        "
+                      />
+
+                    ) : subjects.length > 0 ? (
+
+                      <select
+                        value={subjectId}
+                        onChange={(e) => {
+
+                          const value =
+                            e.target.value
+
+                          setSubjectId(value)
+
+                          const found =
+                            subjects.find(
+                              (s) =>
+                                String(s.id) === value
+                            )
+
+                          setSubject(
+                            found?.name || ""
+                          )
+                        }}
+                        className="
+                          h-10
+                          rounded-full
+                          border
+                          border-[#2a2a2a]
+                          bg-[#242424]
+                          px-4
+                          text-[#e5e2e1]
+                        "
+                      >
+
+                        <option value="">
+                          Select subject
+                        </option>
+
+                        {subjects.map((subject) => (
+
+                          <option
+                            key={subject.id}
+                            value={subject.id}
+                          >
+                            {subject.name}
+                          </option>
+                        ))}
+
+                      </select>
+
+                    ) : (
+
+                      <Input
+                        value={subject}
+                        className="
+                          rounded-full
+                          border-[#2a2a2a]
+                          bg-[#242424]
+                          text-[#a28c83]
+                        "
+                        onChange={(e) =>
+                          setSubject(
+                            e.target.value
+                          )
+                        }
+                      />
+
+                    )}
 
                   </Field>
 
                   <Field>
 
-                    <FieldLabel>Marks</FieldLabel>
+                    <FieldLabel className="text-[#dac1b7]">
+                      Marks
+                    </FieldLabel>
 
                     <Input
                       type="number"
+                      className="
+                        rounded-full
+                        border-[#2a2a2a]
+                        bg-[#242424]
+                        text-[#e5e2e1]
+                        focus-visible:ring-[#ffb595]/40
+                      "
                       value={marks}
                       onChange={(e) =>
                         setMarks(e.target.value)
@@ -245,28 +396,50 @@ export function QuestionEditor({
                 {/* QUESTION */}
                 <Field>
 
-                  <FieldLabel>Question</FieldLabel>
+                  <FieldLabel className="text-[#dac1b7]">
+                    Question
+                  </FieldLabel>
 
                   <Textarea
                     className={cn(
-                      "min-h-[160px]",
+                      `
+                      min-h-[220px]
+                      rounded-3xl
+                      border-[#2a2a2a]
+                      bg-[#242424]
+                      p-5
+                      text-[#e5e2e1]
+                      focus-visible:ring-[#ffb595]/40
+                      `,
                       errors?.question_text &&
-                        "border-destructive focus-visible:ring-destructive"
+                        `
+                        border-destructive
+                        focus-visible:ring-destructive
+                        `
                     )}
                     value={questionText}
                     onChange={(e) => {
 
-                      setQuestionText(e.target.value)
+                      setQuestionText(
+                        e.target.value
+                      )
 
-                      if (errors?.question_text) {
+                      if (
+                        errors?.question_text
+                      ) {
                         onClearErrors()
                       }
                     }}
                   />
 
-                  {errors?.question_text?.[0]?.message && (
-                    <p className="text-sm text-destructive mt-2">
-                      {errors.question_text[0].message}
+                  {errors?.question_text?.[0]
+                    ?.message && (
+
+                    <p className="mt-2 text-sm text-destructive">
+                      {
+                        errors.question_text[0]
+                          .message
+                      }
                     </p>
                   )}
 
@@ -275,9 +448,18 @@ export function QuestionEditor({
                 {/* LATEX */}
                 <Field>
 
-                  <FieldLabel>Math (LaTeX)</FieldLabel>
+                  <FieldLabel className="text-[#dac1b7]">
+                    Math (LaTeX)
+                  </FieldLabel>
 
                   <Input
+                    className="
+                      rounded-full
+                      border-[#2a2a2a]
+                      bg-[#242424]
+                      text-[#e5e2e1]
+                      focus-visible:ring-[#ffb595]/40
+                    "
                     value={math}
                     onChange={(e) =>
                       setMath(e.target.value)
@@ -290,9 +472,18 @@ export function QuestionEditor({
                 {/* GRAPH */}
                 <Field>
 
-                  <FieldLabel>Graph Equation</FieldLabel>
+                  <FieldLabel className="text-[#dac1b7]">
+                    Graph Equation
+                  </FieldLabel>
 
                   <Input
+                    className="
+                      rounded-full
+                      border-[#2a2a2a]
+                      bg-[#242424]
+                      text-[#e5e2e1]
+                      focus-visible:ring-[#ffb595]/40
+                    "
                     value={graph}
                     onChange={(e) =>
                       setGraph(e.target.value)
@@ -305,7 +496,9 @@ export function QuestionEditor({
                 {/* HINTS */}
                 <Field>
 
-                  <FieldLabel>Hints</FieldLabel>
+                  <FieldLabel className="text-[#dac1b7]">
+                    Hints
+                  </FieldLabel>
 
                   <div className="flex flex-col gap-3">
 
@@ -318,6 +511,13 @@ export function QuestionEditor({
 
                         <Input
                           placeholder="Hint"
+                          className="
+                            rounded-full
+                            border-[#2a2a2a]
+                            bg-[#242424]
+                            text-[#e5e2e1]
+                            focus-visible:ring-[#ffb595]/40
+                          "
                           value={hint.text}
                           onChange={(e) =>
                             updateHint(
@@ -330,7 +530,14 @@ export function QuestionEditor({
 
                         <Input
                           type="number"
-                          className="w-20"
+                          className="
+                            w-24
+                            rounded-full
+                            border-[#2a2a2a]
+                            bg-[#242424]
+                            text-[#e5e2e1]
+                            focus-visible:ring-[#ffb595]/40
+                          "
                           value={hint.mark}
                           onChange={(e) =>
                             updateHint(
@@ -344,6 +551,12 @@ export function QuestionEditor({
                         <Button
                           type="button"
                           variant="destructive"
+                          className="
+                            rounded-full
+                            bg-[#6d2c2c]
+                            text-[#ffdad6]
+                            hover:bg-[#823636]
+                          "
                           onClick={() =>
                             removeHint(index)
                           }
@@ -355,22 +568,50 @@ export function QuestionEditor({
                     ))}
 
                     <Button
-                      type="button"
-                      onClick={addHint}
-                    >
-                      + Add Hint
-                    </Button>
+  type="button"
+  onClick={addHint}
+  className="
+    rounded-full
+    border
+    border-[#54433c]/40
+    bg-[#242424]
+    text-[#dac1b7]
+    hover:bg-[#2d2d2d]
+    hover:text-[#f3ddd2]
+    hover:border-[#6b554c]
+    transition-all
+    duration-300
+    shadow-none
+  "
+>
+  + Add Hint
+</Button>
 
                   </div>
 
                 </Field>
 
                 {/* SUBMIT */}
-                <Button type="submit">
+                <Button
+  type="submit"
+  className="
+    rounded-full
+    bg-[#ccb2a3d3]
+    text-[#1a1817]
+    text-lg
+    hover:bg-[#ddbeaa]
+    hover:text-black
+    transition-all
+    duration-300
+    shadow-[0_0_0_1px_rgba(255,255,255,0.03)]
+    hover:shadow-[0_8px_30px_rgba(255,220,200,0.06)]
+    active:scale-[0.995]
+  "
+>
 
-                  {submitLabel}
+  {submitLabel}
 
-                </Button>
+</Button>
 
               </FieldGroup>
 
@@ -458,7 +699,12 @@ export function QuestionEditor({
 
                 <div
                   className={cn(
-                    "h-2 w-2 rounded-full shrink-0",
+                    `
+                    h-2
+                    w-2
+                    rounded-full
+                    shrink-0
+                    `,
 
                     status === "loading" &&
                       "bg-white/70 animate-pulse",
@@ -474,13 +720,13 @@ export function QuestionEditor({
                 <span>
 
                   {status === "loading" &&
-  statusLabels.loading}
+                    statusLabels.loading}
 
-{status === "success" &&
-  statusLabels.success}
+                  {status === "success" &&
+                    statusLabels.success}
 
-{status === "error" &&
-  statusLabels.error}
+                  {status === "error" &&
+                    statusLabels.error}
 
                 </span>
 

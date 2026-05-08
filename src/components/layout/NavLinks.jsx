@@ -2,14 +2,16 @@
 
 const NavLinks = [
     {
-        label: "Dashboard",
-        authRequired: false,
-        href: "/"
+        label: "Create",
+        authRequired: true,
+        href: "/create",
+        permission: "question:create",
     },
     {
         label: "Questions",
         authRequired: true,
-        href: "/questions"
+        href: "/questions",
+        permission: "question:read",
     }
 ]
 
