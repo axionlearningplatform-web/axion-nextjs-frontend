@@ -1,14 +1,17 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-
-const geistSans = Geist({
+import { AuthProvider } from "@/components/authProvider";
+import { cn } from "@/lib/utils";
+import { ThemeProvider } from "@/components/themeProvider";
+import BaseLayout from "@/components/layout/BaseLayout";
+ const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+   variable: "--font-geist-mono",
+   subsets: ["latin"],
 });
 
 export const metadata = {
@@ -19,10 +22,26 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html
+      suppressHydrationWarning
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <head>
+      </head>
+      <body className="min-h-screen bg-background font-sans antialiased">
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthProvider>
+            <BaseLayout className="flex min-h-[calc(100vh-(--spacing(16)))] flex-1 flex-col bg-muted/40  md:gap-8 ">
+              {children}
+            </BaseLayout>
+          </AuthProvider>
+        </ThemeProvider>
+      </body>
     </html>
   );
 }
