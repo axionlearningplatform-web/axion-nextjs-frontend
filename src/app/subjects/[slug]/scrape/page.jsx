@@ -961,6 +961,7 @@ export default function QuestionImportPage() {
                 importSource={draft?.import_source || activeCandidate?.import_source || ""}
                 tags={[]}
                 diagramSvg={draft?.diagram_svg || activeCandidate?.diagram_svg || ""}
+                tikzCode={draft?.tikz_code || activeCandidate?.tikz_code || ""}
                 headerAction={
                   <Button
                     type="button"

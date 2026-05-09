@@ -57,83 +57,6 @@ function criteriaForMarks(marks, existing = []) {
   })
 }
 
-function useDebouncedValue(value, delay = 550) {
-  const [debounced, setDebounced] = useState(value)
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => setDebounced(value), delay)
-    return () => window.clearTimeout(timeout)
-  }, [value, delay])
-
-  return debounced
-}
-
-function TikzLivePreview({ code }) {
-  const debouncedCode = useDebouncedValue(code, 550)
-  const rendering = Boolean(code?.trim()) && code !== debouncedCode
-
-  const srcDoc = useMemo(() => {
-    const escapedCode = String(debouncedCode || "").replace(/<\/script/gi, "<\\/script")
-    return `<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <link rel="stylesheet" href="https://tikzjax.com/v1/fonts.css" />
-    <script src="https://tikzjax.com/v1/tikzjax.js"></script>
-    <style>
-      html, body {
-        margin: 0;
-        min-height: 100%;
-        background: #12100e;
-        color: #eee9e4;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-family: ui-serif, Georgia, serif;
-      }
-      body { padding: 18px; box-sizing: border-box; }
-      svg { max-width: 100%; height: auto; }
-      .empty { color: #6f6258; font-style: italic; }
-    </style>
-  </head>
-  <body>
-    ${
-      escapedCode.trim()
-        ? `<script type="text/tikz">${escapedCode}</script>`
-        : `<div class="empty">Your TikZ diagram will appear here.</div>`
-    }
-  </body>
-</html>`
-  }, [debouncedCode])
-
-  return (
-    <div className="overflow-hidden rounded-3xl border border-[#3a302b] bg-[#12100e]">
-      <div className="flex items-center justify-between border-b border-[#3a302b] px-4 py-3">
-        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8f8378]">
-          Live Diagram Preview
-        </span>
-        <span className="inline-flex items-center gap-2 text-xs text-[#6f6258]">
-          {rendering && <span className="size-1.5 animate-pulse rounded-full bg-[#c8864a]" />}
-          {rendering ? "Rendering" : "TikZJax"}
-        </span>
-      </div>
-      <div className="relative min-h-[220px]">
-        <iframe
-          className="h-[260px] w-full bg-[#12100e]"
-          sandbox="allow-scripts"
-          srcDoc={srcDoc}
-          title="TikZ live preview"
-        />
-        {!code?.trim() && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center font-serif text-sm italic text-[#6f6258]">
-            Add TikZ code to preview a diagram.
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 function readAttachment(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -773,9 +696,6 @@ export function QuestionEditor({
                     value={tikzCode}
                     onChange={(event) => setTikzCode(event.target.value)}
                   />
-                  <div className="mt-3">
-                    <TikzLivePreview code={tikzCode} />
-                  </div>
                 </Field>
 
                 <div className="grid gap-4">
@@ -1050,6 +970,7 @@ export function QuestionEditor({
           subject={subject}
           tags={selectedTags}
           diagramSvg={diagramSvg}
+          tikzCode={tikzCode}
         />
       )}
     </div>

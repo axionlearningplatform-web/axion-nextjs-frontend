@@ -517,7 +517,7 @@ function DiagramSvg({ svg }) {
   if (!svg) return null
 
   return (
-    <figure className="mx-auto my-8 max-w-3xl overflow-hidden rounded-[8px] border border-[#2d2926] bg-[#12100e] p-5">
+    <figure className="mx-auto my-8 max-w-3xl overflow-hidden">
       <div
         className="mx-auto flex max-w-full justify-center overflow-x-auto [&_svg]:h-auto [&_svg]:max-h-[420px] [&_svg]:max-w-full"
         dangerouslySetInnerHTML={{ __html: svg }}
