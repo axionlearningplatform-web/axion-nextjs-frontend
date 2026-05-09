@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Bold, ChevronDown, ImagePlus, Italic, Plus, Trash2 } from "lucide-react"
+import { Bold, ChevronDown, Italic, Plus, Trash2 } from "lucide-react"
 import useSWR from "swr"
 
 import { cn } from "@/lib/utils"
@@ -34,16 +34,17 @@ const emptyPart = (index = 0) => ({
   text: "",
   marks: 1,
   attachments: [],
+  tikz_visuals: [],
   marking_criteria: [emptyCriteria(1)],
   hints: [],
 })
 
-const sampleTikz = String.raw`\begin{tikzpicture}[scale=0.85]
-  \draw[->] (-3.2,0) -- (3.2,0) node[right] {$x$};
-  \draw[->] (0,-0.5) -- (0,4.2) node[above] {$y$};
-  \draw[domain=-2:2,smooth,variable=\x,thick] plot ({\x},{\x*\x});
-  \fill (1,1) circle (2pt) node[below right] {$A(1,1)$};
-\end{tikzpicture}`
+const emptyTikzVisual = (index = 0) => ({
+  id: crypto.randomUUID(),
+  name: `Visual ${index + 1}`,
+  code: "",
+  svg: "",
+})
 
 function criteriaForMarks(marks, existing = []) {
   const count = Math.max(Number(marks) || 1, 1)
@@ -54,24 +55,6 @@ function criteriaForMarks(marks, existing = []) {
       mark,
       text: found?.text || "",
     }
-  })
-}
-
-function readAttachment(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = async () => {
-      const dataUrl = String(reader.result || "")
-      resolve({
-        id: crypto.randomUUID(),
-        name: file.name,
-        mime_type: file.type || "application/octet-stream",
-        data_url: dataUrl,
-        caption: "",
-      })
-    }
-    reader.onerror = reject
-    reader.readAsDataURL(file)
   })
 }
 
@@ -227,65 +210,84 @@ function DropdownSection({ title, summary, children, defaultOpen = false }) {
   )
 }
 
-function AttachmentEditor({ attachments, onChange }) {
-  async function addFiles(files) {
-    const next = [...attachments]
-    for (const file of files) {
-      next.push(await readAttachment(file))
-    }
+function TikzVisualsEditor({ visuals, onChange }) {
+  const normalized = Array.isArray(visuals) ? visuals : []
+
+  function updateVisual(index, updates) {
+    const next = [...normalized]
+    next[index] = { ...next[index], ...updates }
     onChange(next)
   }
 
   return (
     <div className="grid gap-3">
-      <label className="inline-flex h-10 w-fit cursor-pointer items-center gap-2 rounded-full border border-[#54433c]/50 bg-[#242424] px-4 text-sm font-semibold text-[#dac1b7] transition-colors hover:bg-[#2d2d2d]">
-        <ImagePlus className="size-4" />
-        Add Visual
-        <input
-          accept="image/*,.svg"
-          className="hidden"
-          multiple
-          type="file"
-          onChange={(event) => {
-            addFiles(Array.from(event.target.files || []))
-            event.target.value = ""
-          }}
-        />
-      </label>
+      <Button
+        className="w-fit rounded-full border-[#54433c]/50 bg-[#242424] text-[#dac1b7] hover:bg-[#2d2d2d]"
+        type="button"
+        variant="outline"
+        onClick={() => onChange([...normalized, emptyTikzVisual(normalized.length)])}
+      >
+        <Plus className="size-4" />
+        Add TikZ Visual
+      </Button>
 
-      {attachments.map((attachment, index) => (
-        <div
-          className="grid gap-3 rounded-2xl border border-[#54433c]/30 bg-[#201f1f] p-3"
-          key={attachment.id || attachment.name || index}
+      {normalized.length === 0 && (
+        <p className="rounded-2xl border border-[#54433c]/25 bg-[#201f1f] px-4 py-3 text-sm text-[#a28c83]">
+          No TikZ visuals added.
+        </p>
+      )}
+
+      {normalized.map((visual, index) => (
+        <details
+          className="group overflow-hidden rounded-2xl border border-[#54433c]/30 bg-[#201f1f]"
+          key={visual.id || index}
+          open={index === normalized.length - 1}
         >
-          <div className="flex items-center justify-between gap-3">
-            <span className="truncate text-sm text-[#e5e2e1]">
-              {attachment.name || "Attachment"}
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+            <span className="min-w-0 truncate text-sm font-semibold text-[#e5e2e1]">
+              {visual.name || `Visual ${index + 1}`}
             </span>
-            <Button
-              className="rounded-full"
-              size="sm"
-              type="button"
-              variant="destructive"
-              onClick={() => onChange(attachments.filter((_, i) => i !== index))}
-            >
-              <Trash2 className="size-4" />
-            </Button>
+            <span className="flex items-center gap-2 text-xs text-[#a28c83]">
+              {visual.code?.trim() ? "code added" : "empty"}
+              <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
+            </span>
+          </summary>
+          <div className="grid gap-3 border-t border-[#54433c]/25 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                className="h-9 min-w-[180px] flex-1 rounded-full border-[#2a2a2a] bg-[#242424] text-sm text-[#e5e2e1]"
+                placeholder={`Visual ${index + 1}`}
+                value={visual.name || ""}
+                onChange={(event) => updateVisual(index, { name: event.target.value })}
+              />
+              <Button
+                className="rounded-full border-[#54433c]/50 bg-[#242424] text-xs text-[#dac1b7] hover:bg-[#2d2d2d]"
+                size="sm"
+                type="button"
+                variant="outline"
+                onClick={() => updateVisual(index, { code: "", svg: "" })}
+              >
+                Clear editor
+              </Button>
+              <Button
+                className="rounded-full"
+                size="sm"
+                type="button"
+                variant="destructive"
+                onClick={() => onChange(normalized.filter((_, itemIndex) => itemIndex !== index))}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </div>
+            <Textarea
+              className="min-h-[180px] rounded-3xl border-[#2a2a2a] bg-[#242424] p-5 font-mono text-[13px] leading-relaxed text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
+              placeholder="Paste TikZ code here, e.g. \\begin{tikzpicture} ..."
+              spellCheck={false}
+              value={visual.code || ""}
+              onChange={(event) => updateVisual(index, { code: event.target.value, svg: "" })}
+            />
           </div>
-          <Input
-            className="rounded-full border-[#2a2a2a] bg-[#242424] text-[#e5e2e1]"
-            placeholder="Caption"
-            value={attachment.caption || ""}
-            onChange={(event) => {
-              const next = [...attachments]
-              next[index] = {
-                ...next[index],
-                caption: event.target.value,
-              }
-              onChange(next)
-            }}
-          />
-        </div>
+        </details>
       ))}
     </div>
   )
@@ -418,6 +420,7 @@ export function QuestionEditor({
   const [questionText, setQuestionText] = useState("")
   const [tikzCode, setTikzCode] = useState("")
   const [diagramSvg, setDiagramSvg] = useState("")
+  const [tikzVisuals, setTikzVisuals] = useState([])
   const [importSource, setImportSource] = useState("")
   const [hints, setHints] = useState([{ text: "", mark: "1" }])
   const [parts, setParts] = useState([])
@@ -446,8 +449,19 @@ export function QuestionEditor({
     setSubjectId(initialData.subject_id ? String(initialData.subject_id) : "")
     setMarks(String(initialData.marks || "1"))
     setQuestionText(initialData.question_text || "")
-    setTikzCode(initialData.tikz_code || "")
-    setDiagramSvg(initialData.diagram_svg || "")
+    const incomingTikzVisuals = initialData.tikz_visuals?.length
+      ? initialData.tikz_visuals
+      : initialData.tikz_code
+        ? [{
+            id: "legacy-tikz",
+            name: "Visual 1",
+            code: initialData.tikz_code || "",
+            svg: initialData.diagram_svg || "",
+          }]
+        : []
+    setTikzCode("")
+    setDiagramSvg("")
+    setTikzVisuals(incomingTikzVisuals)
     setImportSource(initialData.import_source || "")
     setHints(
       initialData.hints?.length
@@ -464,6 +478,7 @@ export function QuestionEditor({
         text: part.text || "",
         marks: Number(part.marks || 1),
         attachments: part.attachments || [],
+        tikz_visuals: part.tikz_visuals || [],
         marking_criteria: criteriaForMarks(
           part.marks || 1,
           part.marking_criteria || []
@@ -502,6 +517,7 @@ export function QuestionEditor({
       graph: "",
       tikz_code: tikzCode,
       diagram_svg: diagramSvg,
+      tikz_visuals: tikzVisuals,
       hints: hints.map((hint) => ({
         text: hint.text,
         mark: Number(hint.mark),
@@ -511,6 +527,7 @@ export function QuestionEditor({
         text: part.text,
         marks: Number(part.marks) || 1,
         attachments: part.attachments || [],
+        tikz_visuals: part.tikz_visuals || [],
         marking_criteria: part.marking_criteria || [],
         hints: (part.hints || []).map((hint) => ({
           text: hint.text,
@@ -533,7 +550,7 @@ export function QuestionEditor({
     if (!onDraftChange) return
     onDraftChange(payload())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject, subjectId, marks, questionText, tikzCode, diagramSvg, importSource, hints, parts, attachments, markingCriteria, tagIds])
+  }, [subject, subjectId, marks, questionText, tikzCode, diagramSvg, tikzVisuals, importSource, hints, parts, attachments, markingCriteria, tagIds])
 
   return (
     <div className={cn("grid gap-8", !hidePreview && "lg:grid-cols-2")}>
@@ -677,27 +694,6 @@ export function QuestionEditor({
                   )}
                 </Field>
 
-                <Field>
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <FieldLabel className="text-[#dac1b7]">TikZ Diagram</FieldLabel>
-                    <Button
-                      className="h-8 rounded-full border-[#54433c]/50 bg-[#242424] px-3 text-xs text-[#dac1b7] hover:bg-[#2d2d2d]"
-                      type="button"
-                      variant="outline"
-                      onClick={() => setTikzCode(sampleTikz)}
-                    >
-                      Use sample
-                    </Button>
-                  </div>
-                  <Textarea
-                    className="min-h-[160px] rounded-3xl border-[#2a2a2a] bg-[#242424] p-5 font-mono text-[13px] leading-relaxed text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
-                    placeholder="Paste TikZ code here, e.g. \\begin{tikzpicture} ..."
-                    spellCheck={false}
-                    value={tikzCode}
-                    onChange={(event) => setTikzCode(event.target.value)}
-                  />
-                </Field>
-
                 <div className="grid gap-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <SectionTitle>Parts</SectionTitle>
@@ -809,14 +805,14 @@ export function QuestionEditor({
                         </Field>
 
                         <DropdownSection
-                          title="Visuals"
-                          summary={`${part.attachments?.length || 0} added`}
+                          title="TikZ Visuals"
+                          summary={`${part.tikz_visuals?.filter((item) => item.code)?.length || 0} added`}
                         >
-                          <AttachmentEditor
-                            attachments={part.attachments || []}
+                          <TikzVisualsEditor
+                            visuals={part.tikz_visuals || []}
                             onChange={(value) => {
                               const next = [...parts]
-                              next[index] = { ...part, attachments: value }
+                              next[index] = { ...part, tikz_visuals: value }
                               setParts(next)
                             }}
                           />
@@ -858,13 +854,13 @@ export function QuestionEditor({
                 {parts.length === 0 && (
                   <div className="grid gap-4">
                     <DropdownSection
-                      title="Visuals"
-                      summary={`${attachments.length} added`}
+                      title="TikZ Visuals"
+                      summary={`${tikzVisuals.filter((item) => item.code).length} added`}
                     >
-                        <AttachmentEditor
-                          attachments={attachments}
-                          onChange={setAttachments}
-                        />
+                      <TikzVisualsEditor
+                        visuals={tikzVisuals}
+                        onChange={setTikzVisuals}
+                      />
                     </DropdownSection>
                     <DropdownSection
                       title="Marking Criteria"
@@ -971,6 +967,7 @@ export function QuestionEditor({
           tags={selectedTags}
           diagramSvg={diagramSvg}
           tikzCode={tikzCode}
+          tikzVisuals={tikzVisuals}
         />
       )}
     </div>

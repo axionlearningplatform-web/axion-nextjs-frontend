@@ -517,9 +517,9 @@ function DiagramSvg({ svg }) {
   if (!svg) return null
 
   return (
-    <figure className="mx-auto my-8 max-w-3xl overflow-hidden">
+    <figure className="mx-auto my-8 flex w-full max-w-3xl justify-center overflow-x-auto">
       <div
-        className="mx-auto flex max-w-full justify-center overflow-x-auto [&_svg]:h-auto [&_svg]:max-h-[420px] [&_svg]:max-w-full"
+        className="flex w-full min-w-0 justify-center text-center [&_svg]:!mx-auto [&_svg]:!block [&_svg]:h-auto [&_svg]:max-h-[420px] [&_svg]:max-w-full [&_svg]:shrink-0"
         dangerouslySetInnerHTML={{ __html: svg }}
       />
     </figure>
@@ -638,6 +638,9 @@ function QuestionView({
   ].filter(Boolean)
   const hasHint = (question.hints || []).some((hint) => hint.text) ||
     (question.parts || []).some((part) => (part.hints || []).some((hint) => hint.text))
+  const displayQuestionText = question.question_text?.trim()
+    ? (/^Q\)\./i.test(question.question_text.trim()) ? question.question_text : `Q). ${question.question_text}`)
+    : ""
 
   return (
     <main className="min-h-[calc(100vh-64px)] bg-[#0f0e0d] text-[#eee9e4]">
@@ -682,7 +685,7 @@ function QuestionView({
           <div className="min-w-0">
             <div className="flex items-start gap-4">
               <MarkdownMath className="font-serif text-[19px] leading-[1.75] md:text-[21px]">
-                {question.question_text}
+                {displayQuestionText}
               </MarkdownMath>
               {hasHint && (
                 <span className="mt-1.5 inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#3c322b] bg-[#17110e] px-2.5 py-1 text-[11px] font-medium tracking-[0.04em] text-[#6f6258]">
@@ -696,6 +699,9 @@ function QuestionView({
             ))}
 
             <DiagramSvg svg={question.diagram_svg} />
+            {(question.tikz_visuals || []).map((visual, index) => (
+              <DiagramSvg svg={visual.svg} key={visual.id || index} />
+            ))}
 
             <div className="mt-10 grid gap-7">
               {(question.parts || []).map((part, index) => (
@@ -713,6 +719,9 @@ function QuestionView({
                     <p className="mt-2 text-[12px] tracking-[0.04em] text-[#4f4a45]">{part.marks || 1} marks</p>
                     {(part.attachments || []).map((attachment) => (
                       <Attachment key={attachment.id || attachment.name} attachment={attachment} />
+                    ))}
+                    {(part.tikz_visuals || []).map((visual, visualIndex) => (
+                      <DiagramSvg svg={visual.svg} key={visual.id || visualIndex} />
                     ))}
                   </div>
                 </section>

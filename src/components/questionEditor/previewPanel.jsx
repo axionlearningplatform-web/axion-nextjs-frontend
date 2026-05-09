@@ -8,6 +8,7 @@ import {
   Card,
   CardContent,
 } from "@/components/ui/card"
+import { cn } from "@/lib/utils"
 
 const TIKZ_PREVIEW_URL = `/api/questions/tikz/preview/`
 
@@ -37,12 +38,21 @@ function DiagramSvg({ svg }) {
   if (!svg) return null
 
   return (
-    <figure className="mx-auto my-6 max-w-full overflow-hidden">
+    <figure className="mx-auto my-6 flex w-full max-w-full justify-center overflow-x-auto">
       <div
-        className="mx-auto flex max-w-full justify-center overflow-x-auto [&_svg]:h-auto [&_svg]:max-h-[320px] [&_svg]:max-w-full"
+        className="flex w-full min-w-0 justify-center text-center [&_svg]:!mx-auto [&_svg]:!block [&_svg]:h-auto [&_svg]:max-h-[320px] [&_svg]:max-w-full [&_svg]:shrink-0"
         dangerouslySetInnerHTML={{ __html: svg }}
       />
     </figure>
+  )
+}
+
+function TikzPreviewStatus({ children }) {
+  return (
+    <div className="my-6 flex min-h-[92px] w-full items-center justify-center rounded-[8px] border border-[#3c2c24] bg-[#15100d] px-5 py-5 text-center text-[15px] font-medium text-[#c99f7d] shadow-inner shadow-black/20">
+      <span className="mr-2.5 size-1.5 animate-pulse rounded-full bg-[#c8864a]" />
+      {children}
+    </div>
   )
 }
 
@@ -82,6 +92,10 @@ function TikzInlinePreview({ code }) {
     compilerOutput: "",
   })
   const renderFailed = renderStatus.code === browserCode && renderStatus.failed
+  const browserSucceeded = Boolean(browserCode) &&
+    renderStatus.code === browserCode &&
+    !renderStatus.failed
+  const browserPending = Boolean(browserCode) && renderStatus.code !== browserCode
 
   const srcDoc = useMemo(() => {
     const escapedCode = browserCode.replace(/<\/script/gi, "<\\/script")
@@ -92,9 +106,9 @@ function TikzInlinePreview({ code }) {
     <link rel="stylesheet" href="https://tikzjax.com/v1/fonts.css" />
     <script src="https://tikzjax.com/v1/tikzjax.js"></script>
     <style>
-      html, body { margin: 0; background: #12100e; color: #eee9e4; }
-      body { min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; }
-      svg { max-width: 100%; height: auto; }
+      html, body { margin: 0; width: 100%; min-height: 100%; background: transparent; color: #eee9e4; }
+      body { display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; overflow: hidden; }
+      svg { display: block; margin-left: auto; margin-right: auto; max-width: 100%; height: auto; }
     </style>
   </head>
   <body>
@@ -186,11 +200,7 @@ function TikzInlinePreview({ code }) {
 
   if (renderFailed && backendPreview.code === browserCode) {
     if (backendPreview.status === "loading") {
-      return (
-        <div className="my-6 rounded-[8px] border border-[#3c2c24] bg-[#12100e] px-4 py-5 text-center text-sm text-[#9d806c]">
-          Compiling TikZ preview with Tectonic...
-        </div>
-      )
+      return <TikzPreviewStatus>Compiling TikZ preview...</TikzPreviewStatus>
     }
 
     if (backendPreview.status === "error") {
@@ -229,9 +239,17 @@ function TikzInlinePreview({ code }) {
   }
 
   return (
-    <figure className="mx-auto my-6 max-w-full overflow-hidden">
+    <figure className="relative mx-auto my-6 flex w-full max-w-full justify-center overflow-hidden">
+      {(browserPending || renderFailed) && (
+        <TikzPreviewStatus>
+          {renderFailed ? "Compiling TikZ preview..." : "Preparing TikZ preview..."}
+        </TikzPreviewStatus>
+      )}
       <iframe
-        className="h-[300px] w-full bg-[#12100e]"
+        className={cn(
+          "mx-auto h-[300px] w-full bg-transparent",
+          !browserSucceeded && "pointer-events-none absolute inset-0 h-px w-px opacity-0"
+        )}
         sandbox="allow-scripts"
         srcDoc={srcDoc}
         title="TikZ inline preview"
@@ -314,10 +332,14 @@ function PreviewPanelBase({
   headerAction = null,
   diagramSvg = "",
   tikzCode = "",
+  tikzVisuals = [],
 }) {
   const hasParts = parts.length > 0
   const hasHint = hints.some((hint) => hint.text) ||
     parts.some((part) => (part.hints || []).some((hint) => hint.text))
+  const displayQuestionText = questionText?.trim()
+    ? (/^Q\)\./i.test(questionText.trim()) ? questionText : `Q). ${questionText}`)
+    : ""
 
   return (
     <Card className="min-w-0 self-start w-full overflow-hidden rounded-[12px] border-[#4c3427]/60 bg-[#0d0d0b] text-[#e8e4dc] shadow-2xl shadow-black/25">
@@ -356,11 +378,14 @@ function PreviewPanelBase({
           </div>
         </div>
 
-        <div className="grid gap-6 px-5 py-7 lg:grid-cols-[minmax(0,1fr)_120px]">
+        <div className={cn(
+          "grid gap-6 px-5 py-7",
+          importSource ? "lg:grid-cols-[minmax(0,1fr)_120px]" : "lg:grid-cols-1"
+        )}>
           <div className="min-w-0">
-            {questionText ? (
+            {displayQuestionText ? (
               <div className="flex items-start gap-3">
-                <MarkdownBlock>{questionText}</MarkdownBlock>
+                <MarkdownBlock>{displayQuestionText}</MarkdownBlock>
                 {hasHint && (
                   <span className="mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#3c322b] bg-[#17110e] px-2.5 py-1 text-[10px] font-medium tracking-[0.04em] text-[#6f6258]">
                     hint
@@ -379,6 +404,13 @@ function PreviewPanelBase({
 
             <DiagramSvg svg={diagramSvg} />
             {!diagramSvg && <TikzInlinePreview code={tikzCode} />}
+            {(tikzVisuals || []).map((visual, index) => (
+              visual.svg ? (
+                <DiagramSvg svg={visual.svg} key={visual.id || index} />
+              ) : (
+                <TikzInlinePreview code={visual.code} key={visual.id || index} />
+              )
+            ))}
 
             {hasParts && (
               <div className="mt-8 grid gap-6">
@@ -401,6 +433,13 @@ function PreviewPanelBase({
                           key={attachment.id || attachment.name}
                         />
                       ))}
+                      {(part.tikz_visuals || []).map((visual, visualIndex) => (
+                        visual.svg ? (
+                          <DiagramSvg svg={visual.svg} key={visual.id || visualIndex} />
+                        ) : (
+                          <TikzInlinePreview code={visual.code} key={visual.id || visualIndex} />
+                        )
+                      ))}
                     </div>
                   </section>
                 ))}
@@ -408,9 +447,11 @@ function PreviewPanelBase({
             )}
           </div>
 
-          <div className="text-right text-[13px] tracking-[0.04em] text-[#6e6259]">
-            {importSource && <p className="mt-1.5 break-words">{importSource}</p>}
-          </div>
+          {importSource && (
+            <div className="text-right text-[13px] tracking-[0.04em] text-[#6e6259]">
+              <p className="mt-1.5 break-words">{importSource}</p>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
