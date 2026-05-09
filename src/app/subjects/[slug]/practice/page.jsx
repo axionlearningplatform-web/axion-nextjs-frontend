@@ -139,6 +139,8 @@ function formatTimer(seconds) {
 function prepareMarkdown(value) {
   return String(value || "")
     .replace(/\r\n?/g, "\n")
+    .replace(/\\\[((?:.|\n)*?)\\\]/g, (_, expression) => `$$\n${expression.trim()}\n$$`)
+    .replace(/\\\((.+?)\\\)/g, (_, expression) => `$${expression.trim()}$`)
     .split("\n")
     .map((line) => {
       const trimmedRight = line.replace(/\s+$/g, "")

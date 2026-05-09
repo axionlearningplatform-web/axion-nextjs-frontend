@@ -79,35 +79,36 @@ function SectionTitle({ children }) {
 function RichTextArea({ value, onValueChange, className, onAfterChange, ...props }) {
   const textareaRef = useRef(null)
 
-  function applyMarker(marker) {
+  function applyWrap({ before, after = before, fallback, block = false }) {
     const textarea = textareaRef.current
     if (!textarea) return
 
     const start = textarea.selectionStart ?? value.length
     const end = textarea.selectionEnd ?? value.length
     const selected = value.slice(start, end)
-    const fallback = marker === "**" ? "bold text" : "italic text"
     let next = value
     let cursorStart = start
     let cursorEnd = end
 
     if (
       selected &&
-      value.slice(start - marker.length, start) === marker &&
-      value.slice(end, end + marker.length) === marker
+      value.slice(start - before.length, start) === before &&
+      value.slice(end, end + after.length) === after
     ) {
-      next = `${value.slice(0, start - marker.length)}${selected}${value.slice(end + marker.length)}`
-      cursorStart = start - marker.length
+      next = `${value.slice(0, start - before.length)}${selected}${value.slice(end + after.length)}`
+      cursorStart = start - before.length
       cursorEnd = cursorStart + selected.length
-    } else if (selected.startsWith(marker) && selected.endsWith(marker)) {
-      const unwrapped = selected.slice(marker.length, selected.length - marker.length)
+    } else if (selected.startsWith(before) && selected.endsWith(after)) {
+      const unwrapped = selected.slice(before.length, selected.length - after.length)
       next = `${value.slice(0, start)}${unwrapped}${value.slice(end)}`
       cursorStart = start
       cursorEnd = start + unwrapped.length
     } else {
       const insert = selected || fallback
-      next = `${value.slice(0, start)}${marker}${insert}${marker}${value.slice(end)}`
-      cursorStart = start + marker.length
+      const opening = block && start > 0 && value[start - 1] !== "\n" ? `\n\n${before}` : before
+      const closing = block && value[end] && value[end] !== "\n" ? `${after}\n\n` : after
+      next = `${value.slice(0, start)}${opening}${insert}${closing}${value.slice(end)}`
+      cursorStart = start + opening.length
       cursorEnd = cursorStart + insert.length
     }
 
@@ -117,6 +118,31 @@ function RichTextArea({ value, onValueChange, className, onAfterChange, ...props
     requestAnimationFrame(() => {
       textarea.focus()
       textarea.setSelectionRange(cursorStart, cursorEnd)
+    })
+  }
+
+  function applyMarker(marker) {
+    applyWrap({
+      before: marker,
+      after: marker,
+      fallback: marker === "**" ? "bold text" : "italic text",
+    })
+  }
+
+  function applyInlineMath() {
+    applyWrap({
+      before: "$",
+      after: "$",
+      fallback: "x^2",
+    })
+  }
+
+  function applyBlockMath() {
+    applyWrap({
+      before: "$$\n",
+      after: "\n$$",
+      fallback: "x^2 + y^2 = r^2",
+      block: true,
     })
   }
 
@@ -139,7 +165,25 @@ function RichTextArea({ value, onValueChange, className, onAfterChange, ...props
         >
           <Italic className="size-4" />
         </button>
-        <span className="ml-2 text-[11px] text-[#6f6258]">Markdown</span>
+        <button
+          type="button"
+          className="inline-flex h-8 items-center justify-center rounded-md px-2 font-serif text-[13px] text-[#a28c83] transition-colors hover:bg-[#2d2d2d] hover:text-[#ffb595]"
+          onClick={applyInlineMath}
+          aria-label="Inline LaTeX"
+          title="Inline LaTeX"
+        >
+          $x$
+        </button>
+        <button
+          type="button"
+          className="inline-flex h-8 items-center justify-center rounded-md px-2 font-serif text-[13px] text-[#a28c83] transition-colors hover:bg-[#2d2d2d] hover:text-[#ffb595]"
+          onClick={applyBlockMath}
+          aria-label="Block LaTeX"
+          title="Block LaTeX"
+        >
+          $$
+        </button>
+        <span className="ml-2 text-[11px] text-[#6f6258]">Markdown + LaTeX</span>
       </div>
       <Textarea
         ref={textareaRef}

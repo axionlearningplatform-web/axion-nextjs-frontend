@@ -12,6 +12,8 @@ import {
   FileUp,
   LinkIcon,
   ListChecks,
+  Maximize2,
+  Minimize2,
   Search,
   SkipForward,
   X,
@@ -204,6 +206,7 @@ export default function QuestionImportPage() {
   const [status, setStatus] = useState("idle")
   const [parseError, setParseError] = useState("")
   const [saveErrors, setSaveErrors] = useState({})
+  const [previewExpanded, setPreviewExpanded] = useState(false)
 
   const { data: subjects = [], isLoading: subjectsLoading } = useSWR(
     SUBJECTS_API_URL,
@@ -739,8 +742,20 @@ export default function QuestionImportPage() {
         </Card>
 
         {candidates.length > 0 && (
-          <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(260px,320px)_minmax(0,1fr)_minmax(320px,420px)]">
-            <Card className="min-w-0 self-start rounded-2xl border-[#54433c]/35 bg-[#1c1b1b] text-[#e5e2e1]">
+          <div
+            className={cn(
+              "grid min-w-0 gap-6 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+              previewExpanded
+                ? "xl:grid-cols-[minmax(0,0px)_minmax(380px,0.82fr)_minmax(620px,1.18fr)]"
+                : "xl:grid-cols-[minmax(260px,320px)_minmax(0,1fr)_minmax(320px,420px)]"
+            )}
+          >
+            <Card
+              className={cn(
+                "min-w-0 self-start overflow-hidden rounded-2xl border-[#54433c]/35 bg-[#1c1b1b] text-[#e5e2e1] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                previewExpanded && "xl:pointer-events-none xl:max-w-0 xl:-translate-x-4 xl:scale-[0.98] xl:opacity-0"
+              )}
+            >
               <CardHeader>
                 <CardTitle className="font-serif text-xl">Review Queue</CardTitle>
                 <p className="text-sm text-[#a28c83]">
@@ -825,7 +840,7 @@ export default function QuestionImportPage() {
               </CardContent>
             </Card>
 
-            <section className="flex min-w-0 flex-col gap-4">
+            <section className="flex min-w-0 flex-col gap-4 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">
               <div className="flex min-h-[76px] flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#54433c]/30 bg-[#1c1b1b] px-4 py-3">
                 <div>
                   <p className="text-sm font-semibold text-[#e5e2e1]">
@@ -928,17 +943,35 @@ export default function QuestionImportPage() {
               )}
             </section>
 
-            <PreviewPanel
-              subject={draft?.subject || lockedSubject.name}
-              marks={draft?.marks || activeCandidate?.marks || 1}
-              questionText={draft?.question_text || activeCandidate?.question_text || ""}
-              hints={draft?.hints || []}
-              parts={draft?.parts || activeCandidate?.parts || []}
-              attachments={draft?.attachments || activeCandidate?.attachments || []}
-              markingCriteria={draft?.marking_criteria || activeCandidate?.marking_criteria || []}
-              importSource={draft?.import_source || activeCandidate?.import_source || ""}
-              tags={[]}
-            />
+            <section className="min-w-0 self-start transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">
+              <PreviewPanel
+                subject={draft?.subject || lockedSubject.name}
+                marks={draft?.marks || activeCandidate?.marks || 1}
+                questionText={draft?.question_text || activeCandidate?.question_text || ""}
+                hints={draft?.hints || []}
+                parts={draft?.parts || activeCandidate?.parts || []}
+                attachments={draft?.attachments || activeCandidate?.attachments || []}
+                markingCriteria={draft?.marking_criteria || activeCandidate?.marking_criteria || []}
+                importSource={draft?.import_source || activeCandidate?.import_source || ""}
+                tags={[]}
+                headerAction={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="size-8 rounded-full border-[#54433c]/50 bg-[#201f1f]/90 p-0 text-[#dac1b7] shadow-lg shadow-black/20 transition-colors hover:bg-[#2a211e]"
+                    onClick={() => setPreviewExpanded((expanded) => !expanded)}
+                    aria-label={previewExpanded ? "Compact preview" : "Expand preview"}
+                    title={previewExpanded ? "Compact preview" : "Expand preview"}
+                  >
+                    {previewExpanded ? (
+                      <Minimize2 className="size-3.5" />
+                    ) : (
+                      <Maximize2 className="size-3.5" />
+                    )}
+                  </Button>
+                }
+              />
+            </section>
           </div>
         )}
       </div>

@@ -34,6 +34,8 @@ function AttachmentPreview({ attachment }) {
 function prepareMarkdown(value) {
   return String(value || "")
     .replace(/\r\n?/g, "\n")
+    .replace(/\\\[((?:.|\n)*?)\\\]/g, (_, expression) => `$$\n${expression.trim()}\n$$`)
+    .replace(/\\\((.+?)\\\)/g, (_, expression) => `$${expression.trim()}$`)
     .split("\n")
     .map((line) => {
       const trimmedRight = line.replace(/\s+$/g, "")
@@ -100,6 +102,7 @@ function PreviewPanelBase({
   attachments = [],
   importSource = "",
   tags = [],
+  headerAction = null,
 }) {
   const hasParts = parts.length > 0
   const hasHint = hints.some((hint) => hint.text) ||
@@ -108,7 +111,12 @@ function PreviewPanelBase({
   return (
     <Card className="min-w-0 self-start w-full overflow-hidden rounded-[12px] border-[#4c3427]/60 bg-[#0d0d0b] text-[#e8e4dc] shadow-2xl shadow-black/25">
       <CardContent className="min-w-0 p-0">
-        <div className="border-b border-[#3b2a22]/55 px-5 py-5">
+        <div className="relative border-b border-[#3b2a22]/55 px-5 py-5">
+          {headerAction && (
+            <div className="absolute left-4 top-4 z-10">
+              {headerAction}
+            </div>
+          )}
           <p className="text-center font-serif text-[23px] font-medium leading-none tracking-[0.01em] text-[#cfc4b9]">
             Live Preview
           </p>
