@@ -38,6 +38,13 @@ const emptyPart = (index = 0) => ({
   hints: [],
 })
 
+const sampleTikz = String.raw`\begin{tikzpicture}[scale=0.85]
+  \draw[->] (-3.2,0) -- (3.2,0) node[right] {$x$};
+  \draw[->] (0,-0.5) -- (0,4.2) node[above] {$y$};
+  \draw[domain=-2:2,smooth,variable=\x,thick] plot ({\x},{\x*\x});
+  \fill (1,1) circle (2pt) node[below right] {$A(1,1)$};
+\end{tikzpicture}`
+
 function criteriaForMarks(marks, existing = []) {
   const count = Math.max(Number(marks) || 1, 1)
   return Array.from({ length: count }, (_, index) => {
@@ -48,6 +55,83 @@ function criteriaForMarks(marks, existing = []) {
       text: found?.text || "",
     }
   })
+}
+
+function useDebouncedValue(value, delay = 550) {
+  const [debounced, setDebounced] = useState(value)
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebounced(value), delay)
+    return () => window.clearTimeout(timeout)
+  }, [value, delay])
+
+  return debounced
+}
+
+function TikzLivePreview({ code }) {
+  const debouncedCode = useDebouncedValue(code, 550)
+  const rendering = Boolean(code?.trim()) && code !== debouncedCode
+
+  const srcDoc = useMemo(() => {
+    const escapedCode = String(debouncedCode || "").replace(/<\/script/gi, "<\\/script")
+    return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="https://tikzjax.com/v1/fonts.css" />
+    <script src="https://tikzjax.com/v1/tikzjax.js"></script>
+    <style>
+      html, body {
+        margin: 0;
+        min-height: 100%;
+        background: #12100e;
+        color: #eee9e4;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: ui-serif, Georgia, serif;
+      }
+      body { padding: 18px; box-sizing: border-box; }
+      svg { max-width: 100%; height: auto; }
+      .empty { color: #6f6258; font-style: italic; }
+    </style>
+  </head>
+  <body>
+    ${
+      escapedCode.trim()
+        ? `<script type="text/tikz">${escapedCode}</script>`
+        : `<div class="empty">Your TikZ diagram will appear here.</div>`
+    }
+  </body>
+</html>`
+  }, [debouncedCode])
+
+  return (
+    <div className="overflow-hidden rounded-3xl border border-[#3a302b] bg-[#12100e]">
+      <div className="flex items-center justify-between border-b border-[#3a302b] px-4 py-3">
+        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8f8378]">
+          Live Diagram Preview
+        </span>
+        <span className="inline-flex items-center gap-2 text-xs text-[#6f6258]">
+          {rendering && <span className="size-1.5 animate-pulse rounded-full bg-[#c8864a]" />}
+          {rendering ? "Rendering" : "TikZJax"}
+        </span>
+      </div>
+      <div className="relative min-h-[220px]">
+        <iframe
+          className="h-[260px] w-full bg-[#12100e]"
+          sandbox="allow-scripts"
+          srcDoc={srcDoc}
+          title="TikZ live preview"
+        />
+        {!code?.trim() && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center font-serif text-sm italic text-[#6f6258]">
+            Add TikZ code to preview a diagram.
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function readAttachment(file) {
@@ -409,6 +493,8 @@ export function QuestionEditor({
   const [subjectId, setSubjectId] = useState("")
   const [marks, setMarks] = useState("1")
   const [questionText, setQuestionText] = useState("")
+  const [tikzCode, setTikzCode] = useState("")
+  const [diagramSvg, setDiagramSvg] = useState("")
   const [importSource, setImportSource] = useState("")
   const [hints, setHints] = useState([{ text: "", mark: "1" }])
   const [parts, setParts] = useState([])
@@ -437,6 +523,8 @@ export function QuestionEditor({
     setSubjectId(initialData.subject_id ? String(initialData.subject_id) : "")
     setMarks(String(initialData.marks || "1"))
     setQuestionText(initialData.question_text || "")
+    setTikzCode(initialData.tikz_code || "")
+    setDiagramSvg(initialData.diagram_svg || "")
     setImportSource(initialData.import_source || "")
     setHints(
       initialData.hints?.length
@@ -489,6 +577,8 @@ export function QuestionEditor({
       question_text: questionText,
       latex: "",
       graph: "",
+      tikz_code: tikzCode,
+      diagram_svg: diagramSvg,
       hints: hints.map((hint) => ({
         text: hint.text,
         mark: Number(hint.mark),
@@ -520,7 +610,7 @@ export function QuestionEditor({
     if (!onDraftChange) return
     onDraftChange(payload())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject, subjectId, marks, questionText, importSource, hints, parts, attachments, markingCriteria, tagIds])
+  }, [subject, subjectId, marks, questionText, tikzCode, diagramSvg, importSource, hints, parts, attachments, markingCriteria, tagIds])
 
   return (
     <div className={cn("grid gap-8", !hidePreview && "lg:grid-cols-2")}>
@@ -662,6 +752,30 @@ export function QuestionEditor({
                       {errors.question_text[0].message}
                     </p>
                   )}
+                </Field>
+
+                <Field>
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <FieldLabel className="text-[#dac1b7]">TikZ Diagram</FieldLabel>
+                    <Button
+                      className="h-8 rounded-full border-[#54433c]/50 bg-[#242424] px-3 text-xs text-[#dac1b7] hover:bg-[#2d2d2d]"
+                      type="button"
+                      variant="outline"
+                      onClick={() => setTikzCode(sampleTikz)}
+                    >
+                      Use sample
+                    </Button>
+                  </div>
+                  <Textarea
+                    className="min-h-[160px] rounded-3xl border-[#2a2a2a] bg-[#242424] p-5 font-mono text-[13px] leading-relaxed text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
+                    placeholder="Paste TikZ code here, e.g. \\begin{tikzpicture} ..."
+                    spellCheck={false}
+                    value={tikzCode}
+                    onChange={(event) => setTikzCode(event.target.value)}
+                  />
+                  <div className="mt-3">
+                    <TikzLivePreview code={tikzCode} />
+                  </div>
                 </Field>
 
                 <div className="grid gap-4">
@@ -935,6 +1049,7 @@ export function QuestionEditor({
           importSource={importSource}
           subject={subject}
           tags={selectedTags}
+          diagramSvg={diagramSvg}
         />
       )}
     </div>

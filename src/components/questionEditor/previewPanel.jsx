@@ -31,6 +31,19 @@ function AttachmentPreview({ attachment }) {
   )
 }
 
+function DiagramSvg({ svg }) {
+  if (!svg) return null
+
+  return (
+    <figure className="mx-auto my-6 max-w-full overflow-hidden rounded-[8px] border border-[#3c2c24] bg-[#12100e] p-4">
+      <div
+        className="mx-auto flex max-w-full justify-center overflow-x-auto [&_svg]:h-auto [&_svg]:max-h-[320px] [&_svg]:max-w-full"
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+    </figure>
+  )
+}
+
 function prepareMarkdown(value) {
   return String(value || "")
     .replace(/\r\n?/g, "\n")
@@ -103,6 +116,7 @@ function PreviewPanelBase({
   importSource = "",
   tags = [],
   headerAction = null,
+  diagramSvg = "",
 }) {
   const hasParts = parts.length > 0
   const hasHint = hints.some((hint) => hint.text) ||
@@ -165,6 +179,8 @@ function PreviewPanelBase({
             {attachments.map((attachment) => (
               <AttachmentPreview attachment={attachment} key={attachment.id || attachment.name} />
             ))}
+
+            <DiagramSvg svg={diagramSvg} />
 
             {hasParts && (
               <div className="mt-8 grid gap-6">

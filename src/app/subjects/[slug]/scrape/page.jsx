@@ -68,6 +68,8 @@ function candidateToQuestion(candidate, subject) {
     question_text: candidate.question_text || "",
     latex: "",
     graph: "",
+    tikz_code: candidate.tikz_code || "",
+    diagram_svg: candidate.diagram_svg || "",
     hints: [],
     parts: candidate.parts || [],
     attachments: candidate.attachments || [],
@@ -85,6 +87,8 @@ function emptyQuestionDraft(subject, importSource = "") {
     question_text: "",
     latex: "",
     graph: "",
+    tikz_code: "",
+    diagram_svg: "",
     hints: [],
     parts: [],
     attachments: [],
@@ -99,6 +103,8 @@ function draftToCandidate(draft, sourceMetadata = {}) {
     temporary_id: `manual-${crypto.randomUUID()}`,
     question_text: draft.question_text || "Untitled question",
     latex: "",
+    tikz_code: draft.tikz_code || "",
+    diagram_svg: draft.diagram_svg || "",
     marks: draft.marks || 1,
     detected_subject: draft.subject || "",
     confidence: 1,
@@ -954,6 +960,7 @@ export default function QuestionImportPage() {
                 markingCriteria={draft?.marking_criteria || activeCandidate?.marking_criteria || []}
                 importSource={draft?.import_source || activeCandidate?.import_source || ""}
                 tags={[]}
+                diagramSvg={draft?.diagram_svg || activeCandidate?.diagram_svg || ""}
                 headerAction={
                   <Button
                     type="button"
