@@ -240,12 +240,12 @@ export default function AppShell({ children }) {
           />
           {!collapsed && <div className="mx-4 my-2 h-px max-w-[210px] bg-[#54433c]/40" />}
           <NavItem
-            href={subjectBase}
+            href={`${subjectBase}/practice`}
             icon={CalendarDays}
             label="Daily Practice"
-            active={false}
+            active={pathname === `${subjectBase}/practice`}
             collapsed={collapsed}
-            disabled
+            disabled={!currentSubject}
           />
           <NavItem
             href={subjectBase}

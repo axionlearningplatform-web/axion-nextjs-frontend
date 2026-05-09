@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { ChevronDown, ImagePlus, Plus, Trash2 } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { Bold, ChevronDown, ImagePlus, Italic, Plus, Trash2 } from "lucide-react"
 import useSWR from "swr"
 
 import { cn } from "@/lib/utils"
@@ -72,6 +72,88 @@ function SectionTitle({ children }) {
   return (
     <div className="font-serif text-xl font-semibold text-[#e5e2e1]">
       {children}
+    </div>
+  )
+}
+
+function RichTextArea({ value, onValueChange, className, onAfterChange, ...props }) {
+  const textareaRef = useRef(null)
+
+  function applyMarker(marker) {
+    const textarea = textareaRef.current
+    if (!textarea) return
+
+    const start = textarea.selectionStart ?? value.length
+    const end = textarea.selectionEnd ?? value.length
+    const selected = value.slice(start, end)
+    const fallback = marker === "**" ? "bold text" : "italic text"
+    let next = value
+    let cursorStart = start
+    let cursorEnd = end
+
+    if (
+      selected &&
+      value.slice(start - marker.length, start) === marker &&
+      value.slice(end, end + marker.length) === marker
+    ) {
+      next = `${value.slice(0, start - marker.length)}${selected}${value.slice(end + marker.length)}`
+      cursorStart = start - marker.length
+      cursorEnd = cursorStart + selected.length
+    } else if (selected.startsWith(marker) && selected.endsWith(marker)) {
+      const unwrapped = selected.slice(marker.length, selected.length - marker.length)
+      next = `${value.slice(0, start)}${unwrapped}${value.slice(end)}`
+      cursorStart = start
+      cursorEnd = start + unwrapped.length
+    } else {
+      const insert = selected || fallback
+      next = `${value.slice(0, start)}${marker}${insert}${marker}${value.slice(end)}`
+      cursorStart = start + marker.length
+      cursorEnd = cursorStart + insert.length
+    }
+
+    onValueChange(next)
+    onAfterChange?.()
+
+    requestAnimationFrame(() => {
+      textarea.focus()
+      textarea.setSelectionRange(cursorStart, cursorEnd)
+    })
+  }
+
+  return (
+    <div className="overflow-hidden rounded-3xl border border-[#2a2a2a] bg-[#242424] focus-within:ring-3 focus-within:ring-[#ffb595]/40">
+      <div className="flex items-center gap-1 border-b border-[#3a302b] px-3 py-2">
+        <button
+          type="button"
+          className="inline-flex size-8 items-center justify-center rounded-md text-[#a28c83] transition-colors hover:bg-[#2d2d2d] hover:text-[#ffb595]"
+          onClick={() => applyMarker("**")}
+          aria-label="Bold"
+        >
+          <Bold className="size-4" />
+        </button>
+        <button
+          type="button"
+          className="inline-flex size-8 items-center justify-center rounded-md text-[#a28c83] transition-colors hover:bg-[#2d2d2d] hover:text-[#ffb595]"
+          onClick={() => applyMarker("*")}
+          aria-label="Italic"
+        >
+          <Italic className="size-4" />
+        </button>
+        <span className="ml-2 text-[11px] text-[#6f6258]">Markdown</span>
+      </div>
+      <Textarea
+        ref={textareaRef}
+        className={cn(
+          "rounded-none border-0 bg-transparent focus-visible:ring-0",
+          className
+        )}
+        value={value}
+        onChange={(event) => {
+          onValueChange(event.target.value)
+          onAfterChange?.()
+        }}
+        {...props}
+      />
     </div>
   )
 }
@@ -520,14 +602,14 @@ export function QuestionEditor({
                   <FieldLabel className="text-[#dac1b7]">
                     {parts.length ? "Question Stem / Background" : "Question"}
                   </FieldLabel>
-                  <Textarea
+                  <RichTextArea
                     className={cn(
-                      "min-h-[180px] rounded-3xl border-[#2a2a2a] bg-[#242424] p-5 text-[#e5e2e1] focus-visible:ring-[#ffb595]/40",
+                      "min-h-[180px] p-5 text-[#e5e2e1]",
                       errors?.question_text && "border-destructive focus-visible:ring-destructive"
                     )}
                     value={questionText}
-                    onChange={(e) => {
-                      setQuestionText(e.target.value)
+                    onValueChange={setQuestionText}
+                    onAfterChange={() => {
                       if (errors?.question_text && onClearErrors) onClearErrors()
                     }}
                   />
@@ -637,12 +719,12 @@ export function QuestionEditor({
                               </Button>
                             )}
                           </div>
-                          <Textarea
-                            className="min-h-[110px] rounded-3xl border-[#2a2a2a] bg-[#242424] p-4 text-[#e5e2e1]"
+                          <RichTextArea
+                            className="min-h-[110px] p-4 text-[#e5e2e1]"
                             value={part.text}
-                            onChange={(event) => {
+                            onValueChange={(value) => {
                               const next = [...parts]
-                              next[index] = { ...part, text: event.target.value }
+                              next[index] = { ...part, text: value }
                               setParts(next)
                             }}
                           />

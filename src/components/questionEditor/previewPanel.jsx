@@ -7,25 +7,23 @@ import rehypeKatex from "rehype-katex"
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card"
 
 function AttachmentPreview({ attachment }) {
   if (!attachment?.data_url) return null
 
   return (
-    <figure className="overflow-hidden rounded-2xl border border-[#54433c]/35 bg-[#201f1f]">
+    <figure className="mx-auto my-5 max-w-full overflow-hidden rounded-[6px] border border-[#3c2c24] bg-[#14110e]">
       {attachment.mime_type?.startsWith("image/") && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           alt={attachment.caption || attachment.name || "Question attachment"}
-          className="max-h-[320px] w-full object-contain"
+          className="mx-auto max-h-[260px] w-full object-contain"
           src={attachment.data_url}
         />
       )}
       {(attachment.caption || attachment.name) && (
-        <figcaption className="border-t border-[#54433c]/25 px-4 py-2 text-xs text-[#a28c83]">
+        <figcaption className="border-t border-[#3c2c24] px-4 py-2 text-[11px] text-[#6f6258]">
           {attachment.caption || attachment.name}
         </figcaption>
       )}
@@ -33,11 +31,48 @@ function AttachmentPreview({ attachment }) {
   )
 }
 
+function prepareMarkdown(value) {
+  return String(value || "")
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => {
+      const trimmedRight = line.replace(/\s+$/g, "")
+      return trimmedRight.replace(
+        /^(\s*)\*\*(\d+)\.\s+(.+?)\*\*$/,
+        "$1$2. **$3**"
+      )
+    })
+    .join("\n")
+    .replace(/(?<!\n)\n(?!\n)/g, "  \n")
+}
+
 function MarkdownBlock({ children }) {
+  const markdown = prepareMarkdown(children)
+
   return (
-    <div className="prose prose-invert max-w-none overflow-hidden break-words text-base leading-relaxed text-[#e5e2e1]">
+    <div className="prose prose-invert max-w-none overflow-hidden break-words font-serif text-[17px] leading-[1.7] text-[#eee9e4]">
       <ReactMarkdown
         components={{
+          p: ({ children }) => <p className="my-4 first:mt-0 last:mb-0">{children}</p>,
+          ol: ({ children }) => (
+            <ol className="my-5 list-outside list-decimal space-y-1.5 pl-6">
+              {children}
+            </ol>
+          ),
+          ul: ({ children }) => (
+            <ul className="my-5 list-outside list-disc space-y-1.5 pl-6">
+              {children}
+            </ul>
+          ),
+          li: ({ children }) => (
+            <li className="pl-1 marker:text-[#8f8982]">{children}</li>
+          ),
+          strong: ({ children }) => (
+            <strong className="font-semibold text-[#f3ede6]">{children}</strong>
+          ),
+          em: ({ children }) => (
+            <em className="italic text-[#efe4da]">{children}</em>
+          ),
           code: ({ children }) => (
             <code className="whitespace-pre-wrap break-words">{children}</code>
           ),
@@ -50,52 +85,8 @@ function MarkdownBlock({ children }) {
         remarkPlugins={[remarkMath]}
         rehypePlugins={[rehypeKatex]}
       >
-        {children || ""}
+        {markdown}
       </ReactMarkdown>
-    </div>
-  )
-}
-
-function CriteriaList({ criteria = [] }) {
-  const visible = criteria.filter((item) => item.text)
-  if (!visible.length) return null
-
-  return (
-    <div className="rounded-2xl border border-[#54433c]/30 bg-[#201f1f] p-4">
-      <p className="mb-3 text-sm font-semibold text-[#dac1b7]">Marking criteria</p>
-      <div className="grid gap-2">
-        {visible.map((item, index) => (
-          <div
-            className="grid grid-cols-[64px_1fr] gap-3 rounded-xl bg-[#242424] p-3 text-sm"
-            key={`${item.mark}-${index}`}
-          >
-            <span className="text-[#ffb595]">Mark {item.mark}</span>
-            <MarkdownBlock>{item.text}</MarkdownBlock>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function HintsList({ hints = [] }) {
-  const visible = hints.filter((hint) => hint.text)
-  if (!visible.length) return null
-
-  return (
-    <div className="rounded-2xl border border-[#54433c]/30 bg-[#201f1f] p-4">
-      <p className="mb-3 text-sm font-semibold text-[#dac1b7]">Hints</p>
-      <div className="grid gap-2">
-        {visible.map((hint, index) => (
-          <div
-            className="grid grid-cols-[64px_1fr] gap-3 rounded-xl bg-[#242424] p-3 text-sm"
-            key={`${hint.mark}-${index}`}
-          >
-            <span className="text-[#ffb595]">Mark {hint.mark}</span>
-            <MarkdownBlock>{hint.text}</MarkdownBlock>
-          </div>
-        ))}
-      </div>
     </div>
   )
 }
@@ -107,90 +98,98 @@ function PreviewPanelBase({
   hints = [],
   parts = [],
   attachments = [],
-  markingCriteria = [],
   importSource = "",
   tags = [],
 }) {
   const hasParts = parts.length > 0
+  const hasHint = hints.some((hint) => hint.text) ||
+    parts.some((part) => (part.hints || []).some((hint) => hint.text))
 
   return (
-    <Card className="min-w-0 self-start w-full overflow-hidden rounded-3xl border-[#54433c]/45 bg-[#151515] text-[#e5e2e1] shadow-2xl shadow-black/20">
-      <CardHeader>
-        <CardTitle className="font-serif text-2xl font-semibold">Live Preview</CardTitle>
-      </CardHeader>
-
-      <CardContent className="flex min-w-0 flex-col gap-6">
-        <div className="flex justify-between gap-4 text-sm text-[#a28c83]">
-          <span>{subject || "Subject"}</span>
-          <span>{marks} marks</span>
+    <Card className="min-w-0 self-start w-full overflow-hidden rounded-[12px] border-[#4c3427]/60 bg-[#0d0d0b] text-[#e8e4dc] shadow-2xl shadow-black/25">
+      <CardContent className="min-w-0 p-0">
+        <div className="border-b border-[#3b2a22]/55 px-5 py-5">
+          <p className="text-center font-serif text-[23px] font-medium leading-none tracking-[0.01em] text-[#cfc4b9]">
+            Live Preview
+          </p>
+          <div className="mt-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap gap-2">
+              <span className="rounded-[2px] border border-[#3c2c24] bg-[#120f0d] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7f746b]">
+                {subject || "Subject"}
+              </span>
+              {tags.map((tag) => (
+                <span
+                  className="rounded-[2px] border border-[#8b5e42]/55 bg-[#d49a71]/10 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#dba476]"
+                  key={tag.id || tag.name}
+                >
+                  {tag.name}
+                </span>
+              ))}
+            </div>
+            <div className="flex items-center gap-4 text-[12px] tracking-[0.04em] text-[#8f8378]">
+              <span>{marks || 0} marks</span>
+              <span className="text-[#51483f]">·</span>
+              <span className="inline-flex items-center gap-2">
+                <span className="size-1.5 rounded-full bg-[#c8864a]" />
+                0:00
+              </span>
+            </div>
+          </div>
         </div>
 
-        {importSource && (
-          <div className="max-w-full rounded-2xl border border-[#54433c]/30 bg-[#201f1f] px-4 py-3 text-sm text-[#dac1b7]">
-            <span className="mr-2 text-[#a28c83]">Source</span>
-            <span className="break-words">{importSource}</span>
-          </div>
-        )}
-
-        {tags.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {tags.map((tag) => (
-              <span
-                className="rounded-full border border-[#54433c]/40 bg-[#201f1f] px-3 py-1 text-xs text-[#dac1b7]"
-                key={tag.id || tag.name}
-              >
-                {tag.name}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {questionText && (
-          <div className={hasParts ? "text-sm text-[#dac1b7]" : ""}>
-            <MarkdownBlock>{questionText}</MarkdownBlock>
-          </div>
-        )}
-
-        {attachments.map((attachment) => (
-          <AttachmentPreview attachment={attachment} key={attachment.id || attachment.name} />
-        ))}
-
-        {!hasParts && (
-          <>
-            <CriteriaList criteria={markingCriteria} />
-            <HintsList hints={hints} />
-          </>
-        )}
-
-        {hasParts && (
-          <div className="grid gap-4">
-            {parts.map((part, index) => (
-              <section
-                className="rounded-2xl border border-[#54433c]/30 bg-[#201f1f] p-4"
-                key={part.id || part.label || index}
-              >
-                <div className="mb-3 flex items-center justify-between gap-3 text-sm">
-                  <span className="font-semibold text-[#ffb595]">
-                    ({part.label || String.fromCharCode(97 + index)})
+        <div className="grid gap-6 px-5 py-7 lg:grid-cols-[minmax(0,1fr)_120px]">
+          <div className="min-w-0">
+            {questionText ? (
+              <div className="flex items-start gap-3">
+                <MarkdownBlock>{questionText}</MarkdownBlock>
+                {hasHint && (
+                  <span className="mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#3c322b] bg-[#17110e] px-2.5 py-1 text-[10px] font-medium tracking-[0.04em] text-[#6f6258]">
+                    hint
                   </span>
-                  <span className="text-[#a28c83]">{part.marks || 1} marks</span>
-                </div>
-                <MarkdownBlock>{part.text}</MarkdownBlock>
-                <div className="mt-4 grid gap-3">
-                  {(part.attachments || []).map((attachment) => (
-                    <AttachmentPreview attachment={attachment} key={attachment.id || attachment.name} />
-                  ))}
-                </div>
-                <div className="mt-4">
-                  <CriteriaList criteria={part.marking_criteria || []} />
-                </div>
-                <div className="mt-4">
-                  <HintsList hints={part.hints || []} />
-                </div>
-              </section>
+                )}
+              </div>
+            ) : (
+              <p className="font-serif text-[17px] italic text-[#5f554d]">
+                Your question will appear here.
+              </p>
+            )}
+
+            {attachments.map((attachment) => (
+              <AttachmentPreview attachment={attachment} key={attachment.id || attachment.name} />
             ))}
+
+            {hasParts && (
+              <div className="mt-8 grid gap-6">
+                {parts.map((part, index) => (
+                  <section
+                    className="grid gap-3 md:grid-cols-[30px_1fr]"
+                    key={part.id || part.label || index}
+                  >
+                    <span className="font-serif text-[16px] text-[#8f8982]">
+                      ({part.label || String.fromCharCode(97 + index)})
+                    </span>
+                    <div>
+                      <MarkdownBlock>{part.text}</MarkdownBlock>
+                      <p className="mt-1.5 text-[13px] tracking-[0.04em] text-[#5f554d]">
+                        {part.marks || 1} marks
+                      </p>
+                      {(part.attachments || []).map((attachment) => (
+                        <AttachmentPreview
+                          attachment={attachment}
+                          key={attachment.id || attachment.name}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+
+          <div className="text-right text-[13px] tracking-[0.04em] text-[#6e6259]">
+            {importSource && <p className="mt-1.5 break-words">{importSource}</p>}
+          </div>
+        </div>
       </CardContent>
     </Card>
   )
