@@ -157,7 +157,7 @@ function MarkdownMath({ children, className }) {
   const markdown = prepareMarkdown(children)
 
   return (
-    <div className={cn("prose prose-invert max-w-none text-[#eee9e4]", className)}>
+    <div className={cn("axion-question-math prose prose-invert max-w-none text-[#eee9e4]", className)}>
       <ReactMarkdown
         remarkPlugins={[remarkMath]}
         rehypePlugins={[rehypeKatex]}

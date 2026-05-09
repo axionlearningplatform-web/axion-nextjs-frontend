@@ -129,3 +129,13 @@
     @apply font-sans;
   }
 }
+
+@layer components {
+  .axion-question-math .katex .msupsub .mfrac {
+    font-size: 0.9em;
+  }
+
+  .axion-question-math .katex .msupsub .frac-line {
+    border-bottom-width: 0.035em;
+  }
+}

@@ -279,7 +279,7 @@ function MarkdownBlock({ children }) {
   const markdown = prepareMarkdown(children)
 
   return (
-    <div className="prose prose-invert max-w-none overflow-hidden break-words font-serif text-[17px] leading-[1.7] text-[#eee9e4]">
+    <div className="axion-question-math prose prose-invert max-w-none overflow-hidden break-words font-serif text-[17px] leading-[1.7] text-[#eee9e4]">
       <ReactMarkdown
         components={{
           p: ({ children }) => <p className="my-4 first:mt-0 last:mb-0">{children}</p>,
@@ -378,13 +378,18 @@ function PreviewPanelBase({
           </div>
         </div>
 
-        <div className={cn(
-          "grid gap-6 px-5 py-7",
-          importSource ? "lg:grid-cols-[minmax(0,1fr)_120px]" : "lg:grid-cols-1"
-        )}>
+        <div className="relative px-5 py-7">
+          {importSource && (
+            <div className="absolute right-5 top-7 max-w-[88px] text-right text-[13px] tracking-[0.04em] text-[#6e6259]/85 transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]">
+              <p className="break-words">{importSource}</p>
+            </div>
+          )}
           <div className="min-w-0">
             {displayQuestionText ? (
-              <div className="flex items-start gap-3">
+              <div className={cn(
+                "flex items-start gap-3 transition-[padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                importSource && "sm:pr-10 md:pr-14"
+              )}>
                 <MarkdownBlock>{displayQuestionText}</MarkdownBlock>
                 {hasHint && (
                   <span className="mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#3c322b] bg-[#17110e] px-2.5 py-1 text-[10px] font-medium tracking-[0.04em] text-[#6f6258]">
@@ -446,12 +451,6 @@ function PreviewPanelBase({
               </div>
             )}
           </div>
-
-          {importSource && (
-            <div className="text-right text-[13px] tracking-[0.04em] text-[#6e6259]">
-              <p className="mt-1.5 break-words">{importSource}</p>
-            </div>
-          )}
         </div>
       </CardContent>
     </Card>
