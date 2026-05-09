@@ -3,12 +3,30 @@
 @import "shadcn/tailwind.css";
 @import "katex/dist/katex.min.css";
 
+@font-face {
+  font-family: "Satoshi";
+  src: url("/fonts/Satoshi-Variable.woff2") format("woff2"),
+    url("/fonts/Satoshi-Variable.woff") format("woff");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 300 900;
+}
+
+@font-face {
+  font-family: "Satoshi";
+  src: url("/fonts/Satoshi-VariableItalic.woff2") format("woff2"),
+    url("/fonts/Satoshi-VariableItalic.woff") format("woff");
+  font-display: swap;
+  font-style: italic;
+  font-weight: 300 900;
+}
+
 @custom-variant dark (&:is(.dark, .dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: "Satoshi", "sans-serif";
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -85,7 +103,7 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  --background: 16 13 10;
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
@@ -124,6 +142,7 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: theme("fontFamily.sans");
   }
   html {
     @apply font-sans;

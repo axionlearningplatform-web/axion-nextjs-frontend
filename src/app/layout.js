@@ -28,7 +28,7 @@ export default function RootLayout({ children }) {
     >
       <head>
       </head>
-      <body className="min-h-screen bg-background font-sans antialiased">
+      <body className="min-h-screen border-b border-[#2a2118]/60 bg-[#131110] font-sans antialiased">
         <Suspense fallback={<div>Loading...</div>}>
         <ThemeProvider
           attribute="class"

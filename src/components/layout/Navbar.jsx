@@ -11,7 +11,7 @@ import { ThemeToggleButton } from "../ui/themeToggleButton"
 
 export default function Navbar({className}) {
     const auth = useAuth()
-    const finalClass = className ? className : "sticky top-0 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6"
+    const finalClass = className ? className : "sticky top-0 flex h-16 items-center gap-4 border-b border-[#2a2118]/60 bg-[#131110] px-4 md:px-6"
     return  <header className={finalClass}>
     <nav className="hidden flex-col gap-6 text-lg font-medium md:flex md:flex-row md:items-center md:gap-5 md:text-sm lg:gap-6">
         <BrandLink displayName={true} />

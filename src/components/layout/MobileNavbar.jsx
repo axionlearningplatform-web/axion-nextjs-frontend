@@ -16,11 +16,11 @@ export default function MobileNavbar({className}) {
     const auth = useAuth()
     return (
         <Sheet>
-            <SheetTrigger className="inline-flex shrink-0 md:hidden size-9 items-center justify-center rounded-full border border-border bg-background hover:bg-muted transition-all outline-none">
+            <SheetTrigger className="inline-flex shrink-0 md:hidden size-9 items-center justify-center rounded-full border border-[#2a2118]/60 bg-[#131110] hover:bg-[#1e1a16] transition-all outline-none">
                 <Menu className="h-5 w-5" />
                 <span className="sr-only">Toggle navigation menu</span>
             </SheetTrigger>
-            <SheetContent side="left">
+            <SheetContent side="left" className="bg-[#131110] border-r border-[#2a2118]/60">
                 <nav side="middle" className="items-center grid gap-6 text-lg font-medium">
                     <BrandLink displayName={true} className="flex items-center gap-2 text-lg font-semibold" />
                     

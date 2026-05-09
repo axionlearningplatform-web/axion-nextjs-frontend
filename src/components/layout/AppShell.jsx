@@ -75,7 +75,7 @@ function SubjectSwitcher({ collapsed, currentSubject, subjectMemberships }) {
 
   if (!currentSubject) {
     return (
-      <div className="border-t border-[#54433c]/30 p-4">
+      <div className="border-t border-[#2a2118]/60 p-4">
         <div className="rounded-xl border border-[#54433c]/30 bg-[#1c1b1b] p-3 text-xs text-[#dac1b7]">
           No subjects assigned
         </div>
@@ -89,7 +89,7 @@ function SubjectSwitcher({ collapsed, currentSubject, subjectMemberships }) {
   }
 
   return (
-    <div className="relative border-t border-[#54433c]/30 p-4">
+    <div className="relative border-t border-[#2a2118]/60 p-4">
       {open && (
         <div
           className={cn(
@@ -204,7 +204,7 @@ export default function AppShell({ children }) {
     <div className="min-h-screen bg-[#131313] text-[#e5e2e1]">
       <aside
         className={cn(
-          "fixed left-0 top-0 z-50 flex h-screen flex-col border-r border-[#54433c]/30 bg-[#151414] transition-all duration-200",
+          "fixed left-0 top-0 z-50 flex h-screen flex-col border-r border-[#2a2118]/60 bg-[#131110] transition-all duration-200",
           collapsed ? "w-[88px]" : "w-[280px]"
         )}
       >
@@ -322,7 +322,7 @@ function TopBar({ publicPage = false, collapsed }) {
   return (
     <header
       className={cn(
-        "fixed right-0 top-0 z-40 flex h-16 items-center justify-center border-b border-[#54433c]/20 bg-[#131313]/90 px-8 backdrop-blur",
+        "fixed right-0 top-0 z-40 flex h-16 items-center justify-center border-b border-[#2a2118]/60 bg-[#131110] px-8 backdrop-blur",
         publicPage ? "left-0" : collapsed ? "left-[88px]" : "left-[280px]"
       )}
     >

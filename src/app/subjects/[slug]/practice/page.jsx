@@ -277,8 +277,8 @@ function PracticeModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 backdrop-blur-md">
-      <section className="grid h-[min(720px,calc(100vh-44px))] w-full max-w-5xl grid-rows-[auto_1fr_auto] overflow-hidden rounded-[10px] border border-[#4c3427]/60 bg-[#0c0b0a] shadow-[0_26px_90px_rgba(0,0,0,0.7)]">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4 backdrop-blur-md">
+      <section className="grid h-[min(720px,calc(100vh-44px))] w-full max-w-5xl grid-rows-[auto_1fr_auto] overflow-hidden rounded-[10px] border border-[#4c3427]/60 bg-[#1e1a16] shadow-[0_26px_90px_rgba(0,0,0,0.7)]">
         <header className="flex items-center gap-5 border-b border-[#3b2a22]/55 px-8 py-6">
           <button
             type="button"
@@ -442,7 +442,7 @@ function PracticeHome({ config, onGenerate, onOpenModal, subject, userName }) {
   const activeStreak = 4
 
   return (
-    <main className="relative flex min-h-[calc(100vh-64px)] items-center justify-center overflow-hidden bg-[#0d0d0b] px-6 py-12 text-[#e8e4dc] before:absolute before:inset-0 before:bg-[radial-gradient(ellipse_58%_40%_at_50%_56%,rgba(212,154,113,0.07)_0%,transparent_70%)] before:content-['']">
+    <main className="relative flex min-h-[calc(100vh-64px)] items-center justify-center overflow-hidden bg-[#1a1612] px-6 py-12 text-[#e8e4dc] before:absolute before:inset-0 before:bg-[radial-gradient(ellipse_58%_40%_at_50%_56%,rgba(212,154,113,0.055)_0%,transparent_70%)] before:content-['']">
       <section className="relative z-10 w-full max-w-3xl text-center">
         <p className="text-[13px] font-semibold uppercase tracking-[0.22em] text-[#74675d]">
           Daily Practice
@@ -550,7 +550,7 @@ function AnswerArea({ onSubmit }) {
       </div>
 
       {activeTab === "type" ? (
-        <div className="rounded-[3px] border border-white/[0.06] bg-[#141412] p-5">
+        <div className="rounded-[3px] border border-white/[0.06] bg-[#1e1a16] p-5">
           <textarea
             className="min-h-36 w-full resize-y bg-transparent font-serif text-base leading-relaxed text-[#e8e4dc] outline-none placeholder:italic placeholder:text-[#4f4a45]"
             placeholder="Begin your working here..."
@@ -576,7 +576,7 @@ function AnswerArea({ onSubmit }) {
           </div>
         </div>
       ) : (
-        <div className="flex min-h-44 items-center justify-center rounded-[3px] border border-white/[0.06] bg-[#141412] text-[13px] tracking-[0.04em] text-[#4f4a45]">
+        <div className="flex min-h-44 items-center justify-center rounded-[3px] border border-white/[0.06] bg-[#1a1714] text-[13px] tracking-[0.04em] text-[#4f4a45]">
           {titleCase(activeTab)} tools are coming soon.
         </div>
       )}
@@ -605,7 +605,7 @@ function QuestionView({
 }) {
   if (loading) {
     return (
-      <main className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-[#0f0e0d] text-[#8f8982]">
+      <main className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-[#171412] text-[#8f8982]">
         <Loader2 className="size-8 animate-spin" />
       </main>
     )
@@ -613,7 +613,7 @@ function QuestionView({
 
   if (!question) {
     return (
-      <main className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-[#0f0e0d] px-6">
+      <main className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-[#171412] px-6">
         <button
           type="button"
           onClick={onBack}
@@ -643,7 +643,7 @@ function QuestionView({
     : ""
 
   return (
-    <main className="min-h-[calc(100vh-64px)] bg-[#0f0e0d] text-[#eee9e4]">
+    <main className="min-h-[calc(100vh-64px)] bg-[#171412] text-[#eee9e4]">
       <div className="border-b border-white/[0.06] px-6 py-5 md:px-12">
         <button
           type="button"
