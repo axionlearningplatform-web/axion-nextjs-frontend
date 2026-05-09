@@ -1,755 +1,816 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { ChevronDown, ImagePlus, Plus, Trash2 } from "lucide-react"
+import useSWR from "swr"
 
 import { cn } from "@/lib/utils"
+import fetcher from "@/lib/fetcher"
 
 import { Button } from "@/components/ui/button"
-
 import { PreviewPanel } from "@/components/questionEditor/previewPanel"
-
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-
 import {
   Field,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
-
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 
+const emptyCriteria = (mark = 1) => ({
+  mark,
+  text: "",
+})
+
+const emptyPart = (index = 0) => ({
+  id: crypto.randomUUID(),
+  label: String.fromCharCode(97 + index),
+  text: "",
+  marks: 1,
+  attachments: [],
+  marking_criteria: [emptyCriteria(1)],
+  hints: [],
+})
+
+function criteriaForMarks(marks, existing = []) {
+  const count = Math.max(Number(marks) || 1, 1)
+  return Array.from({ length: count }, (_, index) => {
+    const mark = index + 1
+    const found = existing.find((item) => Number(item.mark) === mark)
+    return {
+      mark,
+      text: found?.text || "",
+    }
+  })
+}
+
+function readAttachment(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = async () => {
+      const dataUrl = String(reader.result || "")
+      resolve({
+        id: crypto.randomUUID(),
+        name: file.name,
+        mime_type: file.type || "application/octet-stream",
+        data_url: dataUrl,
+        caption: "",
+      })
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+function SectionTitle({ children }) {
+  return (
+    <div className="font-serif text-xl font-semibold text-[#e5e2e1]">
+      {children}
+    </div>
+  )
+}
+
+function DropdownSection({ title, summary, children, defaultOpen = false }) {
+  return (
+    <details
+      className="group overflow-hidden rounded-2xl border border-[#54433c]/30 bg-[#1c1b1b]"
+      open={defaultOpen}
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-[#dac1b7] transition-colors hover:bg-[#242424] [&::-webkit-details-marker]:hidden">
+        <span>{title}</span>
+        <span className="flex items-center gap-2 text-xs font-normal text-[#a28c83]">
+          {summary}
+          <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
+        </span>
+      </summary>
+      <div className="border-t border-[#54433c]/25 p-4">{children}</div>
+    </details>
+  )
+}
+
+function AttachmentEditor({ attachments, onChange }) {
+  async function addFiles(files) {
+    const next = [...attachments]
+    for (const file of files) {
+      next.push(await readAttachment(file))
+    }
+    onChange(next)
+  }
+
+  return (
+    <div className="grid gap-3">
+      <label className="inline-flex h-10 w-fit cursor-pointer items-center gap-2 rounded-full border border-[#54433c]/50 bg-[#242424] px-4 text-sm font-semibold text-[#dac1b7] transition-colors hover:bg-[#2d2d2d]">
+        <ImagePlus className="size-4" />
+        Add Visual
+        <input
+          accept="image/*,.svg"
+          className="hidden"
+          multiple
+          type="file"
+          onChange={(event) => {
+            addFiles(Array.from(event.target.files || []))
+            event.target.value = ""
+          }}
+        />
+      </label>
+
+      {attachments.map((attachment, index) => (
+        <div
+          className="grid gap-3 rounded-2xl border border-[#54433c]/30 bg-[#201f1f] p-3"
+          key={attachment.id || attachment.name || index}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <span className="truncate text-sm text-[#e5e2e1]">
+              {attachment.name || "Attachment"}
+            </span>
+            <Button
+              className="rounded-full"
+              size="sm"
+              type="button"
+              variant="destructive"
+              onClick={() => onChange(attachments.filter((_, i) => i !== index))}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </div>
+          <Input
+            className="rounded-full border-[#2a2a2a] bg-[#242424] text-[#e5e2e1]"
+            placeholder="Caption"
+            value={attachment.caption || ""}
+            onChange={(event) => {
+              const next = [...attachments]
+              next[index] = {
+                ...next[index],
+                caption: event.target.value,
+              }
+              onChange(next)
+            }}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function CriteriaEditor({ marks, criteria, onChange }) {
+  const normalized = useMemo(
+    () => criteriaForMarks(marks, criteria),
+    [criteria, marks]
+  )
+
+  useEffect(() => {
+    if (JSON.stringify(normalized) !== JSON.stringify(criteria)) {
+      onChange(normalized)
+    }
+  }, [criteria, normalized, onChange])
+
+  return (
+    <div className="grid gap-3">
+      {normalized.map((item, index) => (
+        <div
+          className="grid gap-2 rounded-2xl border border-[#54433c]/25 bg-[#201f1f] p-3"
+          key={item.mark}
+        >
+          <div className="flex items-center gap-3">
+            <span className="rounded-full border border-[#2a2a2a] bg-[#242424] px-3 py-2 text-sm text-[#ffb595]">
+              Mark {item.mark}
+            </span>
+            <span className="text-xs text-[#a28c83]">criterion</span>
+          </div>
+          <Textarea
+            className="min-h-20 rounded-2xl border-[#2a2a2a] bg-[#242424] text-[#e5e2e1]"
+            placeholder="Explain how this mark is awarded. Inline LaTeX is supported."
+            value={item.text}
+            onChange={(event) => {
+              const next = [...normalized]
+              next[index] = {
+                ...next[index],
+                text: event.target.value,
+              }
+              onChange(next)
+            }}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function HintsEditor({ hints, onChange }) {
+  return (
+    <div className="grid gap-3">
+      {hints.length === 0 && (
+        <p className="rounded-2xl border border-[#54433c]/25 bg-[#201f1f] px-4 py-3 text-sm text-[#a28c83]">
+          No hints added.
+        </p>
+      )}
+      {hints.map((hint, index) => (
+        <div className="grid gap-2 rounded-2xl border border-[#54433c]/25 bg-[#201f1f] p-3" key={index}>
+          <div className="flex items-center gap-2">
+            <Input
+              className="h-9 w-14 rounded-full border-[#2a2a2a] bg-[#242424] px-2 text-center text-sm text-[#e5e2e1] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              min="1"
+              type="number"
+              value={hint.mark}
+              onChange={(event) => {
+                const next = [...hints]
+                next[index] = { ...hint, mark: event.target.value }
+                onChange(next)
+              }}
+            />
+            <span className="text-xs text-[#a28c83]">mark hint</span>
+            <Button
+              className="ml-auto rounded-full"
+              size="sm"
+              type="button"
+              variant="destructive"
+              onClick={() => onChange(hints.filter((_, i) => i !== index))}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </div>
+          <Textarea
+            className="min-h-16 rounded-2xl border-[#2a2a2a] bg-[#242424] text-[#e5e2e1]"
+            placeholder="Write a hint for this mark."
+            value={hint.text}
+            onChange={(event) => {
+              const next = [...hints]
+              next[index] = { ...hint, text: event.target.value }
+              onChange(next)
+            }}
+          />
+        </div>
+      ))}
+      <Button
+        className="w-fit rounded-full border border-[#54433c]/40 bg-[#242424] text-[#dac1b7] hover:bg-[#2d2d2d]"
+        type="button"
+        onClick={() => onChange([...hints, { text: "", mark: "1" }])}
+      >
+        <Plus className="size-4" />
+        Add Hint
+      </Button>
+    </div>
+  )
+}
+
 export function QuestionEditor({
   initialData = null,
-
   subjects = [],
   lockedSubject = null,
-
   submitLabel = "Create Question",
-
   statusLabels = {
     loading: "Submitting question...",
     success: "Question submitted",
     error: "Failed to submit",
   },
-
   onSubmit,
-
   onDelete = null,
   deleting = false,
-
   errors,
   status,
-
   onClearErrors,
+  hidePreview = false,
+  onDraftChange = null,
+  onBranchPart = null,
 }) {
-
   const [subject, setSubject] = useState("")
   const [subjectId, setSubjectId] = useState("")
-
   const [marks, setMarks] = useState("1")
+  const [questionText, setQuestionText] = useState("")
+  const [importSource, setImportSource] = useState("")
+  const [hints, setHints] = useState([{ text: "", mark: "1" }])
+  const [parts, setParts] = useState([])
+  const [attachments, setAttachments] = useState([])
+  const [markingCriteria, setMarkingCriteria] = useState([emptyCriteria(1)])
+  const [tagIds, setTagIds] = useState([])
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
-  const [questionText, setQuestionText] =
-    useState("")
+  const tagsUrl = subjectId
+    ? `/api/questions/tags/?subject_id=${subjectId}`
+    : "/api/questions/tags/"
+  const { data: tags = [] } = useSWR(tagsUrl, fetcher)
+  const selectedTags = tags.filter((tag) => tagIds.includes(tag.id))
+  const sourcePlaceholder = `e.g. HSC ${subject || lockedSubject?.name || "Chemistry"} 2025`
 
-  const [math, setMath] = useState("")
+  const effectiveMarks = parts.length
+    ? Number(marks) || parts.reduce((total, part) => total + (Number(part.marks) || 0), 0)
+    : Number(marks) || 1
+  const partMarksTotal = parts.reduce((total, part) => total + (Number(part.marks) || 0), 0)
 
-  const [hints, setHints] = useState([
-    {
-      text: "",
-      mark: "1",
-    },
-  ])
-
-  const [graph, setGraph] = useState("")
-
-  const [confirmDelete, setConfirmDelete] =
-    useState(false)
-
-  // PREFILL QUESTION DATA
   useEffect(() => {
-
     if (!initialData) return
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSubject(initialData.subject || "")
-
-    setMarks(
-      String(initialData.marks || "1")
-    )
-
-    setQuestionText(
-      initialData.question_text || ""
-    )
-
-    setMath(initialData.latex || "")
-
-    setGraph(initialData.graph || "")
-
+    setSubjectId(initialData.subject_id ? String(initialData.subject_id) : "")
+    setMarks(String(initialData.marks || "1"))
+    setQuestionText(initialData.question_text || "")
+    setImportSource(initialData.import_source || "")
     setHints(
       initialData.hints?.length
         ? initialData.hints.map((hint) => ({
             text: hint.text || "",
             mark: String(hint.mark || "1"),
           }))
-        : [
-            {
-              text: "",
-              mark: "1",
-            },
-          ]
+        : [{ text: "", mark: "1" }]
     )
-
+    setParts(
+      (initialData.parts || []).map((part, index) => ({
+        id: part.id || crypto.randomUUID(),
+        label: part.label || String.fromCharCode(97 + index),
+        text: part.text || "",
+        marks: Number(part.marks || 1),
+        attachments: part.attachments || [],
+        marking_criteria: criteriaForMarks(
+          part.marks || 1,
+          part.marking_criteria || []
+        ),
+        hints: (part.hints || []).map((hint) => ({
+          text: hint.text || "",
+          mark: String(hint.mark || "1"),
+        })),
+      }))
+    )
+    setAttachments(initialData.attachments || [])
+    setMarkingCriteria(
+      criteriaForMarks(
+        initialData.marks || 1,
+        initialData.marking_criteria || []
+      )
+    )
+    setTagIds(initialData.tag_ids || [])
   }, [initialData])
 
-  // LOCKED SUBJECT SUPPORT
   useEffect(() => {
-
     if (!lockedSubject) return
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSubject(lockedSubject.name || "")
-
-    setSubjectId(
-      lockedSubject.id
-        ? String(lockedSubject.id)
-        : ""
-    )
-
+    setSubjectId(lockedSubject.id ? String(lockedSubject.id) : "")
   }, [lockedSubject])
 
-  const addHint = () => {
-
-    setHints([
-      ...hints,
-      {
-        text: "",
-        mark: "1",
-      },
-    ])
-  }
-
-  const updateHint = (
-    index,
-    field,
-    value
-  ) => {
-
-    const newHints = [...hints]
-
-    newHints[index][field] = value
-
-    setHints(newHints)
-  }
-
-  const removeHint = (index) => {
-
-    setHints(
-      hints.filter((_, i) => i !== index)
-    )
-  }
-
-  const handleSubmit = (e) => {
-
-    e.preventDefault()
-
-    const payload = {
+  function payload() {
+    return {
       subject,
-      subject_id: subjectId
-        ? Number(subjectId)
-        : null,
-
-      marks: Number(marks),
-
+      subject_id: subjectId ? Number(subjectId) : null,
+      marks: effectiveMarks,
       question_text: questionText,
-
-      latex: math,
-
-      graph,
-
+      latex: "",
+      graph: "",
       hints: hints.map((hint) => ({
         text: hint.text,
         mark: Number(hint.mark),
       })),
+      parts: parts.map((part) => ({
+        label: part.label,
+        text: part.text,
+        marks: Number(part.marks) || 1,
+        attachments: part.attachments || [],
+        marking_criteria: part.marking_criteria || [],
+        hints: (part.hints || []).map((hint) => ({
+          text: hint.text,
+          mark: Number(hint.mark),
+        })),
+      })),
+      attachments,
+      marking_criteria: parts.length ? [] : markingCriteria,
+      tag_ids: tagIds,
+      import_source: importSource,
     }
-
-    console.log("SUBMITTING:", payload)
-
-    onSubmit(payload)
   }
 
+  function handleSubmit(e) {
+    e.preventDefault()
+    onSubmit(payload())
+  }
+
+  useEffect(() => {
+    if (!onDraftChange) return
+    onDraftChange(payload())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subject, subjectId, marks, questionText, importSource, hints, parts, attachments, markingCriteria, tagIds])
+
   return (
-    <div className="grid gap-8 lg:grid-cols-2">
-
-      {/* LEFT */}
-      <div className="flex flex-col gap-6">
-
+    <div className={cn("grid gap-8", !hidePreview && "lg:grid-cols-2")}>
+      <div className="flex min-w-0 flex-col gap-6">
         <Card
           className={cn(
-            `
-            w-full
-            rounded-3xl
-            border-[#54433c]/45
-            bg-[#151515]
-            text-[#e5e2e1]
-            shadow-2xl
-            shadow-black/20
-            transition-colors
-            `,
-            errors?.question_text &&
-              "border-destructive shadow-destructive/20"
+            "w-full rounded-3xl border-[#54433c]/45 bg-[#151515] text-[#e5e2e1] shadow-2xl shadow-black/20 transition-colors",
+            errors?.question_text && "border-destructive shadow-destructive/20"
           )}
         >
-
           <CardHeader>
-
-            <div className="flex items-center justify-between">
-
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <CardTitle className="font-serif text-2xl font-semibold">
-
-                {submitLabel === "Save Changes"
-                  ? "Edit Question"
-                  : "Create Question"}
-
+                {submitLabel === "Save Changes" ? "Edit Question" : "Create Question"}
               </CardTitle>
 
               {onDelete && (
-
                 <div className="flex items-center gap-2">
-
                   {!confirmDelete ? (
-
                     <Button
+                      className="rounded-full"
                       type="button"
                       variant="destructive"
-                      className="rounded-full"
-                      onClick={() =>
-                        setConfirmDelete(true)
-                      }
+                      onClick={() => setConfirmDelete(true)}
                     >
                       Delete Question
                     </Button>
-
                   ) : (
-
                     <>
                       <Button
+                        className="rounded-full"
                         type="button"
                         variant="outline"
-                        className="rounded-full"
-                        onClick={() =>
-                          setConfirmDelete(false)
-                        }
+                        onClick={() => setConfirmDelete(false)}
                       >
                         Cancel
                       </Button>
-
                       <Button
-                        type="button"
-                        variant="destructive"
                         className="rounded-full"
                         disabled={deleting}
+                        type="button"
+                        variant="destructive"
                         onClick={onDelete}
                       >
-                        {deleting
-                          ? "Deleting..."
-                          : "Confirm Delete"}
+                        {deleting ? "Deleting..." : "Confirm Delete"}
                       </Button>
                     </>
                   )}
-
                 </div>
               )}
-
             </div>
-
           </CardHeader>
 
           <CardContent className="relative flex flex-col gap-6">
-
-            <form
-              onSubmit={handleSubmit}
-              className="flex flex-col gap-6"
-            >
-
+            <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
               <FieldGroup className="flex flex-col gap-6">
-
-                {/* SUBJECT + MARKS */}
-                <div className="grid grid-cols-2 gap-4">
-
+                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_112px]">
                   <Field>
-
-                    <FieldLabel className="text-[#dac1b7]">
-                      Subject
-                    </FieldLabel>
-
+                    <FieldLabel className="text-[#dac1b7]">Subject</FieldLabel>
                     {lockedSubject ? (
-
                       <Input
-                        value={lockedSubject.name}
+                        className="rounded-full border-[#2a2a2a] bg-[#242424] text-[#a28c83]"
                         disabled
-                        className="
-                          rounded-full
-                          border-[#2a2a2a]
-                          bg-[#242424]
-                          text-[#a28c83]
-                        "
+                        value={lockedSubject.name}
                       />
-
                     ) : subjects.length > 0 ? (
-
                       <select
+                        className="h-10 rounded-full border border-[#2a2a2a] bg-[#242424] px-4 text-[#e5e2e1]"
                         value={subjectId}
                         onChange={(e) => {
-
-                          const value =
-                            e.target.value
-
+                          const value = e.target.value
                           setSubjectId(value)
-
-                          const found =
-                            subjects.find(
-                              (s) =>
-                                String(s.id) === value
-                            )
-
-                          setSubject(
-                            found?.name || ""
-                          )
+                          const found = subjects.find((s) => String(s.id) === value)
+                          setSubject(found?.name || "")
                         }}
-                        className="
-                          h-10
-                          rounded-full
-                          border
-                          border-[#2a2a2a]
-                          bg-[#242424]
-                          px-4
-                          text-[#e5e2e1]
-                        "
                       >
-
-                        <option value="">
-                          Select subject
-                        </option>
-
-                        {subjects.map((subject) => (
-
-                          <option
-                            key={subject.id}
-                            value={subject.id}
-                          >
-                            {subject.name}
+                        <option value="">Select subject</option>
+                        {subjects.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name}
                           </option>
                         ))}
-
                       </select>
-
                     ) : (
-
                       <Input
+                        className="rounded-full border-[#2a2a2a] bg-[#242424] text-[#a28c83]"
                         value={subject}
-                        className="
-                          rounded-full
-                          border-[#2a2a2a]
-                          bg-[#242424]
-                          text-[#a28c83]
-                        "
-                        onChange={(e) =>
-                          setSubject(
-                            e.target.value
-                          )
-                        }
+                        onChange={(e) => setSubject(e.target.value)}
                       />
-
                     )}
-
                   </Field>
 
                   <Field>
-
                     <FieldLabel className="text-[#dac1b7]">
-                      Marks
+                      {parts.length ? "Total Marks" : "Marks"}
                     </FieldLabel>
-
                     <Input
+                      className="h-10 rounded-full border-[#2a2a2a] bg-[#242424] px-2 text-center text-sm text-[#e5e2e1] [appearance:textfield] focus-visible:ring-[#ffb595]/40 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      min="1"
                       type="number"
-                      className="
-                        rounded-full
-                        border-[#2a2a2a]
-                        bg-[#242424]
-                        text-[#e5e2e1]
-                        focus-visible:ring-[#ffb595]/40
-                      "
                       value={marks}
-                      onChange={(e) =>
-                        setMarks(e.target.value)
-                      }
+                      onChange={(e) => setMarks(e.target.value)}
                     />
-
+                    {parts.length > 0 && partMarksTotal !== Number(marks) && (
+                      <p className="mt-2 text-xs text-amber-200">
+                        Parts currently add to {partMarksTotal} marks.
+                      </p>
+                    )}
                   </Field>
-
                 </div>
 
-                {/* QUESTION */}
                 <Field>
+                  <FieldLabel className="text-[#dac1b7]">Source</FieldLabel>
+                  <Input
+                    className="rounded-full border-[#2a2a2a] bg-[#242424] text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
+                    placeholder={sourcePlaceholder}
+                    value={importSource}
+                    onChange={(event) => setImportSource(event.target.value)}
+                  />
+                </Field>
 
+                <Field>
                   <FieldLabel className="text-[#dac1b7]">
-                    Question
+                    {parts.length ? "Question Stem / Background" : "Question"}
                   </FieldLabel>
-
                   <Textarea
                     className={cn(
-                      `
-                      min-h-[220px]
-                      rounded-3xl
-                      border-[#2a2a2a]
-                      bg-[#242424]
-                      p-5
-                      text-[#e5e2e1]
-                      focus-visible:ring-[#ffb595]/40
-                      `,
-                      errors?.question_text &&
-                        `
-                        border-destructive
-                        focus-visible:ring-destructive
-                        `
+                      "min-h-[180px] rounded-3xl border-[#2a2a2a] bg-[#242424] p-5 text-[#e5e2e1] focus-visible:ring-[#ffb595]/40",
+                      errors?.question_text && "border-destructive focus-visible:ring-destructive"
                     )}
                     value={questionText}
                     onChange={(e) => {
-
-                      setQuestionText(
-                        e.target.value
-                      )
-
-                      if (
-                        errors?.question_text
-                      ) {
-                        onClearErrors()
-                      }
+                      setQuestionText(e.target.value)
+                      if (errors?.question_text && onClearErrors) onClearErrors()
                     }}
                   />
-
-                  {errors?.question_text?.[0]
-                    ?.message && (
-
+                  {errors?.question_text?.[0]?.message && (
                     <p className="mt-2 text-sm text-destructive">
-                      {
-                        errors.question_text[0]
-                          .message
-                      }
+                      {errors.question_text[0].message}
                     </p>
                   )}
-
                 </Field>
 
-                {/* LATEX */}
-                <Field>
-
-                  <FieldLabel className="text-[#dac1b7]">
-                    Math (LaTeX)
-                  </FieldLabel>
-
-                  <Input
-                    className="
-                      rounded-full
-                      border-[#2a2a2a]
-                      bg-[#242424]
-                      text-[#e5e2e1]
-                      focus-visible:ring-[#ffb595]/40
-                    "
-                    value={math}
-                    onChange={(e) =>
-                      setMath(e.target.value)
-                    }
-                    placeholder="e.g. x^2 + 2x"
-                  />
-
-                </Field>
-
-                {/* GRAPH */}
-                <Field>
-
-                  <FieldLabel className="text-[#dac1b7]">
-                    Graph Equation
-                  </FieldLabel>
-
-                  <Input
-                    className="
-                      rounded-full
-                      border-[#2a2a2a]
-                      bg-[#242424]
-                      text-[#e5e2e1]
-                      focus-visible:ring-[#ffb595]/40
-                    "
-                    value={graph}
-                    onChange={(e) =>
-                      setGraph(e.target.value)
-                    }
-                    placeholder="e.g. x^2"
-                  />
-
-                </Field>
-
-                {/* HINTS */}
-                <Field>
-
-                  <FieldLabel className="text-[#dac1b7]">
-                    Hints
-                  </FieldLabel>
-
-                  <div className="flex flex-col gap-3">
-
-                    {hints.map((hint, index) => (
-
-                      <div
-                        key={index}
-                        className="flex gap-2"
-                      >
-
-                        <Input
-                          placeholder="Hint"
-                          className="
-                            rounded-full
-                            border-[#2a2a2a]
-                            bg-[#242424]
-                            text-[#e5e2e1]
-                            focus-visible:ring-[#ffb595]/40
-                          "
-                          value={hint.text}
-                          onChange={(e) =>
-                            updateHint(
-                              index,
-                              "text",
-                              e.target.value
-                            )
-                          }
-                        />
-
-                        <Input
-                          type="number"
-                          className="
-                            w-24
-                            rounded-full
-                            border-[#2a2a2a]
-                            bg-[#242424]
-                            text-[#e5e2e1]
-                            focus-visible:ring-[#ffb595]/40
-                          "
-                          value={hint.mark}
-                          onChange={(e) =>
-                            updateHint(
-                              index,
-                              "mark",
-                              e.target.value
-                            )
-                          }
-                        />
-
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          className="
-                            rounded-full
-                            bg-[#6d2c2c]
-                            text-[#ffdad6]
-                            hover:bg-[#823636]
-                          "
-                          onClick={() =>
-                            removeHint(index)
-                          }
-                        >
-                          X
-                        </Button>
-
-                      </div>
-                    ))}
-
+                <div className="grid gap-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <SectionTitle>Parts</SectionTitle>
                     <Button
-  type="button"
-  onClick={addHint}
-  className="
-    rounded-full
-    border
-    border-[#54433c]/40
-    bg-[#242424]
-    text-[#dac1b7]
-    hover:bg-[#2d2d2d]
-    hover:text-[#f3ddd2]
-    hover:border-[#6b554c]
-    transition-all
-    duration-300
-    shadow-none
-  "
->
-  + Add Hint
-</Button>
-
+                      className="rounded-full border border-[#54433c]/40 bg-[#242424] text-[#dac1b7] hover:bg-[#2d2d2d]"
+                      type="button"
+                      onClick={() => setParts([...parts, emptyPart(parts.length)])}
+                    >
+                      <Plus className="size-4" />
+                      Add Part
+                    </Button>
                   </div>
 
+                  {parts.map((part, index) => (
+                    <details
+                      className="group overflow-hidden rounded-2xl border border-[#54433c]/30 bg-[#1c1b1b]"
+                      key={part.id}
+                      open
+                    >
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 [&::-webkit-details-marker]:hidden">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <Input
+                            className="h-8 w-11 rounded-full border-[#2a2a2a] bg-[#242424] text-center text-sm text-[#e5e2e1]"
+                            value={part.label}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={(event) => {
+                              const next = [...parts]
+                              next[index] = { ...part, label: event.target.value }
+                              setParts(next)
+                            }}
+                          />
+                          <span className="truncate text-sm font-semibold text-[#e5e2e1]">
+                            {part.text || `Part ${index + 1}`}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            className="h-8 w-11 rounded-full border-[#2a2a2a] bg-[#242424] px-1 text-center text-sm text-[#e5e2e1] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            min="1"
+                            type="number"
+                            value={part.marks}
+                            onClick={(event) => event.stopPropagation()}
+                            onBlur={() => {
+                              if (part.marks === "" || Number(part.marks) < 1) {
+                                const next = [...parts]
+                                next[index] = {
+                                  ...part,
+                                  marks: 1,
+                                  marking_criteria: criteriaForMarks(1, part.marking_criteria),
+                                }
+                                setParts(next)
+                              }
+                            }}
+                            onChange={(event) => {
+                              const rawValue = event.target.value
+                              const next = [...parts]
+                              next[index] = {
+                                ...part,
+                                marks: rawValue,
+                                marking_criteria: rawValue
+                                  ? criteriaForMarks(Number(rawValue) || 1, part.marking_criteria)
+                                  : part.marking_criteria,
+                              }
+                              setParts(next)
+                            }}
+                          />
+                          <span className="hidden text-xs text-[#a28c83] sm:inline">marks</span>
+                          <Button
+                            className="rounded-full"
+                            size="sm"
+                            type="button"
+                            variant="destructive"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setParts(parts.filter((_, i) => i !== index))
+                            }}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                          <ChevronDown className="size-4 text-[#a28c83] transition-transform group-open:rotate-180" />
+                        </div>
+                      </summary>
+
+                      <div className="grid gap-4 border-t border-[#54433c]/25 p-4">
+                        <Field>
+                          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                            <FieldLabel className="text-[#dac1b7]">Question Text</FieldLabel>
+                            {onBranchPart && (
+                              <Button
+                                className="rounded-full border-[#54433c]/50 bg-[#242424] text-xs text-[#dac1b7] hover:bg-[#2d2d2d]"
+                                size="sm"
+                                type="button"
+                                variant="outline"
+                                onClick={() => onBranchPart(part, index)}
+                              >
+                                Branch to Question
+                              </Button>
+                            )}
+                          </div>
+                          <Textarea
+                            className="min-h-[110px] rounded-3xl border-[#2a2a2a] bg-[#242424] p-4 text-[#e5e2e1]"
+                            value={part.text}
+                            onChange={(event) => {
+                              const next = [...parts]
+                              next[index] = { ...part, text: event.target.value }
+                              setParts(next)
+                            }}
+                          />
+                        </Field>
+
+                        <DropdownSection
+                          title="Visuals"
+                          summary={`${part.attachments?.length || 0} added`}
+                        >
+                          <AttachmentEditor
+                            attachments={part.attachments || []}
+                            onChange={(value) => {
+                              const next = [...parts]
+                              next[index] = { ...part, attachments: value }
+                              setParts(next)
+                            }}
+                          />
+                        </DropdownSection>
+
+                        <DropdownSection
+                          title="Marking Criteria"
+                          summary={`${part.marking_criteria?.filter((item) => item.text)?.length || 0}/${part.marks || 1} filled`}
+                        >
+                          <CriteriaEditor
+                            criteria={part.marking_criteria || []}
+                            marks={part.marks}
+                            onChange={(value) => {
+                              const next = [...parts]
+                              next[index] = { ...part, marking_criteria: value }
+                              setParts(next)
+                            }}
+                          />
+                        </DropdownSection>
+
+                        <DropdownSection
+                          title="Hints"
+                          summary={`${part.hints?.filter((item) => item.text)?.length || 0} added`}
+                        >
+                          <HintsEditor
+                            hints={part.hints || []}
+                            onChange={(value) => {
+                              const next = [...parts]
+                              next[index] = { ...part, hints: value }
+                              setParts(next)
+                            }}
+                          />
+                        </DropdownSection>
+                      </div>
+                    </details>
+                  ))}
+                </div>
+
+                {parts.length === 0 && (
+                  <div className="grid gap-4">
+                    <DropdownSection
+                      title="Visuals"
+                      summary={`${attachments.length} added`}
+                    >
+                        <AttachmentEditor
+                          attachments={attachments}
+                          onChange={setAttachments}
+                        />
+                    </DropdownSection>
+                    <DropdownSection
+                      title="Marking Criteria"
+                      summary={`${markingCriteria.filter((item) => item.text).length}/${marks || 1} filled`}
+                    >
+                        <CriteriaEditor
+                          criteria={markingCriteria}
+                          marks={marks}
+                          onChange={setMarkingCriteria}
+                        />
+                    </DropdownSection>
+                    <DropdownSection
+                      title="Hints"
+                      summary={`${hints.filter((item) => item.text).length} added`}
+                    >
+                      <HintsEditor hints={hints} onChange={setHints} />
+                    </DropdownSection>
+                  </div>
+                )}
+
+                <Field>
+                  <FieldLabel className="text-[#dac1b7]">Tags</FieldLabel>
+                  <div className="flex flex-wrap gap-2 rounded-2xl border border-[#54433c]/25 bg-[#201f1f] p-3">
+                    {tags.length === 0 && (
+                      <span className="text-sm text-[#a28c83]">
+                        Add question tags in Django admin.
+                      </span>
+                    )}
+                    {tags.map((tag) => {
+                      const selected = tagIds.includes(tag.id)
+                      return (
+                        <button
+                          className={cn(
+                            "rounded-full border px-3 py-1 text-sm transition-colors",
+                            selected
+                              ? "border-[#ffb595]/60 bg-[#4a2f26] text-[#ffb595]"
+                              : "border-[#54433c]/35 bg-[#242424] text-[#dac1b7] hover:bg-[#2d2d2d]"
+                          )}
+                          key={tag.id}
+                          type="button"
+                          onClick={() =>
+                            setTagIds(
+                              selected
+                                ? tagIds.filter((id) => id !== tag.id)
+                                : [...tagIds, tag.id]
+                            )
+                          }
+                        >
+                          {tag.name}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </Field>
 
-                {/* SUBMIT */}
                 <Button
-  type="submit"
-  className="
-    rounded-full
-    bg-[#ccb2a3d3]
-    text-[#1a1817]
-    text-lg
-    hover:bg-[#ddbeaa]
-    hover:text-black
-    transition-all
-    duration-300
-    shadow-[0_0_0_1px_rgba(255,255,255,0.03)]
-    hover:shadow-[0_8px_30px_rgba(255,220,200,0.06)]
-    active:scale-[0.995]
-  "
->
-
-  {submitLabel}
-
-</Button>
-
+                  className="rounded-full bg-[#ccb2a3d3] text-base font-semibold text-[#1a1817] shadow-[0_0_0_1px_rgba(255,255,255,0.03)] transition-all duration-300 hover:bg-[#ddbeaa] hover:text-black hover:shadow-[0_8px_30px_rgba(255,220,200,0.06)] active:scale-[0.995]"
+                  type="submit"
+                >
+                  {submitLabel}
+                </Button>
               </FieldGroup>
-
             </form>
 
-            {/* STATUS */}
             <div
               className={cn(
-                `
-                overflow-hidden
-                rounded-xl
-                border
-                transition-all
-                duration-700
-                ease-[cubic-bezier(0.22,1,0.36,1)]
-                transform-gpu
-                will-change-[max-height,opacity,padding,margin]
-                `,
-
-                status === "idle" &&
-                  `
-                  max-h-0
-                  opacity-0
-                  py-0
-                  px-0
-                  mt-0
-                  border-transparent
-                  `,
-
-                status === "loading" &&
-                  `
-                  max-h-24
-                  opacity-100
-                  px-4
-                  py-3
-                  mt-2
-                  border-white/10
-                  bg-white/5
-                  text-white/80
-                  `,
-
-                status === "success" &&
-                  `
-                  max-h-24
-                  opacity-100
-                  px-4
-                  py-3
-                  mt-2
-                  border-emerald-500/20
-                  bg-emerald-500/10
-                  text-emerald-200
-                  `,
-
-                status === "error" &&
-                  `
-                  max-h-24
-                  opacity-100
-                  px-4
-                  py-3
-                  mt-2
-                  border-red-500/20
-                  bg-red-500/10
-                  text-red-200
-                  `
+                "overflow-hidden rounded-xl border transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                status === "idle" && "max-h-0 border-transparent px-0 py-0 opacity-0",
+                status === "loading" && "mt-2 max-h-24 border-white/10 bg-white/5 px-4 py-3 text-white/80 opacity-100",
+                status === "success" && "mt-2 max-h-24 border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-emerald-200 opacity-100",
+                status === "error" && "mt-2 max-h-24 border-red-500/20 bg-red-500/10 px-4 py-3 text-red-200 opacity-100"
               )}
             >
-
-              <div
-                className={cn(
-                  `
-                  flex
-                  items-center
-                  gap-2
-                  transition-all
-                  duration-500
-                  ease-out
-                  `,
-                  status === "idle" &&
-                    "opacity-0 translate-y-1",
-
-                  status !== "idle" &&
-                    "opacity-100 translate-y-0"
-                )}
-              >
-
+              <div className="flex items-center gap-2">
                 <div
                   className={cn(
-                    `
-                    h-2
-                    w-2
-                    rounded-full
-                    shrink-0
-                    `,
-
-                    status === "loading" &&
-                      "bg-white/70 animate-pulse",
-
-                    status === "success" &&
-                      "bg-emerald-400",
-
-                    status === "error" &&
-                      "bg-red-400"
+                    "size-2 shrink-0 rounded-full",
+                    status === "loading" && "animate-pulse bg-white/70",
+                    status === "success" && "bg-emerald-400",
+                    status === "error" && "bg-red-400"
                   )}
                 />
-
                 <span>
-
-                  {status === "loading" &&
-                    statusLabels.loading}
-
-                  {status === "success" &&
-                    statusLabels.success}
-
-                  {status === "error" &&
-                    statusLabels.error}
-
+                  {status === "loading" && statusLabels.loading}
+                  {status === "success" && statusLabels.success}
+                  {status === "error" && statusLabels.error}
                 </span>
-
               </div>
-
             </div>
-
           </CardContent>
-
         </Card>
-
       </div>
 
-      {/* RIGHT */}
-      <PreviewPanel
-        subject={subject}
-        marks={marks}
-        questionText={questionText}
-        math={math}
-        hints={hints}
-        graph={graph}
-      />
-
+      {!hidePreview && (
+        <PreviewPanel
+          attachments={attachments}
+          hints={hints}
+          markingCriteria={markingCriteria}
+          marks={effectiveMarks}
+          parts={parts}
+          questionText={questionText}
+          importSource={importSource}
+          subject={subject}
+          tags={selectedTags}
+        />
+      )}
     </div>
   )
 }

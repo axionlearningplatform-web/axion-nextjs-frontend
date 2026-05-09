@@ -60,9 +60,10 @@ export default function QuestionTable() {
       <TableHeader className="[&_tr]:border-0">
         <TableRow className="border-0 hover:bg-transparent">
           <TableHead className="w-20 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">ID</TableHead>
-          <TableHead className="w-48 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">Subject</TableHead>
           <TableHead className="px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">Question</TableHead>
-          <TableHead className="w-32 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">Creator</TableHead>
+          <TableHead className="w-48 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">Source</TableHead>
+          <TableHead className="w-52 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">Topics</TableHead>
+          <TableHead className="w-36 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">Creator</TableHead>
           <TableHead className="w-24 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">Marks</TableHead>
           <TableHead className="w-36 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">Created</TableHead>
         </TableRow>
@@ -75,13 +76,41 @@ export default function QuestionTable() {
             onClick={() => router.push(lockedSubject ? `/subjects/${lockedSubject.slug}/questions/${item.id}` : `/questions/${item.id}`)}
         >
             <TableCell className="px-4 font-semibold text-[#ffb595]">{item.id}</TableCell>
-            <TableCell className="px-4 text-[#dac1b7]">{item.subject}</TableCell>
-            <TableCell className="max-w-[560px] px-4">
+            <TableCell className="max-w-[520px] px-4">
                 <div className="overflow-hidden text-ellipsis line-clamp-3 break-words">
                 {item.question_text}
             </div>
             </TableCell>
-            <TableCell className="px-4 text-[#dac1b7]">{item.creator_name || "Unknown"}</TableCell>
+            <TableCell className="max-w-48 px-4 text-[#dac1b7]">
+              <div className="line-clamp-2 whitespace-normal break-words">
+                {item.import_source || "Manual"}
+              </div>
+            </TableCell>
+            <TableCell className="px-4">
+              <div className="flex max-w-52 flex-wrap gap-1.5">
+                {(item.tags || []).slice(0, 3).map((tag) => (
+                  <span
+                    className="rounded-full border border-[#54433c]/45 bg-[#2a211e] px-2 py-1 text-[11px] text-[#dac1b7]"
+                    key={tag.id}
+                  >
+                    {tag.name}
+                  </span>
+                ))}
+                {(item.tags || []).length > 3 && (
+                  <span className="rounded-full border border-[#54433c]/35 bg-[#242424] px-2 py-1 text-[11px] text-[#a28c83]">
+                    +{item.tags.length - 3}
+                  </span>
+                )}
+                {(item.tags || []).length === 0 && (
+                  <span className="text-xs text-[#6f5c55]">Untagged</span>
+                )}
+              </div>
+            </TableCell>
+            <TableCell className="max-w-36 px-4 text-[#dac1b7]">
+              <div className="line-clamp-1 whitespace-normal break-words">
+                {item.creator_name || "Unknown"}
+              </div>
+            </TableCell>
             <TableCell className="px-4">{item.marks}</TableCell>
             <TableCell className="px-4 text-[#dac1b7]">
                 {new Date(item.created_at).toLocaleDateString()}

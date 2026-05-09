@@ -13,6 +13,7 @@ import {
   Menu,
   PenSquare,
   Sparkles,
+  Upload,
 } from "lucide-react"
 
 import AccountDropdown from "@/components/layout/AccountDropdown"
@@ -275,6 +276,13 @@ export default function AppShell({ children }) {
                 icon={PenSquare}
                 label="Creator"
                 active={pathname === `${subjectBase}/create`}
+                collapsed={collapsed}
+              />
+              <NavItem
+                href={`${subjectBase}/scrape`}
+                icon={Upload}
+                label="Scrape"
+                active={pathname === `${subjectBase}/scrape`}
                 collapsed={collapsed}
               />
               <NavItem

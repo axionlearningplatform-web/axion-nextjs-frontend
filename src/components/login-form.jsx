@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input"
 
 export function LoginForm({
   className,
+  onSubmit,
   ...props
 }) {
   return (
@@ -31,7 +32,7 @@ export function LoginForm({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form>
+          <form onSubmit={onSubmit}>
             <FieldGroup>
               <Field>
                 <Button variant="outline" type="button">
