@@ -142,6 +142,19 @@ function formatTimer(seconds) {
   return `${minutes}:${String(remainder).padStart(2, "0")}`
 }
 
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve({
+      name: file.name,
+      mime_type: file.type || "application/octet-stream",
+      data_url: reader.result,
+    })
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
+
 function prepareMarkdown(value) {
   return String(value || "")
     .replace(/\r\n?/g, "\n")
@@ -557,8 +570,32 @@ function DiagramSvg({ svg }) {
   )
 }
 
-function AnswerArea({ onSubmit }) {
+function AnswerArea({ markingError, markingLoading, markingResult, onSubmit }) {
   const [activeTab, setActiveTab] = useState("type")
+  const [typedAnswer, setTypedAnswer] = useState("")
+  const [files, setFiles] = useState([])
+
+  async function addFiles(fileList) {
+    const nextFiles = await Promise.all(Array.from(fileList || []).map(readFileAsDataUrl))
+    setFiles((current) => [...current, ...nextFiles])
+  }
+
+  function removeFile(index) {
+    setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))
+  }
+
+  function submitAnswer() {
+    const payloadFiles = [...files]
+    if (typedAnswer.trim()) {
+      payloadFiles.push({
+        name: "typed-answer.txt",
+        mime_type: "text/plain",
+        data_url: typedAnswer.trim(),
+        text: typedAnswer.trim(),
+      })
+    }
+    onSubmit({ files: payloadFiles })
+  }
 
   return (
     <section className="border-t border-white/[0.06] px-6 py-6 md:px-12">
@@ -583,6 +620,8 @@ function AnswerArea({ onSubmit }) {
       {activeTab === "type" ? (
         <div className="rounded-[3px] border border-white/[0.06] bg-[#1b1713] p-5">
           <textarea
+            value={typedAnswer}
+            onChange={(event) => setTypedAnswer(event.target.value)}
             className="min-h-36 w-full resize-y bg-transparent font-serif text-base leading-relaxed text-[#e8e4dc] outline-none placeholder:italic placeholder:text-[#4f4a45]"
             placeholder="Begin your working here..."
           />
@@ -606,6 +645,44 @@ function AnswerArea({ onSubmit }) {
             </span>
           </div>
         </div>
+      ) : activeTab === "photo" ? (
+        <div className="rounded-[3px] border border-white/[0.06] bg-[#1a1714] p-5">
+          <label className="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-[3px] border border-dashed border-white/[0.09] px-4 py-8 text-center text-[13px] tracking-[0.04em] text-[#6f6861] transition-colors hover:border-[#9b673d]/45 hover:text-[#dba476]">
+            <input
+              type="file"
+              multiple
+              accept="image/*,.heic,.heif,.pdf,application/pdf"
+              className="sr-only"
+              onChange={(event) => {
+                addFiles(event.target.files)
+                event.target.value = ""
+              }}
+            />
+            Upload images or PDFs of your working
+            <span className="mt-2 text-[11px] text-[#4f4a45]">JPG, PNG, HEIC, PDF</span>
+          </label>
+          {files.length > 0 && (
+            <div className="mt-4 grid gap-2">
+              {files.map((file, index) => (
+                <div
+                  key={`${file.name}-${index}`}
+                  className="flex items-center gap-3 rounded-[3px] border border-white/[0.06] px-3 py-2 text-[12px] text-[#9b8f84]"
+                >
+                  <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                  <span className="shrink-0 text-[#4f4a45]">{file.mime_type || "file"}</span>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${file.name}`}
+                    onClick={() => removeFile(index)}
+                    className="shrink-0 text-[#6f6861] transition-colors hover:text-[#e8e4dc]"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       ) : (
         <div className="flex min-h-44 items-center justify-center rounded-[3px] border border-white/[0.06] bg-[#1a1714] text-[13px] tracking-[0.04em] text-[#4f4a45]">
           {titleCase(activeTab)} tools are coming soon.
@@ -615,13 +692,54 @@ function AnswerArea({ onSubmit }) {
       <div className="mt-5 flex justify-end">
         <button
           type="button"
-          onClick={onSubmit}
-          className="inline-flex h-11 items-center justify-center gap-3 rounded-[2px] border border-[#9b673d]/42 bg-[#c8864a]/12 px-7 text-[12px] font-medium tracking-[0.06em] text-[#dba476] transition-colors hover:border-[#c8864a]/62 hover:bg-[#c8864a]/18 hover:text-[#efbd94]"
+          disabled={markingLoading}
+          onClick={submitAnswer}
+          className="inline-flex h-11 items-center justify-center gap-3 rounded-[2px] border border-[#9b673d]/42 bg-[#c8864a]/12 px-7 text-[12px] font-medium tracking-[0.06em] text-[#dba476] transition-colors hover:border-[#c8864a]/62 hover:bg-[#c8864a]/18 hover:text-[#efbd94] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Submit Answer
-          <ArrowRight className="size-[18px]" />
+          {markingLoading ? "Marking..." : "Submit Answer"}
+          {markingLoading ? <Loader2 className="size-[18px] animate-spin" /> : <ArrowRight className="size-[18px]" />}
         </button>
       </div>
+
+      {(markingError || markingResult) && (
+        <div className="mt-5 rounded-[3px] border border-white/[0.06] bg-[#1a1714] p-5">
+          {markingError && (
+            <p className="text-[13px] text-[#d99658]">{markingError}</p>
+          )}
+          {markingResult && (
+            <div className="grid gap-4">
+              <div className="flex flex-wrap items-center gap-3 text-[13px] text-[#b7aca1]">
+                <span className="font-serif text-[22px] text-[#eee9e4]">
+                  {markingResult.marks_awarded}/{markingResult.marks_possible}
+                </span>
+                <span className="text-[#4f4a45]">question marks</span>
+                <span className="text-[#5b5048]">·</span>
+                <span>{markingResult.tag_score}/{markingResult.tag_score_possible} tag score</span>
+              </div>
+              {(markingResult.parts || []).map((part) => (
+                <div key={part.label} className="border-t border-white/[0.06] pt-4">
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
+                    {part.label}: {part.marks_awarded}/{part.marks_possible} marks
+                  </p>
+                  {part.lost_tags?.length > 0 ? (
+                    <ul className="mt-3 grid gap-2">
+                      {part.lost_tags.map((item) => (
+                        <li key={item.tag} className="text-[13px] leading-relaxed text-[#9b8f84]">
+                          <span className="text-[#dba476]">{item.tag}</span>
+                          <span className="text-[#5b5048]"> {item.score}/{item.max_score}: </span>
+                          {item.reason}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-3 text-[13px] text-[#9b8f84]">No lost tags detected.</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </section>
   )
 }
@@ -629,8 +747,11 @@ function AnswerArea({ onSubmit }) {
 function QuestionView({
   config,
   loading,
+  markingError,
+  markingLoading,
+  markingResult,
   onBack,
-  onNextQuestion,
+  onSubmitAnswer,
   question,
   timer,
 }) {
@@ -767,7 +888,12 @@ function QuestionView({
         </article>
       </section>
 
-      <AnswerArea onSubmit={onNextQuestion} />
+      <AnswerArea
+        markingError={markingError}
+        markingLoading={markingLoading}
+        markingResult={markingResult}
+        onSubmit={onSubmitAnswer}
+      />
     </main>
   )
 }
@@ -782,6 +908,9 @@ export default function DailyPracticePage() {
   const [questionLoading, setQuestionLoading] = useState(false)
   const [arrivalSource, setArrivalSource] = useState("home")
   const [timer, setTimer] = useState(0)
+  const [markingLoading, setMarkingLoading] = useState(false)
+  const [markingResult, setMarkingResult] = useState(null)
+  const [markingError, setMarkingError] = useState("")
 
   const membership = auth.subjectMemberships?.find(
     (item) => item.subject.slug === params.slug
@@ -838,6 +967,8 @@ export default function DailyPracticePage() {
       }
       const detail = await fetcher(`${QUESTIONS_API_URL}${matchingQuestion.id}/`)
       setQuestion(detail)
+      setMarkingResult(null)
+      setMarkingError("")
     } finally {
       setQuestionLoading(false)
     }
@@ -853,6 +984,32 @@ export default function DailyPracticePage() {
   function backFromQuestion() {
     setMode("home")
     if (arrivalSource === "modal") setModalOpen(true)
+  }
+
+  async function submitAnswer(payload) {
+    if (!question?.id) return
+    setMarkingLoading(true)
+    setMarkingError("")
+    setMarkingResult(null)
+    try {
+      const response = await fetch(`${QUESTIONS_API_URL}${question.id}/mark/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(payload),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.detail || data.message || "Could not mark this response.")
+      }
+      setMarkingResult(data)
+    } catch (error) {
+      setMarkingError(error.message || "Could not mark this response.")
+    } finally {
+      setMarkingLoading(false)
+    }
   }
 
   if (!config) {
@@ -879,8 +1036,11 @@ export default function DailyPracticePage() {
         <QuestionView
           config={config}
           loading={questionLoading}
+          markingError={markingError}
+          markingLoading={markingLoading}
+          markingResult={markingResult}
           onBack={backFromQuestion}
-          onNextQuestion={loadQuestion}
+          onSubmitAnswer={submitAnswer}
           question={question}
           timer={timer}
         />

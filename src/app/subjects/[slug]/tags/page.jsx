@@ -32,14 +32,14 @@ function TagPill({ tag, active, deleting, onClick, onDelete }) {
       disabled={deleting}
       onClick={onClick}
       className={cn(
-        "group flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition-all",
+        "group flex w-full min-w-0 items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition-all",
         active
           ? "border-[#c8864a]/55 bg-[#c8864a]/13 text-[#f1d0b9]"
           : "border-[#3b2a22]/55 bg-white/[0.025] text-[#d8c4b0] hover:border-[#c8864a]/30 hover:bg-white/[0.04]",
         deleting && "cursor-wait opacity-70"
       )}
     >
-      <span className="min-w-0">
+      <span className="min-w-0 flex-1 overflow-hidden">
         <span className="block truncate font-serif text-[17px] font-medium">{tag.name}</span>
         <span className="mt-1 block text-[10px] uppercase tracking-[0.16em] text-[#8c8178]">
           {isMicroskill(tag) ? "Microskill" : `Layer ${tag.layer}`} · {tag.children_count || 0} child tags
@@ -204,7 +204,7 @@ export default function SubjectTagsPage() {
           </p>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-4">
+        <div className="grid min-w-0 gap-4 xl:grid-cols-[repeat(4,minmax(0,1fr))]">
           {LAYERS.map((layer) => {
             const parent = layer.id === 1 || layer.id === 4 ? null : selected[layer.id - 1]
             const locked = layer.id > 1 && layer.id !== 4 && !parent
@@ -214,7 +214,7 @@ export default function SubjectTagsPage() {
               <article
                 key={layer.id}
                 className={cn(
-                  "min-h-[520px] rounded-3xl border border-[#3b2a22]/55 bg-[#1b1713] p-4 shadow-2xl shadow-black/15",
+                  "min-w-0 overflow-hidden rounded-3xl border border-[#3b2a22]/55 bg-[#1b1713] p-4 shadow-2xl shadow-black/15 xl:min-h-[520px]",
                   locked && "opacity-50"
                 )}
               >
@@ -241,7 +241,7 @@ export default function SubjectTagsPage() {
                       subjectId={subject.id}
                       onCreated={mutate}
                     />
-                    <div className="mt-4 grid gap-2">
+                    <div className="mt-4 grid min-w-0 gap-2">
                       {isLoading && layer.id === 1 && (
                         <div className="flex items-center gap-2 rounded-2xl border border-[#3b2a22]/55 bg-[#181410] px-4 py-3 text-sm text-[#8c8178]">
                           <Loader2 className="size-4 animate-spin" />

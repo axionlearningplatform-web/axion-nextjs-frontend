@@ -305,6 +305,15 @@ function isTaxonomyTag(tag) {
   return tag && !isMicroskill(tag)
 }
 
+function isGranularMarkingTag(tag) {
+  return tag?.layer === 3 || isMicroskill(tag)
+}
+
+function selectedGranularTagCount(selectedIds = [], tags = []) {
+  const selectedSet = new Set(selectedIds)
+  return tags.filter((tag) => selectedSet.has(tag.id) && isGranularMarkingTag(tag)).length
+}
+
 function scoreScaleForTag(tag) {
   if (isMicroskill(tag)) return [0, 1]
   if (tag?.layer === 3) return [0, 1, 2]
@@ -315,7 +324,7 @@ function syncTagRequirements(selectedIds, existing = [], tags = []) {
   const existingById = new Map((existing || []).map((item) => [Number(item.tag_id), item]))
   return selectedIds
     .map((id) => tags.find((tag) => tag.id === id))
-    .filter((tag) => tag?.layer === 3 || isMicroskill(tag))
+    .filter(isGranularMarkingTag)
     .map((tag) => ({
       tag_id: tag.id,
       amount: existingById.get(tag.id)?.amount === "" ? "" : Math.max(Number(existingById.get(tag.id)?.amount || 1), 1),
@@ -326,7 +335,7 @@ function syncTagRequirements(selectedIds, existing = [], tags = []) {
 function TagRequirementAmounts({ tags, selectedIds, requirements, onChange }) {
   const selectedTags = selectedIds
     .map((id) => tags.find((tag) => tag.id === id))
-    .filter((tag) => tag?.layer === 3 || isMicroskill(tag))
+    .filter(isGranularMarkingTag)
 
   if (!selectedTags.length) return null
 
@@ -1019,7 +1028,7 @@ export function QuestionEditor({
 
                         <DropdownSection
                           title="Concepts & Microskills"
-                          summary={`${part.tag_ids?.length || 0} selected`}
+                          summary={`${selectedGranularTagCount(part.tag_ids || [], tags)} selected`}
                         >
                           <TagTaxonomyPicker
                             tags={tags}
