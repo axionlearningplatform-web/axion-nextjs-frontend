@@ -33,6 +33,7 @@ const emptyPart = (index = 0) => ({
   label: String.fromCharCode(97 + index),
   text: "",
   marks: 1,
+  tag_ids: [],
   attachments: [],
   tikz_visuals: [],
   marking_criteria: [emptyCriteria(1)],
@@ -337,6 +338,180 @@ function CriteriaEditor({ marks, criteria, onChange }) {
   )
 }
 
+function getDescendantIds(tags, tagId) {
+  const children = tags.filter((tag) => tag.parent_id === tagId)
+  return children.flatMap((child) => [child.id, ...getDescendantIds(tags, child.id)])
+}
+
+function TagTaxonomyPicker({
+  tags,
+  selectedIds,
+  onChange,
+  parentSelectedIds = [],
+  deepOnly = false,
+  showDeep = true,
+}) {
+  const [openRoot, setOpenRoot] = useState(null)
+  const closeTimerRef = useRef(null)
+  const layer1 = tags.filter((tag) => tag.layer === 1)
+  const selectedSet = new Set(selectedIds)
+  const parentSet = new Set(parentSelectedIds)
+  const hasMainPath = parentSelectedIds.some((id) => {
+    const tag = tags.find((item) => item.id === id)
+    return tag?.layer === 2
+  })
+
+  function toggle(tag) {
+    const descendants = getDescendantIds(tags, tag.id)
+    if (selectedSet.has(tag.id)) {
+      onChange(selectedIds.filter((id) => id !== tag.id && !descendants.includes(id)))
+    } else {
+      onChange([...selectedIds, tag.id])
+    }
+  }
+
+  function children(parentId, layer) {
+    return tags.filter((tag) => tag.parent_id === parentId && tag.layer === layer)
+  }
+
+  function openFlyout(tagId) {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
+    setOpenRoot(tagId)
+  }
+
+  function scheduleCloseFlyout() {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
+    closeTimerRef.current = setTimeout(() => setOpenRoot(null), 320)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
+    }
+  }, [])
+
+  if (deepOnly && !hasMainPath) {
+    return (
+      <p className="rounded-2xl border border-[#c8864a]/20 bg-[#c8864a]/10 px-4 py-3 text-sm text-[#d7a67d]">
+        Assign a Layer 1 topic and Layer 2 subtopic to the main question before adding granular part tags.
+      </p>
+    )
+  }
+
+  if (deepOnly) {
+    const layer2Parents = tags.filter((tag) => tag.layer === 2 && parentSet.has(tag.id))
+    const deepTags = layer2Parents.flatMap((parent) => [
+      ...children(parent.id, 3),
+      ...children(parent.id, 3).flatMap((tag) => children(tag.id, 4)),
+    ])
+
+    return (
+      <div className="flex flex-wrap gap-2">
+        {deepTags.length === 0 && (
+          <span className="text-sm text-[#a28c83]">No Layer 3 or 4 tags exist under the selected subtopics yet.</span>
+        )}
+        {deepTags.map((tag) => (
+          <button
+            className={cn(
+              "rounded-full border px-3 py-1.5 text-sm transition-colors",
+              selectedSet.has(tag.id)
+                ? "border-[#ffb595]/60 bg-[#4a2f26] text-[#ffb595]"
+                : "border-[#3b2a22]/55 bg-white/[0.035] text-[#dac1b7] hover:bg-[#211913]"
+            )}
+            key={tag.id}
+            type="button"
+            onClick={() => toggle(tag)}
+          >
+            L{tag.layer} · {tag.name}
+          </button>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid gap-4">
+      <div className="flex flex-wrap gap-2">
+        {layer1.length === 0 && (
+          <span className="text-sm text-[#a28c83]">Create Layer 1 tags in the Tags admin section.</span>
+        )}
+        {layer1.map((tag) => {
+          const selected = selectedSet.has(tag.id)
+          const subtopics = children(tag.id, 2)
+          return (
+            <span
+              className="relative"
+              key={tag.id}
+              onMouseEnter={() => openFlyout(tag.id)}
+              onMouseLeave={scheduleCloseFlyout}
+            >
+              <button
+                className={cn(
+                  "rounded-full border px-2.5 py-1 font-serif text-[14px] transition-colors",
+                  selected
+                    ? "border-[#ffb595]/60 bg-[#4a2f26] text-[#ffb595]"
+                    : "border-[#3b2a22]/55 bg-white/[0.035] text-[#dac1b7] hover:bg-[#211913]"
+                )}
+                type="button"
+                onClick={() => toggle(tag)}
+              >
+                {tag.name}
+              </button>
+              {openRoot === tag.id && subtopics.length > 0 && (
+                <span
+                  className="absolute left-0 top-9 z-30 grid min-w-[240px] gap-2 rounded-2xl border border-[#3b2a22]/70 bg-[#131110] p-3 shadow-2xl shadow-black/40"
+                  onMouseEnter={() => openFlyout(tag.id)}
+                  onMouseLeave={scheduleCloseFlyout}
+                >
+                  <span className="px-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8c8178]">
+                    Layer 2 under {tag.name}
+                  </span>
+                  {subtopics.map((child) => (
+                    <button
+                      className={cn(
+                        "rounded-xl border px-3 py-2 text-left text-sm transition-colors",
+                        selectedSet.has(child.id)
+                          ? "border-[#ffb595]/60 bg-[#4a2f26] text-[#ffb595]"
+                          : "border-[#3b2a22]/55 bg-white/[0.035] text-[#dac1b7] hover:bg-[#211913]"
+                      )}
+                      key={child.id}
+                      type="button"
+                      onClick={() => {
+                        const withParent = selectedSet.has(tag.id) ? selectedIds : [...selectedIds, tag.id]
+                        onChange(
+                          selectedSet.has(child.id)
+                            ? withParent.filter((id) => id !== child.id && !getDescendantIds(tags, child.id).includes(id))
+                            : [...withParent, child.id]
+                        )
+                      }}
+                    >
+                      {child.name}
+                    </button>
+                  ))}
+                </span>
+              )}
+            </span>
+          )
+        })}
+      </div>
+
+      {showDeep && selectedIds.some((id) => tags.find((tag) => tag.id === id)?.layer === 2) && (
+        <div className="rounded-2xl border border-[#3b2a22]/55 bg-[#181410] p-3">
+          <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8c8178]">
+            Granular tags for this question
+          </p>
+          <TagTaxonomyPicker tags={tags} selectedIds={selectedIds} onChange={onChange} parentSelectedIds={selectedIds} deepOnly />
+        </div>
+      )}
+      {!showDeep && selectedIds.some((id) => tags.find((tag) => tag.id === id)?.layer === 2) && (
+        <p className="rounded-2xl border border-[#3b2a22]/55 bg-[#181410] px-4 py-3 text-sm text-[#a28c83]">
+          Granular Layer 3 and 4 tags are assigned inside each part.
+        </p>
+      )}
+    </div>
+  )
+}
+
 function HintsEditor({ hints, onChange }) {
   return (
     <div className="grid gap-3">
@@ -479,6 +654,7 @@ export function QuestionEditor({
         label: part.label || String.fromCharCode(97 + index),
         text: part.text || "",
         marks: Number(part.marks || 1),
+        tag_ids: part.tag_ids || [],
         attachments: part.attachments || [],
         tikz_visuals: part.tikz_visuals || [],
         marking_criteria: criteriaForMarks(
@@ -528,6 +704,7 @@ export function QuestionEditor({
         label: part.label,
         text: part.text,
         marks: Number(part.marks) || 1,
+        tag_ids: part.tag_ids || [],
         attachments: part.attachments || [],
         tikz_visuals: part.tikz_visuals || [],
         marking_criteria: part.marking_criteria || [],
@@ -858,7 +1035,24 @@ export function QuestionEditor({
                               setParts(next)
                             }}
                         />
-                      </DropdownSection>
+                        </DropdownSection>
+
+                        <DropdownSection
+                          title="Concept Tags"
+                          summary={`${part.tag_ids?.length || 0} selected`}
+                        >
+                          <TagTaxonomyPicker
+                            tags={tags}
+                            selectedIds={part.tag_ids || []}
+                            parentSelectedIds={tagIds}
+                            deepOnly
+                            onChange={(value) => {
+                              const next = [...parts]
+                              next[index] = { ...part, tag_ids: value }
+                              setParts(next)
+                            }}
+                          />
+                        </DropdownSection>
 
                         <DropdownSection
                           title="Hints"
@@ -922,33 +1116,17 @@ export function QuestionEditor({
                   <div className="flex flex-wrap gap-2 rounded-2xl border border-[#3b2a22]/55 bg-[#181410] p-3">
                     {tags.length === 0 && (
                       <span className="text-sm text-[#a28c83]">
-                        Add question tags in Django admin.
+                        Add question tags in the Tags admin section.
                       </span>
                     )}
-                    {tags.map((tag) => {
-                      const selected = tagIds.includes(tag.id)
-                      return (
-                        <button
-                          className={cn(
-                            "rounded-full border px-3 py-1 text-sm transition-colors",
-                            selected
-                              ? "border-[#ffb595]/60 bg-[#4a2f26] text-[#ffb595]"
-                              : "border-[#3b2a22]/55 bg-white/[0.035] text-[#dac1b7] hover:bg-[#211913]"
-                          )}
-                          key={tag.id}
-                          type="button"
-                          onClick={() =>
-                            setTagIds(
-                              selected
-                                ? tagIds.filter((id) => id !== tag.id)
-                                : [...tagIds, tag.id]
-                            )
-                          }
-                        >
-                          {tag.name}
-                        </button>
-                      )
-                    })}
+                    {tags.length > 0 && (
+                      <TagTaxonomyPicker
+                        tags={tags}
+                        selectedIds={tagIds}
+                        onChange={setTagIds}
+                        showDeep={parts.length === 0}
+                      />
+                    )}
                   </div>
                 </Field>
 

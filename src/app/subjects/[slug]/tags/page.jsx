@@ -1,0 +1,258 @@
+"use client"
+
+import { useMemo, useState } from "react"
+import { useParams } from "next/navigation"
+import useSWR from "swr"
+import { ChevronRight, Loader2, Plus, Trash2 } from "lucide-react"
+
+import fetcher from "@/lib/fetcher"
+import { cn } from "@/lib/utils"
+
+const SUBJECTS_API_URL = "/api/subjects/"
+const TAGS_API_URL = "/api/questions/tags/"
+const LAYERS = [
+  { id: 1, title: "Topics", hint: "Vectors, Complex, Integration" },
+  { id: 2, title: "Subtopics", hint: "2D vectors, equations, volumes" },
+  { id: 3, title: "Concepts", hint: "y-axis rotation, proof methods" },
+  { id: 4, title: "Micro Skills", hint: "tiny behaviours and traps" },
+]
+
+function childrenOf(tags, parentId) {
+  return tags.filter((tag) => (tag.parent_id || null) === (parentId || null))
+}
+
+function TagPill({ tag, active, deleting, onClick, onDelete }) {
+  return (
+    <button
+      type="button"
+      disabled={deleting}
+      onClick={onClick}
+      className={cn(
+        "group flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition-all",
+        active
+          ? "border-[#c8864a]/55 bg-[#c8864a]/13 text-[#f1d0b9]"
+          : "border-[#3b2a22]/55 bg-white/[0.025] text-[#d8c4b0] hover:border-[#c8864a]/30 hover:bg-white/[0.04]",
+        deleting && "cursor-wait opacity-70"
+      )}
+    >
+      <span className="min-w-0">
+        <span className="block truncate font-serif text-[17px] font-medium">{tag.name}</span>
+        <span className="mt-1 block text-[10px] uppercase tracking-[0.16em] text-[#8c8178]">
+          Layer {tag.layer} · {tag.children_count || 0} child tags
+        </span>
+      </span>
+      <span className="flex shrink-0 items-center gap-2">
+        <span
+          className="inline-flex size-7 items-center justify-center rounded-full text-[#8c8178] opacity-0 transition-opacity hover:bg-red-400/10 hover:text-red-200 group-hover:opacity-100"
+          onClick={(event) => {
+            event.stopPropagation()
+            if (!deleting) onDelete()
+          }}
+        >
+          {deleting ? (
+            <Loader2 className="size-3.5 animate-spin text-[#c8864a]" />
+          ) : (
+            <Trash2 className="size-3.5" />
+          )}
+        </span>
+        <ChevronRight className="size-4 text-[#c8864a]/70" />
+      </span>
+    </button>
+  )
+}
+
+function CreateTagForm({ layer, parent, subjectId, onCreated }) {
+  const [name, setName] = useState("")
+  const [message, setMessage] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  async function createTag(event) {
+    event.preventDefault()
+    if (!name.trim()) return
+    setSaving(true)
+    setMessage("")
+
+    const response = await fetch(TAGS_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: name.trim(),
+        subject_id: subjectId,
+        parent_id: parent?.id || null,
+        layer,
+      }),
+    })
+    const data = await response.json()
+    setSaving(false)
+
+    if (!response.ok) {
+      setMessage(data.detail || "Could not create tag.")
+      return
+    }
+
+    setName("")
+    onCreated()
+  }
+
+  return (
+    <form className="mt-4 rounded-2xl border border-[#3b2a22]/55 bg-[#181410] p-3" onSubmit={createTag}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8c8178]">
+        {parent ? `Under ${parent.name}` : "Root topic"}
+      </p>
+      <div className="mt-3 flex gap-2">
+        <input
+          className="h-10 min-w-0 flex-1 rounded-xl border border-white/[0.07] bg-white/[0.035] px-3 text-sm text-[#eee9e4] outline-none transition-colors placeholder:text-[#6f6258] focus:border-[#c8864a]/50"
+          placeholder={`New ${LAYERS[layer - 1].title.slice(0, -1).toLowerCase()}`}
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
+        <button
+          type="submit"
+          disabled={saving || !name.trim()}
+          className="inline-flex size-10 items-center justify-center rounded-xl border border-[#c8864a]/30 bg-[#c8864a]/12 text-[#e6b083] transition-colors hover:bg-[#c8864a]/20 disabled:opacity-50"
+        >
+          {saving ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+        </button>
+      </div>
+      {message && <p className="mt-2 text-xs text-red-200">{message}</p>}
+    </form>
+  )
+}
+
+export default function SubjectTagsPage() {
+  const params = useParams()
+  const { data: subjects = [] } = useSWR(SUBJECTS_API_URL, fetcher)
+  const subject = subjects.find((item) => item.slug === params.slug)
+  const tagsUrl = subject ? `${TAGS_API_URL}?subject_id=${subject.id}` : null
+  const { data: tags = [], mutate, isLoading } = useSWR(tagsUrl, fetcher)
+  const [selected, setSelected] = useState({})
+  const [deletingTagId, setDeletingTagId] = useState(null)
+
+  const visibleByLayer = useMemo(() => {
+    const layer1 = tags.filter((tag) => tag.layer === 1)
+    const layer2 = selected[1] ? childrenOf(tags, selected[1].id) : []
+    const layer3 = selected[2] ? childrenOf(tags, selected[2].id) : []
+    const layer4 = selected[3] ? childrenOf(tags, selected[3].id) : []
+    return { 1: layer1, 2: layer2, 3: layer3, 4: layer4 }
+  }, [selected, tags])
+
+  function selectTag(layer, tag) {
+    setSelected((current) => {
+      const next = { ...current, [layer]: tag }
+      for (let item = layer + 1; item <= 4; item += 1) delete next[item]
+      return next
+    })
+  }
+
+  async function deleteTag(tag) {
+    if (deletingTagId) return
+    setDeletingTagId(tag.id)
+    try {
+      const response = await fetch(`${TAGS_API_URL}${tag.id}/`, { method: "DELETE" })
+      if (response.ok) {
+        setSelected((current) => {
+          const next = { ...current }
+          Object.entries(next).forEach(([layer, value]) => {
+            if (value.id === tag.id) delete next[layer]
+          })
+          return next
+        })
+        mutate()
+      }
+    } finally {
+      setDeletingTagId(null)
+    }
+  }
+
+  if (!subject) {
+    return (
+      <main className="min-h-[calc(100vh-64px)] bg-[#16130f] p-10 text-[#dac1b7]">
+        Loading subject tags...
+      </main>
+    )
+  }
+
+  return (
+    <main className="min-h-[calc(100vh-64px)] bg-[#16130f] px-6 py-10 text-[#eee9e4] md:px-10">
+      <section className="mx-auto flex w-full max-w-[1500px] flex-col gap-8">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c8864a]/55">
+            {subject.name} taxonomy
+          </p>
+          <h1 className="mt-3 font-serif text-[34px] font-semibold text-[#eee9e4]">
+            Question Tags
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#8c8178]">
+            Build the four-layer map analysts use for questions. Students only see layers 1 and 2 in Daily Practice.
+          </p>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-4">
+          {LAYERS.map((layer) => {
+            const parent = layer.id === 1 ? null : selected[layer.id - 1]
+            const locked = layer.id > 1 && !parent
+            const items = visibleByLayer[layer.id] || []
+
+            return (
+              <article
+                key={layer.id}
+                className={cn(
+                  "min-h-[520px] rounded-3xl border border-[#3b2a22]/55 bg-[#1b1713] p-4 shadow-2xl shadow-black/15",
+                  locked && "opacity-50"
+                )}
+              >
+                <div className="rounded-2xl border border-white/[0.055] bg-white/[0.025] p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#c8864a]/60">
+                    Layer {layer.id}
+                  </p>
+                  <h2 className="mt-2 font-serif text-[24px] font-semibold text-[#eee9e4]">
+                    {layer.title}
+                  </h2>
+                  <p className="mt-2 text-xs leading-5 text-[#8c8178]">{layer.hint}</p>
+                </div>
+
+                {locked ? (
+                  <div className="mt-4 rounded-2xl border border-dashed border-[#3b2a22]/55 p-4 text-sm leading-6 text-[#8c8178]">
+                    Select a layer {layer.id - 1} tag first.
+                  </div>
+                ) : (
+                  <>
+                    <CreateTagForm
+                      layer={layer.id}
+                      parent={parent}
+                      subjectId={subject.id}
+                      onCreated={mutate}
+                    />
+                    <div className="mt-4 grid gap-2">
+                      {isLoading && layer.id === 1 && (
+                        <div className="flex items-center gap-2 rounded-2xl border border-[#3b2a22]/55 bg-[#181410] px-4 py-3 text-sm text-[#8c8178]">
+                          <Loader2 className="size-4 animate-spin" />
+                          Loading tags
+                        </div>
+                      )}
+                      {items.map((tag) => (
+                        <TagPill
+                          key={tag.id}
+                          tag={tag}
+                          active={selected[layer.id]?.id === tag.id}
+                          deleting={deletingTagId === tag.id}
+                          onClick={() => selectTag(layer.id, tag)}
+                          onDelete={() => deleteTag(tag)}
+                        />
+                      ))}
+                      {!items.length && !isLoading && (
+                        <div className="rounded-2xl border border-dashed border-[#3b2a22]/55 p-4 text-sm leading-6 text-[#8c8178]">
+                          No tags here yet.
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </article>
+            )
+          })}
+        </div>
+      </section>
+    </main>
+  )
+}

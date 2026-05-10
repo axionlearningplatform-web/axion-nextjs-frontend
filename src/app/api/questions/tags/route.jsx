@@ -16,3 +16,17 @@ export async function GET(request) {
     { status: response.status }
   )
 }
+
+export async function POST(request) {
+  const requestData = await request.json()
+  const response = await ApiProxy.post(
+    DJANGO_TAGS_URL,
+    requestData,
+    true
+  )
+
+  return NextResponse.json(
+    response.data,
+    { status: response.status }
+  )
+}

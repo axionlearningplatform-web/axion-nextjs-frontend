@@ -13,6 +13,7 @@ import {
   Menu,
   PenSquare,
   Sparkles,
+  Tags,
   Upload,
 } from "lucide-react"
 
@@ -291,6 +292,13 @@ export default function AppShell({ children }) {
                 icon={Database}
                 label="Database"
                 active={pathname.startsWith(`${subjectBase}/questions`)}
+                collapsed={collapsed}
+              />
+              <NavItem
+                href={`${subjectBase}/tags`}
+                icon={Tags}
+                label="Tags"
+                active={pathname === `${subjectBase}/tags`}
                 collapsed={collapsed}
               />
             </div>

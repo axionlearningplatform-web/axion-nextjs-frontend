@@ -71,6 +71,7 @@ function splitTags(tags = []) {
   const topics = []
 
   tags.forEach((tag) => {
+    if (tag.layer && tag.layer > 2) return
     if (tagLooksLike(tag, ["year 11", "year11", "yr 11", "yr11"])) {
       year.push(tag)
       return
@@ -90,7 +91,15 @@ function splitTags(tags = []) {
     topics.push(tag)
   })
 
-  return { year, difficulty, type, topics }
+  return {
+    year,
+    difficulty,
+    type,
+    topics: topics.sort((a, b) => {
+      if ((a.layer || 1) !== (b.layer || 1)) return (a.layer || 1) - (b.layer || 1)
+      return a.name.localeCompare(b.name)
+    }),
+  }
 }
 
 function defaultConfig(subject) {
@@ -241,38 +250,63 @@ function PracticeModal({
   subject,
 }) {
   const [activeSection, setActiveSection] = useState("year")
+  const topicById = new Map(buckets.topics.map((tag) => [tag.id, tag]))
+  const selectedTopicTags = config.topicIds
+    .map((id) => topicById.get(id))
+    .filter(Boolean)
+  const visibleTopicTags = buckets.topics.filter((tag) => {
+    if ((tag.layer || 1) === 1) return true
+    return config.topicIds.includes(tag.parent_id)
+  })
   const chips = [
-    config.year,
-    config.course,
-    ...config.topicNames,
-    config.difficulty,
-    config.type,
+    config.year && { key: "year", label: config.year, type: "year" },
+    config.course && { key: "course", label: config.course, type: "course" },
+    ...selectedTopicTags.map((tag) => ({
+      key: `topic-${tag.id}`,
+      label: tag.name,
+      type: "topic",
+      id: tag.id,
+    })),
+    config.difficulty && { key: "difficulty", label: config.difficulty, type: "difficulty" },
+    config.type && { key: "type", label: config.type, type: "type" },
   ].filter(Boolean)
 
-  function removeChip(label) {
-    if (label === config.year) onChange({ ...config, year: "" })
-    else if (label === config.difficulty) onChange({ ...config, difficulty: "" })
-    else if (label === config.type) onChange({ ...config, type: "" })
-    else if (config.topicNames.includes(label)) {
-      const index = config.topicNames.indexOf(label)
+  function removeChip(chip) {
+    if (chip.type === "year") onChange({ ...config, year: "" })
+    else if (chip.type === "difficulty") onChange({ ...config, difficulty: "" })
+    else if (chip.type === "type") onChange({ ...config, type: "" })
+    else if (chip.type === "topic") {
+      const tag = topicById.get(chip.id)
+      const childIds = tag?.layer === 1
+        ? buckets.topics.filter((item) => item.parent_id === tag.id).map((item) => item.id)
+        : []
+      const removeIds = new Set([chip.id, ...childIds])
       onChange({
         ...config,
-        topicNames: config.topicNames.filter((_, itemIndex) => itemIndex !== index),
-        topicIds: config.topicIds.filter((_, itemIndex) => itemIndex !== index),
+        topicIds: config.topicIds.filter((id) => !removeIds.has(id)),
+        topicNames: config.topicIds
+          .filter((id) => !removeIds.has(id))
+          .map((id) => topicById.get(id)?.name)
+          .filter(Boolean),
       })
     }
   }
 
   function toggleTopic(tag) {
     const selected = config.topicIds.includes(tag.id)
+    const childIds = tag.layer === 1
+      ? buckets.topics.filter((item) => item.parent_id === tag.id).map((item) => item.id)
+      : []
+    const removeIds = new Set([tag.id, ...childIds])
+    const nextTopicIds = selected
+      ? config.topicIds.filter((id) => !removeIds.has(id))
+      : [...config.topicIds, tag.id]
     onChange({
       ...config,
-      topicIds: selected
-        ? config.topicIds.filter((id) => id !== tag.id)
-        : [...config.topicIds, tag.id],
-      topicNames: selected
-        ? config.topicNames.filter((name) => name !== tag.name)
-        : [...config.topicNames, tag.name],
+      topicIds: nextTopicIds,
+      topicNames: nextTopicIds
+        .map((id) => topicById.get(id)?.name)
+        .filter(Boolean),
     })
   }
 
@@ -358,14 +392,14 @@ function PracticeModal({
 
             {activeSection === "topics" && (
               <div className="flex flex-wrap gap-2">
-                {buckets.topics.length ? (
-                  buckets.topics.map((tag) => (
+                {visibleTopicTags.length ? (
+                  visibleTopicTags.map((tag) => (
                     <OptionButton
                       key={tag.id}
                       active={config.topicIds.includes(tag.id)}
                       onClick={() => toggleTopic(tag)}
                     >
-                      {tag.name}
+                      {tag.layer === 2 ? `· ${tag.name}` : tag.name}
                     </OptionButton>
                   ))
                 ) : (
@@ -413,8 +447,8 @@ function PracticeModal({
         <footer className="flex flex-col gap-4 border-t border-[#3b2a22]/55 p-8 md:flex-row md:items-center">
           <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1">
             {chips.map((chip) => (
-              <SelectionChip key={chip} onRemove={() => removeChip(chip)}>
-                {chip}
+              <SelectionChip key={chip.key} onRemove={() => removeChip(chip)}>
+                {chip.label}
               </SelectionChip>
             ))}
             {!chips.length && <SelectionChip muted>Select a filter</SelectionChip>}
