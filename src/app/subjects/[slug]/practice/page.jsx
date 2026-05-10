@@ -71,6 +71,7 @@ function splitTags(tags = []) {
   const topics = []
 
   tags.forEach((tag) => {
+    if (tag.tag_kind === "microskill") return
     if (tag.layer && tag.layer > 2) return
     if (tagLooksLike(tag, ["year 11", "year11", "yr 11", "yr11"])) {
       year.push(tag)
@@ -114,20 +115,16 @@ function defaultConfig(subject) {
 }
 
 function configTagIds(config, buckets) {
-  const selectedNames = [
-    config.year,
-    config.difficulty,
-    config.type,
-    ...config.topicNames,
-  ].map(normalize)
+  const selectedTopicIds = new Set(config.topicIds || [])
+  const selectedTopicNames = new Set((config.topicNames || []).map(normalize))
 
-  return [...buckets.year, ...buckets.difficulty, ...buckets.type, ...buckets.topics]
-    .filter((tag) => selectedNames.includes(normalize(tag.name)))
+  return buckets.topics
+    .filter((tag) => selectedTopicIds.has(tag.id) || selectedTopicNames.has(normalize(tag.name)))
     .map((tag) => tag.id)
 }
 
 function questionMatchesConfig(question, config, buckets) {
-  const selectedTagIds = new Set([...config.topicIds, ...configTagIds(config, buckets)])
+  const selectedTagIds = new Set(configTagIds(config, buckets))
   if (!selectedTagIds.size) return true
 
   const questionTagIds = new Set((question.tags || []).map((tag) => tag.id))

@@ -11,14 +11,18 @@ import { cn } from "@/lib/utils"
 const SUBJECTS_API_URL = "/api/subjects/"
 const TAGS_API_URL = "/api/questions/tags/"
 const LAYERS = [
-  { id: 1, title: "Topics", hint: "Vectors, Complex, Integration" },
-  { id: 2, title: "Subtopics", hint: "2D vectors, equations, volumes" },
-  { id: 3, title: "Concepts", hint: "y-axis rotation, proof methods" },
-  { id: 4, title: "Micro Skills", hint: "tiny behaviours and traps" },
+  { id: 1, title: "Topics", hint: "Vectors, Complex, Integration", kind: "taxonomy" },
+  { id: 2, title: "Subtopics", hint: "2D vectors, equations, volumes", kind: "taxonomy" },
+  { id: 3, title: "Concepts", hint: "y-axis rotation, proof methods", kind: "taxonomy" },
+  { id: 4, title: "Microskills", hint: "tiny behaviours and traps", kind: "microskill" },
 ]
 
 function childrenOf(tags, parentId) {
   return tags.filter((tag) => (tag.parent_id || null) === (parentId || null))
+}
+
+function isMicroskill(tag) {
+  return tag.tag_kind === "microskill" || tag.layer === 4
 }
 
 function TagPill({ tag, active, deleting, onClick, onDelete }) {
@@ -38,7 +42,7 @@ function TagPill({ tag, active, deleting, onClick, onDelete }) {
       <span className="min-w-0">
         <span className="block truncate font-serif text-[17px] font-medium">{tag.name}</span>
         <span className="mt-1 block text-[10px] uppercase tracking-[0.16em] text-[#8c8178]">
-          Layer {tag.layer} · {tag.children_count || 0} child tags
+          {isMicroskill(tag) ? "Microskill" : `Layer ${tag.layer}`} · {tag.children_count || 0} child tags
         </span>
       </span>
       <span className="flex shrink-0 items-center gap-2">
@@ -61,7 +65,7 @@ function TagPill({ tag, active, deleting, onClick, onDelete }) {
   )
 }
 
-function CreateTagForm({ layer, parent, subjectId, onCreated }) {
+function CreateTagForm({ layer, kind = "taxonomy", parent, subjectId, onCreated }) {
   const [name, setName] = useState("")
   const [message, setMessage] = useState("")
   const [saving, setSaving] = useState(false)
@@ -80,6 +84,7 @@ function CreateTagForm({ layer, parent, subjectId, onCreated }) {
         subject_id: subjectId,
         parent_id: parent?.id || null,
         layer,
+        tag_kind: kind,
       }),
     })
     const data = await response.json()
@@ -97,12 +102,12 @@ function CreateTagForm({ layer, parent, subjectId, onCreated }) {
   return (
     <form className="mt-4 rounded-2xl border border-[#3b2a22]/55 bg-[#181410] p-3" onSubmit={createTag}>
       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8c8178]">
-        {parent ? `Under ${parent.name}` : "Root topic"}
+        {kind === "microskill" ? "Root microskill" : parent ? `Under ${parent.name}` : "Root topic"}
       </p>
       <div className="mt-3 flex gap-2">
         <input
           className="h-10 min-w-0 flex-1 rounded-xl border border-white/[0.07] bg-white/[0.035] px-3 text-sm text-[#eee9e4] outline-none transition-colors placeholder:text-[#6f6258] focus:border-[#c8864a]/50"
-          placeholder={`New ${LAYERS[layer - 1].title.slice(0, -1).toLowerCase()}`}
+          placeholder={`New ${LAYERS[layer - 1].title.replace(/s$/, "").toLowerCase()}`}
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
@@ -129,17 +134,29 @@ export default function SubjectTagsPage() {
   const [deletingTagId, setDeletingTagId] = useState(null)
 
   const visibleByLayer = useMemo(() => {
-    const layer1 = tags.filter((tag) => tag.layer === 1)
-    const layer2 = selected[1] ? childrenOf(tags, selected[1].id) : []
-    const layer3 = selected[2] ? childrenOf(tags, selected[2].id) : []
-    const layer4 = selected[3] ? childrenOf(tags, selected[3].id) : []
+    const layer1 = tags.filter((tag) => tag.layer === 1 && !isMicroskill(tag))
+    const layer2 = selected[1]
+      ? childrenOf(tags, selected[1].id).filter((tag) => tag.layer === 2 && !isMicroskill(tag))
+      : []
+    const layer3 = selected[2]
+      ? childrenOf(tags, selected[2].id).filter((tag) => tag.layer === 3 && !isMicroskill(tag))
+      : []
+    const layer4 = tags.filter(isMicroskill)
     return { 1: layer1, 2: layer2, 3: layer3, 4: layer4 }
   }, [selected, tags])
 
   function selectTag(layer, tag) {
     setSelected((current) => {
       const next = { ...current, [layer]: tag }
-      for (let item = layer + 1; item <= 4; item += 1) delete next[item]
+      if (layer === 1) {
+        delete next[2]
+        delete next[3]
+        delete next[4]
+      }
+      if (layer === 2) {
+        delete next[3]
+        delete next[4]
+      }
       return next
     })
   }
@@ -189,8 +206,8 @@ export default function SubjectTagsPage() {
 
         <div className="grid gap-4 xl:grid-cols-4">
           {LAYERS.map((layer) => {
-            const parent = layer.id === 1 ? null : selected[layer.id - 1]
-            const locked = layer.id > 1 && !parent
+            const parent = layer.id === 1 || layer.id === 4 ? null : selected[layer.id - 1]
+            const locked = layer.id > 1 && layer.id !== 4 && !parent
             const items = visibleByLayer[layer.id] || []
 
             return (
@@ -203,7 +220,7 @@ export default function SubjectTagsPage() {
               >
                 <div className="rounded-2xl border border-white/[0.055] bg-white/[0.025] p-4">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#c8864a]/60">
-                    Layer {layer.id}
+                    {layer.kind === "microskill" ? "Separate skill set" : `Layer ${layer.id}`}
                   </p>
                   <h2 className="mt-2 font-serif text-[24px] font-semibold text-[#eee9e4]">
                     {layer.title}
@@ -219,6 +236,7 @@ export default function SubjectTagsPage() {
                   <>
                     <CreateTagForm
                       layer={layer.id}
+                      kind={layer.kind}
                       parent={parent}
                       subjectId={subject.id}
                       onCreated={mutate}

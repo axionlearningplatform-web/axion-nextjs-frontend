@@ -23,20 +23,16 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 
-const emptyCriteria = (mark = 1) => ({
-  mark,
-  text: "",
-})
-
 const emptyPart = (index = 0) => ({
   id: crypto.randomUUID(),
   label: String.fromCharCode(97 + index),
   text: "",
   marks: 1,
   tag_ids: [],
+  tag_requirements: [],
   attachments: [],
   tikz_visuals: [],
-  marking_criteria: [emptyCriteria(1)],
+  marking_criteria: [],
   hints: [],
 })
 
@@ -46,18 +42,6 @@ const emptyTikzVisual = (index = 0) => ({
   code: "",
   svg: "",
 })
-
-function criteriaForMarks(marks, existing = []) {
-  const count = Math.max(Number(marks) || 1, 1)
-  return Array.from({ length: count }, (_, index) => {
-    const mark = index + 1
-    const found = existing.find((item) => Number(item.mark) === mark)
-    return {
-      mark,
-      text: found?.text || "",
-    }
-  })
-}
 
 function SectionTitle({ children }) {
   return (
@@ -211,6 +195,20 @@ function DropdownSection({ title, summary, children, defaultOpen = false }) {
   )
 }
 
+function DisabledSection({ title, summary = "Disabled for now" }) {
+  return (
+    <div
+      aria-disabled="true"
+      className="overflow-hidden rounded-2xl border border-[#3b2a22]/35 bg-[#181410]/55 opacity-45"
+    >
+      <div className="flex cursor-not-allowed list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-[#dac1b7]">
+        <span>{title}</span>
+        <span className="text-xs font-normal text-[#a28c83]">{summary}</span>
+      </div>
+    </div>
+  )
+}
+
 function TikzVisualsEditor({ visuals, onChange }) {
   const normalized = Array.isArray(visuals) ? visuals : []
 
@@ -294,53 +292,74 @@ function TikzVisualsEditor({ visuals, onChange }) {
   )
 }
 
-function CriteriaEditor({ marks, criteria, onChange }) {
-  const normalized = useMemo(
-    () => criteriaForMarks(marks, criteria),
-    [criteria, marks]
-  )
-
-  useEffect(() => {
-    if (JSON.stringify(normalized) !== JSON.stringify(criteria)) {
-      onChange(normalized)
-    }
-  }, [criteria, normalized, onChange])
-
-  return (
-    <div className="grid gap-3">
-      {normalized.map((item, index) => (
-        <div
-          className="grid gap-2 rounded-2xl border border-[#3b2a22]/55 bg-[#181410] p-3"
-          key={item.mark}
-        >
-          <div className="flex items-center gap-3">
-            <span className="rounded-full border border-[#3b2a22]/55 bg-white/[0.035] px-3 py-2 text-sm text-[#ffb595]">
-              Mark {item.mark}
-            </span>
-            <span className="text-xs text-[#a28c83]">criterion</span>
-          </div>
-          <Textarea
-            className="min-h-20 rounded-2xl border-[#3b2a22]/55 bg-white/[0.035] text-[#e5e2e1]"
-            placeholder="Explain how this mark is awarded. Inline LaTeX is supported."
-            value={item.text}
-            onChange={(event) => {
-              const next = [...normalized]
-              next[index] = {
-                ...next[index],
-                text: event.target.value,
-              }
-              onChange(next)
-            }}
-          />
-        </div>
-      ))}
-    </div>
-  )
-}
-
 function getDescendantIds(tags, tagId) {
   const children = tags.filter((tag) => tag.parent_id === tagId)
   return children.flatMap((child) => [child.id, ...getDescendantIds(tags, child.id)])
+}
+
+function isMicroskill(tag) {
+  return tag?.tag_kind === "microskill" || tag?.layer === 4
+}
+
+function isTaxonomyTag(tag) {
+  return tag && !isMicroskill(tag)
+}
+
+function scoreScaleForTag(tag) {
+  if (isMicroskill(tag)) return [0, 1]
+  if (tag?.layer === 3) return [0, 1, 2]
+  return []
+}
+
+function syncTagRequirements(selectedIds, existing = [], tags = []) {
+  const existingById = new Map((existing || []).map((item) => [Number(item.tag_id), item]))
+  return selectedIds
+    .map((id) => tags.find((tag) => tag.id === id))
+    .filter((tag) => tag?.layer === 3 || isMicroskill(tag))
+    .map((tag) => ({
+      tag_id: tag.id,
+      amount: existingById.get(tag.id)?.amount === "" ? "" : Math.max(Number(existingById.get(tag.id)?.amount || 1), 1),
+      score_scale: scoreScaleForTag(tag),
+    }))
+}
+
+function TagRequirementAmounts({ tags, selectedIds, requirements, onChange }) {
+  const selectedTags = selectedIds
+    .map((id) => tags.find((tag) => tag.id === id))
+    .filter((tag) => tag?.layer === 3 || isMicroskill(tag))
+
+  if (!selectedTags.length) return null
+
+  const amountFor = (tagId) => requirements.find((item) => Number(item.tag_id) === tagId)?.amount ?? 1
+
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {selectedTags.map((tag) => (
+        <label
+          className="inline-flex max-w-full items-center gap-2 rounded-full border border-[#3b2a22]/60 bg-white/[0.03] px-2.5 py-1.5 text-sm text-[#dac1b7]"
+          key={tag.id}
+        >
+          <span className="max-w-[190px] truncate">{tag.name}</span>
+          <Input
+            className="h-7 w-11 rounded-full border-[#3b2a22]/55 bg-[#131110] px-1 text-center text-xs text-[#e5e2e1] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            min="1"
+            aria-label={`${tag.name} count`}
+            type="number"
+            value={amountFor(tag.id)}
+            onChange={(event) => {
+              const rawValue = event.target.value
+              const amount = rawValue === "" ? "" : Math.max(Number(rawValue) || 1, 1)
+              onChange(
+                syncTagRequirements(selectedIds, requirements, tags).map((item) =>
+                  Number(item.tag_id) === tag.id ? { ...item, amount } : item
+                )
+              )
+            }}
+          />
+        </label>
+      ))}
+    </div>
+  )
 }
 
 function TagTaxonomyPicker({
@@ -353,7 +372,7 @@ function TagTaxonomyPicker({
 }) {
   const [openRoot, setOpenRoot] = useState(null)
   const closeTimerRef = useRef(null)
-  const layer1 = tags.filter((tag) => tag.layer === 1)
+  const layer1 = tags.filter((tag) => tag.layer === 1 && isTaxonomyTag(tag))
   const selectedSet = new Set(selectedIds)
   const parentSet = new Set(parentSelectedIds)
   const hasMainPath = parentSelectedIds.some((id) => {
@@ -371,7 +390,11 @@ function TagTaxonomyPicker({
   }
 
   function children(parentId, layer) {
-    return tags.filter((tag) => tag.parent_id === parentId && tag.layer === layer)
+    return tags.filter((tag) => tag.parent_id === parentId && tag.layer === layer && isTaxonomyTag(tag))
+  }
+
+  function microskills() {
+    return tags.filter(isMicroskill)
   }
 
   function openFlyout(tagId) {
@@ -390,40 +413,44 @@ function TagTaxonomyPicker({
     }
   }, [])
 
-  if (deepOnly && !hasMainPath) {
-    return (
-      <p className="rounded-2xl border border-[#c8864a]/20 bg-[#c8864a]/10 px-4 py-3 text-sm text-[#d7a67d]">
-        Assign a Layer 1 topic and Layer 2 subtopic to the main question before adding granular part tags.
-      </p>
-    )
-  }
-
   if (deepOnly) {
     const layer2Parents = tags.filter((tag) => tag.layer === 2 && parentSet.has(tag.id))
-    const deepTags = layer2Parents.flatMap((parent) => [
-      ...children(parent.id, 3),
-      ...children(parent.id, 3).flatMap((tag) => children(tag.id, 4)),
-    ])
+    const conceptTags = hasMainPath ? layer2Parents.flatMap((parent) => children(parent.id, 3)) : []
+    const microskillTags = microskills()
+    const groups = [
+      { label: "Layer 3 concepts", tags: conceptTags },
+      { label: "Microskills", tags: microskillTags },
+    ]
 
     return (
-      <div className="flex flex-wrap gap-2">
-        {deepTags.length === 0 && (
-          <span className="text-sm text-[#a28c83]">No Layer 3 or 4 tags exist under the selected subtopics yet.</span>
+      <div className="grid gap-3">
+        {!hasMainPath && (
+          <span className="text-sm text-[#a28c83]">Assign a Layer 1 topic and Layer 2 subtopic to unlock concept tags.</span>
         )}
-        {deepTags.map((tag) => (
-          <button
-            className={cn(
-              "rounded-full border px-3 py-1.5 text-sm transition-colors",
-              selectedSet.has(tag.id)
-                ? "border-[#ffb595]/60 bg-[#4a2f26] text-[#ffb595]"
-                : "border-[#3b2a22]/55 bg-white/[0.035] text-[#dac1b7] hover:bg-[#211913]"
-            )}
-            key={tag.id}
-            type="button"
-            onClick={() => toggle(tag)}
-          >
-            L{tag.layer} · {tag.name}
-          </button>
+        {hasMainPath && conceptTags.length === 0 && microskillTags.length === 0 && (
+          <span className="text-sm text-[#a28c83]">No concepts or microskills exist yet.</span>
+        )}
+        {groups.map((group) => group.tags.length > 0 && (
+          <div className="grid gap-2" key={group.label}>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8c8178]">{group.label}</p>
+            <div className="flex flex-wrap gap-2">
+              {group.tags.map((tag) => (
+                <button
+                  className={cn(
+                    "rounded-full border px-3 py-1.5 text-sm transition-colors",
+                    selectedSet.has(tag.id)
+                      ? "border-[#ffb595]/60 bg-[#4a2f26] text-[#ffb595]"
+                      : "border-[#3b2a22]/55 bg-white/[0.035] text-[#dac1b7] hover:bg-[#211913]"
+                  )}
+                  key={tag.id}
+                  type="button"
+                  onClick={() => toggle(tag)}
+                >
+                  {isMicroskill(tag) ? "MS" : "L3"} · {tag.name}
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
     )
@@ -495,7 +522,7 @@ function TagTaxonomyPicker({
         })}
       </div>
 
-      {showDeep && selectedIds.some((id) => tags.find((tag) => tag.id === id)?.layer === 2) && (
+      {showDeep && (selectedIds.some((id) => tags.find((tag) => tag.id === id)?.layer === 2) || microskills().length > 0) && (
         <div className="rounded-2xl border border-[#3b2a22]/55 bg-[#181410] p-3">
           <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8c8178]">
             Granular tags for this question
@@ -600,10 +627,9 @@ export function QuestionEditor({
   const [hints, setHints] = useState([{ text: "", mark: "1" }])
   const [parts, setParts] = useState([])
   const [attachments, setAttachments] = useState([])
-  const [markingCriteria, setMarkingCriteria] = useState([emptyCriteria(1)])
+  const [tagRequirements, setTagRequirements] = useState([])
   const [tagIds, setTagIds] = useState([])
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [criteriaError, setCriteriaError] = useState("")
 
   const tagsUrl = subjectId
     ? `/api/questions/tags/?subject_id=${subjectId}`
@@ -639,7 +665,6 @@ export function QuestionEditor({
     setDiagramSvg("")
     setTikzVisuals(incomingTikzVisuals)
     setImportSource(initialData.import_source || "")
-    setCriteriaError("")
     setHints(
       initialData.hints?.length
         ? initialData.hints.map((hint) => ({
@@ -655,12 +680,10 @@ export function QuestionEditor({
         text: part.text || "",
         marks: Number(part.marks || 1),
         tag_ids: part.tag_ids || [],
+        tag_requirements: part.tag_requirements || [],
         attachments: part.attachments || [],
         tikz_visuals: part.tikz_visuals || [],
-        marking_criteria: criteriaForMarks(
-          part.marks || 1,
-          part.marking_criteria || []
-        ),
+        marking_criteria: [],
         hints: (part.hints || []).map((hint) => ({
           text: hint.text || "",
           mark: String(hint.mark || "1"),
@@ -668,12 +691,7 @@ export function QuestionEditor({
       }))
     )
     setAttachments(initialData.attachments || [])
-    setMarkingCriteria(
-      criteriaForMarks(
-        initialData.marks || 1,
-        initialData.marking_criteria || []
-      )
-    )
+    setTagRequirements(initialData.tag_requirements || [])
     setTagIds(initialData.tag_ids || [])
   }, [initialData])
 
@@ -705,47 +723,25 @@ export function QuestionEditor({
         text: part.text,
         marks: Number(part.marks) || 1,
         tag_ids: part.tag_ids || [],
+        tag_requirements: syncTagRequirements(part.tag_ids || [], part.tag_requirements || [], tags),
         attachments: part.attachments || [],
         tikz_visuals: part.tikz_visuals || [],
-        marking_criteria: part.marking_criteria || [],
+        marking_criteria: [],
         hints: (part.hints || []).map((hint) => ({
           text: hint.text,
           mark: Number(hint.mark),
         })),
       })),
       attachments,
-      marking_criteria: parts.length ? [] : markingCriteria,
+      marking_criteria: [],
       tag_ids: tagIds,
+      tag_requirements: parts.length ? [] : syncTagRequirements(tagIds, tagRequirements, tags),
       import_source: importSource,
     }
   }
 
-  function criteriaComplete(items, expectedMarks) {
-    return criteriaForMarks(expectedMarks, items).every((item) => item.text?.trim())
-  }
-
-  function validateMarkingCriteria() {
-    if (parts.length) {
-      const incompletePart = parts.find(
-        (part) => !criteriaComplete(part.marking_criteria || [], part.marks)
-      )
-      if (incompletePart) {
-        return `Marking criteria is required for every mark in part (${incompletePart.label || "?"}).`
-      }
-      return ""
-    }
-
-    if (!criteriaComplete(markingCriteria, marks)) {
-      return "Marking criteria is required for every mark."
-    }
-    return ""
-  }
-
   function handleSubmit(e) {
     e.preventDefault()
-    const nextCriteriaError = validateMarkingCriteria()
-    setCriteriaError(nextCriteriaError)
-    if (nextCriteriaError) return
     onSubmit(payload())
   }
 
@@ -753,7 +749,7 @@ export function QuestionEditor({
     if (!onDraftChange) return
     onDraftChange(payload())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject, subjectId, marks, questionText, tikzCode, diagramSvg, tikzVisuals, importSource, hints, parts, attachments, markingCriteria, tagIds])
+  }, [subject, subjectId, marks, questionText, tikzCode, diagramSvg, tikzVisuals, importSource, hints, parts, attachments, tagIds, tagRequirements, tags])
 
   return (
     <div className={cn("grid gap-8", !hidePreview && "lg:grid-cols-2")}>
@@ -942,12 +938,12 @@ export function QuestionEditor({
                             onBlur={() => {
                               if (part.marks === "" || Number(part.marks) < 1) {
                                 const next = [...parts]
-                                next[index] = {
-                                  ...part,
-                                  marks: 1,
-                                  marking_criteria: criteriaForMarks(1, part.marking_criteria),
-                                }
-                                setParts(next)
+                              next[index] = {
+                                ...part,
+                                marks: 1,
+                                  marking_criteria: [],
+                              }
+                              setParts(next)
                               }
                             }}
                             onChange={(event) => {
@@ -956,9 +952,7 @@ export function QuestionEditor({
                               next[index] = {
                                 ...part,
                                 marks: rawValue,
-                                marking_criteria: rawValue
-                                  ? criteriaForMarks(Number(rawValue) || 1, part.marking_criteria)
-                                  : part.marking_criteria,
+                                marking_criteria: [],
                               }
                               setParts(next)
                             }}
@@ -1021,24 +1015,10 @@ export function QuestionEditor({
                           />
                         </DropdownSection>
 
-                        <DropdownSection
-                          title="Marking Criteria"
-                          summary={`${part.marking_criteria?.filter((item) => item.text)?.length || 0}/${part.marks || 1} filled`}
-                        >
-                          <CriteriaEditor
-                            criteria={part.marking_criteria || []}
-                            marks={part.marks}
-                            onChange={(value) => {
-                              setCriteriaError("")
-                              const next = [...parts]
-                              next[index] = { ...part, marking_criteria: value }
-                              setParts(next)
-                            }}
-                        />
-                        </DropdownSection>
+                        <DisabledSection title="Marking Criteria" summary="Not used in production" />
 
                         <DropdownSection
-                          title="Concept Tags"
+                          title="Concepts & Microskills"
                           summary={`${part.tag_ids?.length || 0} selected`}
                         >
                           <TagTaxonomyPicker
@@ -1048,7 +1028,21 @@ export function QuestionEditor({
                             deepOnly
                             onChange={(value) => {
                               const next = [...parts]
-                              next[index] = { ...part, tag_ids: value }
+                              next[index] = {
+                                ...part,
+                                tag_ids: value,
+                                tag_requirements: syncTagRequirements(value, part.tag_requirements || [], tags),
+                              }
+                              setParts(next)
+                            }}
+                          />
+                          <TagRequirementAmounts
+                            tags={tags}
+                            selectedIds={part.tag_ids || []}
+                            requirements={part.tag_requirements || []}
+                            onChange={(value) => {
+                              const next = [...parts]
+                              next[index] = { ...part, tag_requirements: value }
                               setParts(next)
                             }}
                           />
@@ -1083,19 +1077,7 @@ export function QuestionEditor({
                         onChange={setTikzVisuals}
                       />
                     </DropdownSection>
-                    <DropdownSection
-                      title="Marking Criteria"
-                      summary={`${markingCriteria.filter((item) => item.text).length}/${marks || 1} filled`}
-                    >
-                      <CriteriaEditor
-                        criteria={markingCriteria}
-                        marks={marks}
-                        onChange={(value) => {
-                          setCriteriaError("")
-                          setMarkingCriteria(value)
-                        }}
-                      />
-                    </DropdownSection>
+                    <DisabledSection title="Marking Criteria" summary="Not used in production" />
                     <DropdownSection
                       title="Hints"
                       summary={`${hints.filter((item) => item.text).length} added`}
@@ -1103,12 +1085,6 @@ export function QuestionEditor({
                       <HintsEditor hints={hints} onChange={setHints} />
                     </DropdownSection>
                   </div>
-                )}
-
-                {criteriaError && (
-                  <p className="rounded-2xl border border-[#c8864a]/25 bg-[#c8864a]/10 px-4 py-3 text-sm text-[#e7b586]">
-                    {criteriaError}
-                  </p>
                 )}
 
                 <Field>
@@ -1123,8 +1099,19 @@ export function QuestionEditor({
                       <TagTaxonomyPicker
                         tags={tags}
                         selectedIds={tagIds}
-                        onChange={setTagIds}
+                        onChange={(value) => {
+                          setTagIds(value)
+                          setTagRequirements(syncTagRequirements(value, tagRequirements, tags))
+                        }}
                         showDeep={parts.length === 0}
+                      />
+                    )}
+                    {parts.length === 0 && (
+                      <TagRequirementAmounts
+                        tags={tags}
+                        selectedIds={tagIds}
+                        requirements={tagRequirements}
+                        onChange={setTagRequirements}
                       />
                     )}
                   </div>
@@ -1172,7 +1159,7 @@ export function QuestionEditor({
         <PreviewPanel
           attachments={attachments}
           hints={hints}
-          markingCriteria={markingCriteria}
+          markingCriteria={[]}
           marks={effectiveMarks}
           parts={parts}
           questionText={questionText}
