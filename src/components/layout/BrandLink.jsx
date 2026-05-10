@@ -4,7 +4,7 @@ import Link from "next/link"
 import { Package2 } from "lucide-react"
 
 export default function BrandLink({displayName, className}){
-    const finalClass = className ? className : "flex items-center gap-2 text-lg font-semibold md:text-base"
+    const finalClass = className ? className : "flex items-center gap-2 font-serif text-xl font-semibold"
     return <Link
         href="/"
         className={finalClass}

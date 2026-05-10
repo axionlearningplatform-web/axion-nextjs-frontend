@@ -51,7 +51,7 @@ function NavItem({ href, icon: Icon, label, active, collapsed, disabled = false 
   const content = (
     <span
       className={cn(
-        "flex h-11 items-center gap-3 rounded-xl px-4 text-sm font-medium transition-colors",
+        "flex h-11 items-center gap-3 rounded-xl px-4 font-serif text-[16px] font-medium transition-colors",
         collapsed && "justify-center px-0",
         active
           ? "bg-[#4a2f26] text-[#ffb595]"
@@ -118,7 +118,7 @@ function SubjectSwitcher({ collapsed, currentSubject, subjectMemberships }) {
                   {getSubjectInitial(membership.subject)}
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-[#e5e2e1]">
+                  <span className="block truncate font-serif text-[15px] font-semibold text-[#e5e2e1]">
                     {membership.subject.name}
                   </span>
                   <span className="block truncate text-xs capitalize text-[#a28c83]">
@@ -145,7 +145,7 @@ function SubjectSwitcher({ collapsed, currentSubject, subjectMemberships }) {
         {!collapsed && (
           <>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-semibold text-[#e5e2e1]">
+              <span className="block truncate font-serif text-[15px] font-semibold text-[#e5e2e1]">
                 {currentSubject.subject.name}
               </span>
               <span className="block truncate text-[10px] font-semibold uppercase tracking-wide text-[#a28c83]">
@@ -165,7 +165,8 @@ export default function AppShell({ children }) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
 
-  const publicPage = pathname === "/login" || pathname === "/signup"
+  const publicPage = pathname === "/login" || pathname === "/signup" || pathname === "/logout"
+  const authChoicePage = pathname === "/login" || pathname === "/signup"
   const subjectMemberships = useMemo(
     () => auth.subjectMemberships || [],
     [auth.subjectMemberships]
@@ -193,15 +194,15 @@ export default function AppShell({ children }) {
 
   if (publicPage) {
     return (
-      <div className="min-h-screen bg-[#131313] text-[#e5e2e1]">
-        <TopBar publicPage collapsed={false} />
+      <div className="min-h-screen bg-[#16130f] text-[#e5e2e1]">
+        <TopBar authChoicePage={authChoicePage} publicPage collapsed={false} />
         <main className="pt-16">{children}</main>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#131313] text-[#e5e2e1]">
+    <div className="min-h-screen bg-[#16130f] text-[#e5e2e1]">
       <aside
         className={cn(
           "fixed left-0 top-0 z-50 flex h-screen flex-col border-r border-[#2a2118]/60 bg-[#131110] transition-all duration-200",
@@ -219,7 +220,7 @@ export default function AppShell({ children }) {
           </button>
           {!collapsed && (
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold capitalize text-[#e5e2e1]">
+              <p className="truncate font-serif text-[16px] font-semibold capitalize text-[#e5e2e1]">
                 {currentSubject ? roleLabel(currentSubject.role) : "No subject"}
               </p>
               <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-[#a28c83]">
@@ -238,7 +239,7 @@ export default function AppShell({ children }) {
             collapsed={collapsed}
             disabled={!currentSubject}
           />
-          {!collapsed && <div className="mx-4 my-2 h-px max-w-[210px] bg-[#54433c]/40" />}
+          {!collapsed && <div className="mx-4 my-2 h-px max-w-[210px] bg-[#2a2118]/60" />}
           <NavItem
             href={`${subjectBase}/practice`}
             icon={CalendarDays}
@@ -316,7 +317,7 @@ export default function AppShell({ children }) {
   )
 }
 
-function TopBar({ publicPage = false, collapsed }) {
+function TopBar({ authChoicePage = false, publicPage = false, collapsed }) {
   const auth = useAuth()
 
   return (
@@ -328,27 +329,27 @@ function TopBar({ publicPage = false, collapsed }) {
     >
       <Link
         href="/dashboard"
-        className="bg-gradient-to-r from-[#e5e2e1] via-[#ffdbc9] to-[#ffb595] bg-[length:180%_100%] bg-clip-text font-serif text-xl font-semibold tracking-wide text-transparent transition-all duration-500 [background-position:0_0] hover:[background-position:100%_0]"
+        className="bg-gradient-to-r from-[#e5e2e1] via-[#ffdbc9] to-[#ffb595] bg-[length:180%_100%] bg-clip-text font-serif text-2xl font-semibold tracking-normal text-transparent transition-all duration-500 [background-position:0_0] hover:[background-position:100%_0]"
       >
         Axion
       </Link>
 
       <div className="absolute right-8 flex items-center gap-4">
-        {auth.isAuthenticated ? (
-          <AccountDropdown />
-        ) : (
+        {authChoicePage ? (
           <div className="flex items-center gap-4 text-sm font-medium">
-            <Link className="text-[#dac1b7] hover:text-[#ffb595]" href="/login">
+            <Link className="text-[14px] text-[#dac1b7] hover:text-[#ffb595]" href="/login">
               Login
             </Link>
             <Link
-              className="rounded-full bg-[#ffb595] px-4 py-2 text-[#351000] hover:bg-[#ffdbc9]"
+              className="rounded-md border border-[#c8864a]/35 px-4 py-1.5 text-[14px] text-[#c8864a] transition-colors hover:bg-[#c8864a]/10"
               href="/signup"
             >
-              Sign Up
+              Sign up
             </Link>
           </div>
-        )}
+        ) : !publicPage && auth.isAuthenticated ? (
+          <AccountDropdown />
+        ) : null}
       </div>
     </header>
   )

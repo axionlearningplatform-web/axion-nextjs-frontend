@@ -137,7 +137,7 @@ function RichTextArea({ value, onValueChange, className, onAfterChange, ...props
   }
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-[#2a2a2a] bg-[#242424] focus-within:ring-3 focus-within:ring-[#ffb595]/40">
+    <div className="overflow-hidden rounded-3xl border border-[#3b2a22]/55 bg-white/[0.035] focus-within:ring-3 focus-within:ring-[#ffb595]/40">
       <div className="flex items-center gap-1 border-b border-[#3a302b] px-3 py-2">
         <button
           type="button"
@@ -195,17 +195,17 @@ function RichTextArea({ value, onValueChange, className, onAfterChange, ...props
 function DropdownSection({ title, summary, children, defaultOpen = false }) {
   return (
     <details
-      className="group overflow-hidden rounded-2xl border border-[#54433c]/30 bg-[#1c1b1b]"
+      className="group overflow-hidden rounded-2xl border border-[#3b2a22]/55 bg-[#181410]"
       open={defaultOpen}
     >
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-[#dac1b7] transition-colors hover:bg-[#242424] [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-[#dac1b7] transition-colors hover:bg-[#211913] [&::-webkit-details-marker]:hidden">
         <span>{title}</span>
         <span className="flex items-center gap-2 text-xs font-normal text-[#a28c83]">
           {summary}
           <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
         </span>
       </summary>
-      <div className="border-t border-[#54433c]/25 p-4">{children}</div>
+      <div className="border-t border-[#3b2a22]/55 p-4">{children}</div>
     </details>
   )
 }
@@ -222,7 +222,7 @@ function TikzVisualsEditor({ visuals, onChange }) {
   return (
     <div className="grid gap-3">
       <Button
-        className="w-fit rounded-full border-[#54433c]/50 bg-[#242424] text-[#dac1b7] hover:bg-[#2d2d2d]"
+        className="w-fit rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-[#dac1b7] hover:bg-[#211913]"
         type="button"
         variant="outline"
         onClick={() => onChange([...normalized, emptyTikzVisual(normalized.length)])}
@@ -232,14 +232,14 @@ function TikzVisualsEditor({ visuals, onChange }) {
       </Button>
 
       {normalized.length === 0 && (
-        <p className="rounded-2xl border border-[#54433c]/25 bg-[#201f1f] px-4 py-3 text-sm text-[#a28c83]">
+        <p className="rounded-2xl border border-[#3b2a22]/55 bg-[#181410] px-4 py-3 text-sm text-[#a28c83]">
           No TikZ visuals added.
         </p>
       )}
 
       {normalized.map((visual, index) => (
         <details
-          className="group overflow-hidden rounded-2xl border border-[#54433c]/30 bg-[#201f1f]"
+          className="group overflow-hidden rounded-2xl border border-[#3b2a22]/55 bg-[#181410]"
           key={visual.id || index}
           open={index === normalized.length - 1}
         >
@@ -252,16 +252,16 @@ function TikzVisualsEditor({ visuals, onChange }) {
               <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
             </span>
           </summary>
-          <div className="grid gap-3 border-t border-[#54433c]/25 p-4">
+          <div className="grid gap-3 border-t border-[#3b2a22]/55 p-4">
             <div className="flex flex-wrap items-center gap-2">
               <Input
-                className="h-9 min-w-[180px] flex-1 rounded-full border-[#2a2a2a] bg-[#242424] text-sm text-[#e5e2e1]"
+                className="h-9 min-w-[180px] flex-1 rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-sm text-[#e5e2e1]"
                 placeholder={`Visual ${index + 1}`}
                 value={visual.name || ""}
                 onChange={(event) => updateVisual(index, { name: event.target.value })}
               />
               <Button
-                className="rounded-full border-[#54433c]/50 bg-[#242424] text-xs text-[#dac1b7] hover:bg-[#2d2d2d]"
+                className="rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-xs text-[#dac1b7] hover:bg-[#211913]"
                 size="sm"
                 type="button"
                 variant="outline"
@@ -280,7 +280,7 @@ function TikzVisualsEditor({ visuals, onChange }) {
               </Button>
             </div>
             <Textarea
-              className="min-h-[180px] rounded-3xl border-[#2a2a2a] bg-[#242424] p-5 font-mono text-[13px] leading-relaxed text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
+              className="min-h-[180px] rounded-3xl border-[#3b2a22]/55 bg-white/[0.035] p-5 font-mono text-[13px] leading-relaxed text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
               placeholder="Paste TikZ code here, e.g. \\begin{tikzpicture} ..."
               spellCheck={false}
               value={visual.code || ""}
@@ -309,17 +309,17 @@ function CriteriaEditor({ marks, criteria, onChange }) {
     <div className="grid gap-3">
       {normalized.map((item, index) => (
         <div
-          className="grid gap-2 rounded-2xl border border-[#54433c]/25 bg-[#201f1f] p-3"
+          className="grid gap-2 rounded-2xl border border-[#3b2a22]/55 bg-[#181410] p-3"
           key={item.mark}
         >
           <div className="flex items-center gap-3">
-            <span className="rounded-full border border-[#2a2a2a] bg-[#242424] px-3 py-2 text-sm text-[#ffb595]">
+            <span className="rounded-full border border-[#3b2a22]/55 bg-white/[0.035] px-3 py-2 text-sm text-[#ffb595]">
               Mark {item.mark}
             </span>
             <span className="text-xs text-[#a28c83]">criterion</span>
           </div>
           <Textarea
-            className="min-h-20 rounded-2xl border-[#2a2a2a] bg-[#242424] text-[#e5e2e1]"
+            className="min-h-20 rounded-2xl border-[#3b2a22]/55 bg-white/[0.035] text-[#e5e2e1]"
             placeholder="Explain how this mark is awarded. Inline LaTeX is supported."
             value={item.text}
             onChange={(event) => {
@@ -341,15 +341,15 @@ function HintsEditor({ hints, onChange }) {
   return (
     <div className="grid gap-3">
       {hints.length === 0 && (
-        <p className="rounded-2xl border border-[#54433c]/25 bg-[#201f1f] px-4 py-3 text-sm text-[#a28c83]">
+        <p className="rounded-2xl border border-[#3b2a22]/55 bg-[#181410] px-4 py-3 text-sm text-[#a28c83]">
           No hints added.
         </p>
       )}
       {hints.map((hint, index) => (
-        <div className="grid gap-2 rounded-2xl border border-[#54433c]/25 bg-[#201f1f] p-3" key={index}>
+        <div className="grid gap-2 rounded-2xl border border-[#3b2a22]/55 bg-[#181410] p-3" key={index}>
           <div className="flex items-center gap-2">
             <Input
-              className="h-9 w-14 rounded-full border-[#2a2a2a] bg-[#242424] px-2 text-center text-sm text-[#e5e2e1] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              className="h-9 w-14 rounded-full border-[#3b2a22]/55 bg-white/[0.035] px-2 text-center text-sm text-[#e5e2e1] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               min="1"
               type="number"
               value={hint.mark}
@@ -371,7 +371,7 @@ function HintsEditor({ hints, onChange }) {
             </Button>
           </div>
           <Textarea
-            className="min-h-16 rounded-2xl border-[#2a2a2a] bg-[#242424] text-[#e5e2e1]"
+            className="min-h-16 rounded-2xl border-[#3b2a22]/55 bg-white/[0.035] text-[#e5e2e1]"
             placeholder="Write a hint for this mark."
             value={hint.text}
             onChange={(event) => {
@@ -383,7 +383,7 @@ function HintsEditor({ hints, onChange }) {
         </div>
       ))}
       <Button
-        className="w-fit rounded-full border border-[#54433c]/40 bg-[#242424] text-[#dac1b7] hover:bg-[#2d2d2d]"
+        className="w-fit rounded-full border border-[#3b2a22]/55 bg-white/[0.035] text-[#dac1b7] hover:bg-[#211913]"
         type="button"
         onClick={() => onChange([...hints, { text: "", mark: "1" }])}
       >
@@ -428,6 +428,7 @@ export function QuestionEditor({
   const [markingCriteria, setMarkingCriteria] = useState([emptyCriteria(1)])
   const [tagIds, setTagIds] = useState([])
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [criteriaError, setCriteriaError] = useState("")
 
   const tagsUrl = subjectId
     ? `/api/questions/tags/?subject_id=${subjectId}`
@@ -463,6 +464,7 @@ export function QuestionEditor({
     setDiagramSvg("")
     setTikzVisuals(incomingTikzVisuals)
     setImportSource(initialData.import_source || "")
+    setCriteriaError("")
     setHints(
       initialData.hints?.length
         ? initialData.hints.map((hint) => ({
@@ -541,8 +543,32 @@ export function QuestionEditor({
     }
   }
 
+  function criteriaComplete(items, expectedMarks) {
+    return criteriaForMarks(expectedMarks, items).every((item) => item.text?.trim())
+  }
+
+  function validateMarkingCriteria() {
+    if (parts.length) {
+      const incompletePart = parts.find(
+        (part) => !criteriaComplete(part.marking_criteria || [], part.marks)
+      )
+      if (incompletePart) {
+        return `Marking criteria is required for every mark in part (${incompletePart.label || "?"}).`
+      }
+      return ""
+    }
+
+    if (!criteriaComplete(markingCriteria, marks)) {
+      return "Marking criteria is required for every mark."
+    }
+    return ""
+  }
+
   function handleSubmit(e) {
     e.preventDefault()
+    const nextCriteriaError = validateMarkingCriteria()
+    setCriteriaError(nextCriteriaError)
+    if (nextCriteriaError) return
     onSubmit(payload())
   }
 
@@ -557,7 +583,7 @@ export function QuestionEditor({
       <div className="flex min-w-0 flex-col gap-6">
         <Card
           className={cn(
-            "w-full rounded-3xl border-[#54433c]/45 bg-[#151515] text-[#e5e2e1] shadow-2xl shadow-black/20 transition-colors",
+            "w-full rounded-3xl border-[#3b2a22]/55 bg-[#1b1713] text-[#e5e2e1] shadow-2xl shadow-black/20 transition-colors",
             errors?.question_text && "border-destructive shadow-destructive/20"
           )}
         >
@@ -612,13 +638,13 @@ export function QuestionEditor({
                     <FieldLabel className="text-[#dac1b7]">Subject</FieldLabel>
                     {lockedSubject ? (
                       <Input
-                        className="rounded-full border-[#2a2a2a] bg-[#242424] text-[#a28c83]"
+                        className="rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-[#a28c83]"
                         disabled
                         value={lockedSubject.name}
                       />
                     ) : subjects.length > 0 ? (
                       <select
-                        className="h-10 rounded-full border border-[#2a2a2a] bg-[#242424] px-4 text-[#e5e2e1]"
+                        className="h-10 rounded-full border border-[#3b2a22]/55 bg-white/[0.035] px-4 text-[#e5e2e1]"
                         value={subjectId}
                         onChange={(e) => {
                           const value = e.target.value
@@ -636,7 +662,7 @@ export function QuestionEditor({
                       </select>
                     ) : (
                       <Input
-                        className="rounded-full border-[#2a2a2a] bg-[#242424] text-[#a28c83]"
+                        className="rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-[#a28c83]"
                         value={subject}
                         onChange={(e) => setSubject(e.target.value)}
                       />
@@ -648,7 +674,7 @@ export function QuestionEditor({
                       {parts.length ? "Total Marks" : "Marks"}
                     </FieldLabel>
                     <Input
-                      className="h-10 rounded-full border-[#2a2a2a] bg-[#242424] px-2 text-center text-sm text-[#e5e2e1] [appearance:textfield] focus-visible:ring-[#ffb595]/40 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      className="h-10 rounded-full border-[#3b2a22]/55 bg-white/[0.035] px-2 text-center text-sm text-[#e5e2e1] [appearance:textfield] focus-visible:ring-[#ffb595]/40 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                       min="1"
                       type="number"
                       value={marks}
@@ -665,7 +691,7 @@ export function QuestionEditor({
                 <Field>
                   <FieldLabel className="text-[#dac1b7]">Source</FieldLabel>
                   <Input
-                    className="rounded-full border-[#2a2a2a] bg-[#242424] text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
+                    className="rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
                     placeholder={sourcePlaceholder}
                     value={importSource}
                     onChange={(event) => setImportSource(event.target.value)}
@@ -698,7 +724,7 @@ export function QuestionEditor({
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <SectionTitle>Parts</SectionTitle>
                     <Button
-                      className="rounded-full border border-[#54433c]/40 bg-[#242424] text-[#dac1b7] hover:bg-[#2d2d2d]"
+                      className="rounded-full border border-[#3b2a22]/55 bg-white/[0.035] text-[#dac1b7] hover:bg-[#211913]"
                       type="button"
                       onClick={() => setParts([...parts, emptyPart(parts.length)])}
                     >
@@ -709,14 +735,14 @@ export function QuestionEditor({
 
                   {parts.map((part, index) => (
                     <details
-                      className="group overflow-hidden rounded-2xl border border-[#54433c]/30 bg-[#1c1b1b]"
+                      className="group overflow-hidden rounded-2xl border border-[#3b2a22]/55 bg-[#181410]"
                       key={part.id}
                       open
                     >
                       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 [&::-webkit-details-marker]:hidden">
                         <div className="flex min-w-0 items-center gap-3">
                           <Input
-                            className="h-8 w-11 rounded-full border-[#2a2a2a] bg-[#242424] text-center text-sm text-[#e5e2e1]"
+                            className="h-8 w-11 rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-center text-sm text-[#e5e2e1]"
                             value={part.label}
                             onClick={(event) => event.stopPropagation()}
                             onChange={(event) => {
@@ -731,7 +757,7 @@ export function QuestionEditor({
                         </div>
                         <div className="flex items-center gap-2">
                           <Input
-                            className="h-8 w-11 rounded-full border-[#2a2a2a] bg-[#242424] px-1 text-center text-sm text-[#e5e2e1] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            className="h-8 w-11 rounded-full border-[#3b2a22]/55 bg-white/[0.035] px-1 text-center text-sm text-[#e5e2e1] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             min="1"
                             type="number"
                             value={part.marks}
@@ -777,13 +803,13 @@ export function QuestionEditor({
                         </div>
                       </summary>
 
-                      <div className="grid gap-4 border-t border-[#54433c]/25 p-4">
+                      <div className="grid gap-4 border-t border-[#3b2a22]/55 p-4">
                         <Field>
                           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                             <FieldLabel className="text-[#dac1b7]">Question Text</FieldLabel>
                             {onBranchPart && (
                               <Button
-                                className="rounded-full border-[#54433c]/50 bg-[#242424] text-xs text-[#dac1b7] hover:bg-[#2d2d2d]"
+                                className="rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-xs text-[#dac1b7] hover:bg-[#211913]"
                                 size="sm"
                                 type="button"
                                 variant="outline"
@@ -826,12 +852,13 @@ export function QuestionEditor({
                             criteria={part.marking_criteria || []}
                             marks={part.marks}
                             onChange={(value) => {
+                              setCriteriaError("")
                               const next = [...parts]
                               next[index] = { ...part, marking_criteria: value }
                               setParts(next)
                             }}
-                          />
-                        </DropdownSection>
+                        />
+                      </DropdownSection>
 
                         <DropdownSection
                           title="Hints"
@@ -866,11 +893,14 @@ export function QuestionEditor({
                       title="Marking Criteria"
                       summary={`${markingCriteria.filter((item) => item.text).length}/${marks || 1} filled`}
                     >
-                        <CriteriaEditor
-                          criteria={markingCriteria}
-                          marks={marks}
-                          onChange={setMarkingCriteria}
-                        />
+                      <CriteriaEditor
+                        criteria={markingCriteria}
+                        marks={marks}
+                        onChange={(value) => {
+                          setCriteriaError("")
+                          setMarkingCriteria(value)
+                        }}
+                      />
                     </DropdownSection>
                     <DropdownSection
                       title="Hints"
@@ -881,9 +911,15 @@ export function QuestionEditor({
                   </div>
                 )}
 
+                {criteriaError && (
+                  <p className="rounded-2xl border border-[#c8864a]/25 bg-[#c8864a]/10 px-4 py-3 text-sm text-[#e7b586]">
+                    {criteriaError}
+                  </p>
+                )}
+
                 <Field>
                   <FieldLabel className="text-[#dac1b7]">Tags</FieldLabel>
-                  <div className="flex flex-wrap gap-2 rounded-2xl border border-[#54433c]/25 bg-[#201f1f] p-3">
+                  <div className="flex flex-wrap gap-2 rounded-2xl border border-[#3b2a22]/55 bg-[#181410] p-3">
                     {tags.length === 0 && (
                       <span className="text-sm text-[#a28c83]">
                         Add question tags in Django admin.
@@ -897,7 +933,7 @@ export function QuestionEditor({
                             "rounded-full border px-3 py-1 text-sm transition-colors",
                             selected
                               ? "border-[#ffb595]/60 bg-[#4a2f26] text-[#ffb595]"
-                              : "border-[#54433c]/35 bg-[#242424] text-[#dac1b7] hover:bg-[#2d2d2d]"
+                              : "border-[#3b2a22]/55 bg-white/[0.035] text-[#dac1b7] hover:bg-[#211913]"
                           )}
                           key={tag.id}
                           type="button"

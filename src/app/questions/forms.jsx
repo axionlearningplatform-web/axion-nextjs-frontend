@@ -81,7 +81,7 @@ export default function Questions() {
 
   return (
 
-    <div className="flex min-h-[calc(100vh-64px)] flex-col items-center bg-[#131313] px-6 py-10 md:px-10">
+    <div className="flex min-h-[calc(100vh-64px)] flex-col items-center bg-[#16130f] px-6 py-10 md:px-10">
 
       <div className="w-full max-w-7xl mx-auto flex flex-col gap-8">
 

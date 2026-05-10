@@ -55,7 +55,7 @@ export default function QuestionTable() {
       </h1>
     </div>
 
-    <div className="rounded-2xl border border-[#54433c]/30 bg-[#1c1b1b]/80 p-3">
+    <div className="rounded-2xl border border-[#3b2a22]/55 bg-[#1b1713]/90 p-3">
     <Table className="border-separate border-spacing-y-2">
       <TableHeader className="[&_tr]:border-0">
         <TableRow className="border-0 hover:bg-transparent">
@@ -72,7 +72,7 @@ export default function QuestionTable() {
         {data?.map((item) => (
         <TableRow
             key={item.id}
-            className="cursor-pointer border-0 bg-[#201f1f] text-[#e5e2e1] shadow-sm transition-colors hover:bg-[#2a211e] [&>td:first-child]:rounded-l-xl [&>td:last-child]:rounded-r-xl"
+            className="cursor-pointer border-0 bg-[#181410] text-[#e5e2e1] shadow-sm transition-colors hover:bg-[#211913] [&>td:first-child]:rounded-l-xl [&>td:last-child]:rounded-r-xl"
             onClick={() => router.push(lockedSubject ? `/subjects/${lockedSubject.slug}/questions/${item.id}` : `/questions/${item.id}`)}
         >
             <TableCell className="px-4 font-semibold text-[#ffb595]">{item.id}</TableCell>
@@ -90,14 +90,14 @@ export default function QuestionTable() {
               <div className="flex max-w-52 flex-wrap gap-1.5">
                 {(item.tags || []).slice(0, 3).map((tag) => (
                   <span
-                    className="rounded-full border border-[#54433c]/45 bg-[#2a211e] px-2 py-1 text-[11px] text-[#dac1b7]"
+                    className="rounded-full border border-[#3b2a22]/60 bg-[#211913] px-2 py-1 text-[11px] text-[#dac1b7]"
                     key={tag.id}
                   >
                     {tag.name}
                   </span>
                 ))}
                 {(item.tags || []).length > 3 && (
-                  <span className="rounded-full border border-[#54433c]/35 bg-[#242424] px-2 py-1 text-[11px] text-[#a28c83]">
+                  <span className="rounded-full border border-[#3b2a22]/55 bg-white/[0.035] px-2 py-1 text-[11px] text-[#a28c83]">
                     +{item.tags.length - 3}
                   </span>
                 )}

@@ -278,7 +278,7 @@ function PracticeModal({
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4 backdrop-blur-md">
-      <section className="grid h-[min(720px,calc(100vh-44px))] w-full max-w-5xl grid-rows-[auto_1fr_auto] overflow-hidden rounded-[10px] border border-[#4c3427]/60 bg-[#1e1a16] shadow-[0_26px_90px_rgba(0,0,0,0.7)]">
+      <section className="grid h-[min(720px,calc(100vh-44px))] w-full max-w-5xl grid-rows-[auto_1fr_auto] overflow-hidden rounded-[10px] border border-[#3b2a22]/55 bg-[#181410] shadow-[0_26px_90px_rgba(0,0,0,0.7)]">
         <header className="flex items-center gap-5 border-b border-[#3b2a22]/55 px-8 py-6">
           <button
             type="button"
@@ -289,7 +289,7 @@ function PracticeModal({
             back
           </button>
           <span className="h-5 w-px bg-[#3b332d]" />
-          <h2 className="text-[18px] font-medium tracking-[0.08em] text-[#a5978a]">
+          <h2 className="font-serif text-[22px] font-medium tracking-normal text-[#d6c7ba]">
             Configure question
           </h2>
         </header>
@@ -312,7 +312,7 @@ function PracticeModal({
                     disabled={section.disabled}
                     onClick={() => setActiveSection(section.id)}
                     className={cn(
-                      "flex items-center justify-between text-left text-[19px] font-medium tracking-[0.01em] transition-colors",
+                      "flex items-center justify-between text-left font-serif text-[22px] font-medium tracking-normal transition-colors",
                       activeSection === section.id ? "text-[#f2eee9]" : "text-[#8c8178]",
                       section.disabled && "cursor-not-allowed text-[#3e3934]"
                     )}
@@ -422,7 +422,7 @@ function PracticeModal({
           <button
             type="button"
             onClick={() => onGenerate("modal")}
-            className="h-12 rounded-[8px] border border-[#d49a71]/45 bg-[#d49a71]/16 px-9 text-[14px] font-semibold tracking-[0.08em] text-[#e6b083] shadow-[0_12px_38px_rgba(0,0,0,0.22)] transition-colors hover:border-[#d49a71]/70 hover:bg-[#d49a71]/24 hover:text-[#f1c39e]"
+            className="h-12 rounded-[8px] border border-[#d49a71]/45 bg-[#d49a71]/16 px-9 font-serif text-[20px] font-semibold tracking-normal text-[#e6b083] shadow-[0_12px_38px_rgba(0,0,0,0.22)] transition-colors hover:border-[#d49a71]/70 hover:bg-[#d49a71]/24 hover:text-[#f1c39e]"
           >
             Generate
           </button>
@@ -442,12 +442,12 @@ function PracticeHome({ config, onGenerate, onOpenModal, subject, userName }) {
   const activeStreak = 4
 
   return (
-    <main className="relative flex min-h-[calc(100vh-64px)] items-center justify-center overflow-hidden bg-[#1a1612] px-6 py-12 text-[#e8e4dc] before:absolute before:inset-0 before:bg-[radial-gradient(ellipse_58%_40%_at_50%_56%,rgba(212,154,113,0.055)_0%,transparent_70%)] before:content-['']">
+    <main className="relative flex min-h-[calc(100vh-64px)] items-center justify-center overflow-hidden bg-[#16130f] px-6 py-12 text-[#e8e4dc] before:absolute before:inset-0 before:bg-[radial-gradient(ellipse_58%_40%_at_50%_56%,rgba(212,154,113,0.055)_0%,transparent_70%)] before:content-['']">
       <section className="relative z-10 w-full max-w-3xl text-center">
         <p className="text-[13px] font-semibold uppercase tracking-[0.22em] text-[#74675d]">
           Daily Practice
         </p>
-        <h1 className="mt-7 font-serif text-[clamp(3rem,5.7vw,5.8rem)] font-medium leading-[0.98] tracking-[-0.015em]">
+        <h1 className="mt-7 font-serif text-[clamp(3.2rem,5.1vw,5.35rem)] font-medium leading-[0.98] tracking-[-0.015em]">
           {greeting}
           <em className="mt-2 block italic text-[#d49a71]">{displayName}.</em>
         </h1>
@@ -550,7 +550,7 @@ function AnswerArea({ onSubmit }) {
       </div>
 
       {activeTab === "type" ? (
-        <div className="rounded-[3px] border border-white/[0.06] bg-[#1e1a16] p-5">
+        <div className="rounded-[3px] border border-white/[0.06] bg-[#1b1713] p-5">
           <textarea
             className="min-h-36 w-full resize-y bg-transparent font-serif text-base leading-relaxed text-[#e8e4dc] outline-none placeholder:italic placeholder:text-[#4f4a45]"
             placeholder="Begin your working here..."
@@ -826,7 +826,7 @@ export default function DailyPracticePage() {
 
   if (!config) {
     return (
-      <main className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-[#0f0e0d] text-[#8f8982]">
+      <main className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-[#16130f] text-[#8f8982]">
         <Loader2 className="size-8 animate-spin" />
       </main>
     )

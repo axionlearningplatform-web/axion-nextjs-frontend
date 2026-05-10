@@ -561,7 +561,7 @@ export default function QuestionImportPage() {
   }
 
   return (
-    <main className="min-h-[calc(100vh-64px)] overflow-x-hidden bg-[#131313] px-6 py-8">
+    <main className="min-h-[calc(100vh-64px)] overflow-x-hidden bg-[#16130f] px-6 py-8">
       <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -586,7 +586,7 @@ export default function QuestionImportPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-full border-[#54433c]/50 bg-[#201f1f] text-[#dac1b7] hover:bg-[#2a211e]"
+                className="rounded-full border-[#3b2a22]/55 bg-[#181410] text-[#dac1b7] hover:bg-[#211913]"
                 onClick={rejectAllPending}
               >
                 Reject Pending
@@ -595,7 +595,7 @@ export default function QuestionImportPage() {
           )}
         </div>
 
-        <Card className="rounded-2xl border-[#54433c]/35 bg-[#1c1b1b] text-[#e5e2e1]">
+        <Card className="rounded-2xl border-[#3b2a22]/55 bg-[#1b1713] text-[#e5e2e1]">
           <CardHeader className="flex flex-row items-center justify-between gap-4">
             <div>
               <CardTitle className="font-serif text-2xl">Import Source</CardTitle>
@@ -614,7 +614,7 @@ export default function QuestionImportPage() {
             {candidates.length > 0 && (
               <button
                 type="button"
-                className="flex h-10 items-center gap-2 rounded-full border border-[#54433c]/50 bg-[#201f1f] px-4 text-sm font-semibold text-[#dac1b7] transition-colors hover:bg-[#2a211e]"
+                className="flex h-10 items-center gap-2 rounded-full border border-[#3b2a22]/55 bg-[#181410] px-4 text-sm font-semibold text-[#dac1b7] transition-colors hover:bg-[#211913]"
                 onClick={() => setSourceCollapsed((value) => !value)}
               >
                 <ChevronDown
@@ -643,7 +643,7 @@ export default function QuestionImportPage() {
                       candidates.length > 0 && "cursor-not-allowed opacity-45",
                       sourceMode === mode
                         ? "bg-[#4a2f26] text-[#ffb595]"
-                        : "bg-[#242424] text-[#dac1b7] hover:bg-[#2d2d2d]"
+                        : "bg-white/[0.035] text-[#dac1b7] hover:bg-[#211913]"
                     )}
                     disabled={candidates.length > 0}
                     onClick={() => setSourceMode(mode)}
@@ -659,7 +659,7 @@ export default function QuestionImportPage() {
                   <Field>
                     <FieldLabel className="text-[#dac1b7]">Source</FieldLabel>
                     <Input
-                      className="rounded-full border-[#2a2a2a] bg-[#242424] text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
+                      className="rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
                       disabled={candidates.length > 0}
                       placeholder={sourcePlaceholder}
                       value={importSource}
@@ -671,7 +671,7 @@ export default function QuestionImportPage() {
                     <Field className="mt-4">
                       <FieldLabel className="text-[#dac1b7]">Content</FieldLabel>
                       <Textarea
-                        className="min-h-[150px] rounded-2xl border-[#2a2a2a] bg-[#242424] p-4 text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
+                        className="min-h-[150px] rounded-2xl border-[#3b2a22]/55 bg-white/[0.035] p-4 text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
                         disabled={candidates.length > 0}
                         placeholder="Paste numbered questions, LaTeX source, or exported document text."
                         value={pastedContent}
@@ -686,7 +686,7 @@ export default function QuestionImportPage() {
                       <Input
                         type="file"
                         accept=".pdf,.tex,.txt,.md,.docx,application/pdf"
-                        className="rounded-full border-[#2a2a2a] bg-[#242424] text-[#e5e2e1] file:text-[#dac1b7]"
+                        className="rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-[#e5e2e1] file:text-[#dac1b7]"
                         disabled={candidates.length > 0}
                         onChange={(event) => setFile(event.target.files?.[0] || null)}
                       />
@@ -697,7 +697,7 @@ export default function QuestionImportPage() {
                     <Field className="mt-4">
                       <FieldLabel className="text-[#dac1b7]">URL</FieldLabel>
                       <Input
-                        className="rounded-full border-[#2a2a2a] bg-[#242424] text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
+                        className="rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
                         disabled={candidates.length > 0}
                         placeholder="https://..."
                         value={sourceUrl}
@@ -715,7 +715,7 @@ export default function QuestionImportPage() {
                   <Field className="mt-4">
                     <FieldLabel className="text-[#dac1b7]">Parsing Notes</FieldLabel>
                     <Textarea
-                      className="min-h-[84px] rounded-2xl border-[#2a2a2a] bg-[#242424] p-4 text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
+                      className="min-h-[84px] rounded-2xl border-[#3b2a22]/55 bg-white/[0.035] p-4 text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
                       disabled={candidates.length > 0}
                       placeholder="Optional: e.g. questions start at page 3, ignore solutions, use marks in right margin, split by Exercise 2A."
                       value={importInstructions}
@@ -761,7 +761,7 @@ export default function QuestionImportPage() {
           >
             <Card
               className={cn(
-                "min-w-0 self-start overflow-hidden rounded-2xl border-[#54433c]/35 bg-[#1c1b1b] text-[#e5e2e1] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                "min-w-0 self-start overflow-hidden rounded-2xl border-[#3b2a22]/55 bg-[#1b1713] text-[#e5e2e1] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
                 previewExpanded && "xl:pointer-events-none xl:max-w-0 xl:-translate-x-4 xl:scale-[0.98] xl:opacity-0"
               )}
             >
@@ -774,14 +774,14 @@ export default function QuestionImportPage() {
                   <div className="relative min-w-0 flex-1">
                     <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#a28c83]" />
                     <Input
-                      className="h-10 rounded-full border-[#2a2a2a] bg-[#242424] pl-9 text-sm text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
+                      className="h-10 rounded-full border-[#3b2a22]/55 bg-white/[0.035] pl-9 text-sm text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
                       placeholder="Search candidates"
                       value={candidateSearch}
                       onChange={(event) => setCandidateSearch(event.target.value)}
                     />
                   </div>
                   <Button
-                    className="size-8 shrink-0 rounded-full border-[#54433c]/50 bg-[#242424] p-0 text-base leading-none text-[#dac1b7] hover:bg-[#2d2d2d]"
+                    className="size-8 shrink-0 rounded-full border-[#3b2a22]/55 bg-white/[0.035] p-0 text-base leading-none text-[#dac1b7] hover:bg-[#211913]"
                     type="button"
                     variant="outline"
                     onClick={addManualQuestion}
@@ -810,7 +810,7 @@ export default function QuestionImportPage() {
                       "w-full min-w-0 rounded-xl border p-3 text-left transition-colors",
                       index === activeIndex
                         ? "border-[#ffb595]/60 bg-[#2a211e]"
-                        : "border-[#54433c]/20 bg-[#201f1f] hover:bg-[#242424]"
+                        : "border-[#3b2a22]/40 bg-[#181410] hover:bg-[#211913]"
                     )}
                     onClick={() => selectCandidate(index, candidate)}
                   >
@@ -842,7 +842,7 @@ export default function QuestionImportPage() {
                   </button>
                 ))}
                 {filteredCandidates.length === 0 && (
-                  <div className="rounded-xl border border-[#54433c]/20 bg-[#201f1f] p-4 text-sm text-[#a28c83]">
+                  <div className="rounded-xl border border-[#3b2a22]/40 bg-[#181410] p-4 text-sm text-[#a28c83]">
                     No candidates match that search.
                   </div>
                 )}
@@ -850,7 +850,7 @@ export default function QuestionImportPage() {
             </Card>
 
             <section className="flex min-w-0 flex-col gap-4 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">
-              <div className="flex min-h-[76px] flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#54433c]/30 bg-[#1c1b1b] px-4 py-3">
+              <div className="flex min-h-[76px] flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#3b2a22]/55 bg-[#1b1713] px-4 py-3">
                 <div>
                   <p className="text-sm font-semibold text-[#e5e2e1]">
                     Candidate {activeIndex + 1} of {candidates.length}
@@ -883,7 +883,7 @@ export default function QuestionImportPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-full border-[#54433c]/50 bg-[#201f1f] text-[#dac1b7] hover:bg-[#2a211e]"
+                    className="rounded-full border-[#3b2a22]/55 bg-[#181410] text-[#dac1b7] hover:bg-[#211913]"
                     disabled={activeIndex === 0}
                     onClick={() => selectCandidate(activeIndex - 1)}
                   >
@@ -893,7 +893,7 @@ export default function QuestionImportPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-full border-[#54433c]/50 bg-[#201f1f] text-[#dac1b7] hover:bg-[#2a211e]"
+                    className="rounded-full border-[#3b2a22]/55 bg-[#181410] text-[#dac1b7] hover:bg-[#211913]"
                     disabled={activeIndex >= candidates.length - 1}
                     onClick={() => selectCandidate(activeIndex + 1)}
                   >
@@ -903,7 +903,7 @@ export default function QuestionImportPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-full border-[#54433c]/50 bg-[#201f1f] text-[#dac1b7] hover:bg-[#2a211e]"
+                    className="rounded-full border-[#3b2a22]/55 bg-[#181410] text-[#dac1b7] hover:bg-[#211913]"
                     onClick={() => markCurrent("skipped")}
                   >
                     <SkipForward className="size-4" />
@@ -970,7 +970,7 @@ export default function QuestionImportPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="size-8 rounded-full border-[#54433c]/50 bg-[#201f1f]/90 p-0 text-[#dac1b7] shadow-lg shadow-black/20 transition-colors hover:bg-[#2a211e]"
+                    className="size-8 rounded-full border-[#3b2a22]/55 bg-[#181410]/90 p-0 text-[#dac1b7] shadow-lg shadow-black/20 transition-colors hover:bg-[#211913]"
                     onClick={() => setPreviewExpanded((expanded) => !expanded)}
                     aria-label={previewExpanded ? "Compact preview" : "Expand preview"}
                     title={previewExpanded ? "Compact preview" : "Expand preview"}
