@@ -20,8 +20,8 @@ export function drawStroke(ctx, stroke, { clean = false } = {}) {
   const outline = getStroke(
     stroke.points.map((point) => [point.x, point.y, point.pressure || 0.5]),
     {
-      size: stroke.tool === "eraser" ? stroke.width * 2.4 : stroke.width,
-      thinning: stroke.tool === "eraser" ? 0 : 0.55,
+      size: stroke.width,
+      thinning: 0.55,
       smoothing: 0.58,
       streamline: 0.45,
       simulatePressure: false,
@@ -30,13 +30,8 @@ export function drawStroke(ctx, stroke, { clean = false } = {}) {
 
   const path = new Path2D(getSvgPathFromStroke(outline))
   ctx.save()
-  if (stroke.tool === "eraser") {
-    ctx.globalCompositeOperation = "destination-out"
-    ctx.fillStyle = "rgba(0,0,0,1)"
-  } else {
-    ctx.globalCompositeOperation = "source-over"
-    ctx.fillStyle = clean ? "#050505" : stroke.color || "#e8d8c7"
-  }
+  ctx.globalCompositeOperation = "source-over"
+  ctx.fillStyle = clean ? "#050505" : stroke.color || "#e8d8c7"
   ctx.fill(path)
   ctx.restore()
 }
@@ -64,4 +59,3 @@ export function renderPageToCanvas({ page, width, height, scale = 1, clean = fal
   ;(page.strokes || []).forEach((stroke) => drawStroke(ctx, stroke, { clean }))
   return canvas
 }
-

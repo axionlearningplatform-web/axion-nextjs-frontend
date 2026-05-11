@@ -4,7 +4,6 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 
 import PageNavigator from "@/components/answering/PageNavigator"
 import PencilToolbar from "@/components/answering/PencilToolbar"
-import StrokeRenderer from "@/components/answering/StrokeRenderer"
 import { exportHandwrittenAnswer } from "@/services/handwriting/answer_export"
 import { drawStroke } from "@/services/handwriting/render_submission"
 import { createPoint, createStroke } from "@/services/handwriting/stroke_serializer"
@@ -13,15 +12,37 @@ const PAGE_WIDTH = 820
 const PAGE_HEIGHT = 1060
 const PEN_COLOR = "#e8d6c4"
 const PEN_WIDTH = 4.4
-const ERASER_WIDTH = 18
+const ERASER_RADIUS = 20
 
 function createPage(index) {
   return {
     id: crypto.randomUUID(),
     page_number: index + 1,
     strokes: [],
+    history: [],
     redoStack: [],
   }
+}
+
+function distanceToSegment(point, start, end) {
+  const dx = end.x - start.x
+  const dy = end.y - start.y
+  if (dx === 0 && dy === 0) return Math.hypot(point.x - start.x, point.y - start.y)
+  const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / (dx * dx + dy * dy)))
+  const x = start.x + t * dx
+  const y = start.y + t * dy
+  return Math.hypot(point.x - x, point.y - y)
+}
+
+function strokeIntersectsEraser(stroke, eraserPoints) {
+  for (const point of stroke.points || []) {
+    for (let index = 1; index < eraserPoints.length; index += 1) {
+      if (distanceToSegment(point, eraserPoints[index - 1], eraserPoints[index]) <= ERASER_RADIUS) {
+        return true
+      }
+    }
+  }
+  return false
 }
 
 function drawPaper(ctx) {
@@ -45,7 +66,7 @@ function drawPaper(ctx) {
 }
 
 const HandwritingCanvas = forwardRef(function HandwritingCanvas(
-  { devMode = false, onSubmit, questionId },
+  { onSubmit, questionId },
   ref
 ) {
   const canvasRef = useRef(null)
@@ -58,7 +79,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   const [tool, setTool] = useState("pen")
 
   const currentPage = pages[currentPageIndex] || pages[0]
-  const canUndo = Boolean(currentPage?.strokes?.length)
+  const canUndo = Boolean(currentPage?.history?.length)
   const canRedo = Boolean(currentPage?.redoStack?.length)
 
   const canvasScale = useMemo(() => {
@@ -79,7 +100,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     ctx.setTransform(canvasScale, 0, 0, canvasScale, 0, 0)
     drawPaper(ctx)
     ;(pagesRef.current[currentPageIndex]?.strokes || []).forEach((stroke) => drawStroke(ctx, stroke))
-    if (strokeOverride) drawStroke(ctx, strokeOverride)
+    if (strokeOverride?.tool === "pen") drawStroke(ctx, strokeOverride)
     ctx.restore()
   }, [canvasScale, currentPageIndex])
 
@@ -119,8 +140,8 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     const point = createPoint(event, canvasRef.current)
     currentStrokeRef.current = createStroke({
       tool,
-      color: tool === "eraser" ? "#000000" : PEN_COLOR,
-      width: tool === "eraser" ? ERASER_WIDTH : PEN_WIDTH,
+      color: PEN_COLOR,
+      width: PEN_WIDTH,
       points: [point],
     })
     scheduleRender(currentStrokeRef.current)
@@ -142,27 +163,69 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     const completedStroke = currentStrokeRef.current
     activePointerRef.current = null
     currentStrokeRef.current = null
+    if (completedStroke.tool === "eraser") {
+      updateCurrentPage((page) => {
+        const removed = page.strokes.filter((stroke) => strokeIntersectsEraser(stroke, completedStroke.points))
+        if (!removed.length) return page
+        const removedIds = new Set(removed.map((stroke) => stroke.id))
+        return {
+          ...page,
+          strokes: page.strokes.filter((stroke) => !removedIds.has(stroke.id)),
+          history: [...(page.history || []), { type: "erase", strokes: removed }],
+          redoStack: [],
+        }
+      })
+      return
+    }
     updateCurrentPage((page) => ({
       ...page,
       strokes: [...page.strokes, completedStroke],
+      history: [...(page.history || []), { type: "add", stroke: completedStroke }],
       redoStack: [],
     }))
   }
 
   function undo() {
     updateCurrentPage((page) => {
-      if (!page.strokes.length) return page
-      const strokes = page.strokes.slice(0, -1)
-      const undone = page.strokes[page.strokes.length - 1]
-      return { ...page, strokes, redoStack: [undone, ...page.redoStack] }
+      const history = page.history || []
+      if (!history.length) return page
+      const action = history[history.length - 1]
+      if (action.type === "add") {
+        return {
+          ...page,
+          strokes: page.strokes.filter((stroke) => stroke.id !== action.stroke.id),
+          history: history.slice(0, -1),
+          redoStack: [action, ...page.redoStack],
+        }
+      }
+      return {
+        ...page,
+        strokes: [...page.strokes, ...action.strokes],
+        history: history.slice(0, -1),
+        redoStack: [action, ...page.redoStack],
+      }
     })
   }
 
   function redo() {
     updateCurrentPage((page) => {
       if (!page.redoStack.length) return page
-      const [stroke, ...redoStack] = page.redoStack
-      return { ...page, strokes: [...page.strokes, stroke], redoStack }
+      const [action, ...redoStack] = page.redoStack
+      if (action.type === "add") {
+        return {
+          ...page,
+          strokes: [...page.strokes, action.stroke],
+          history: [...(page.history || []), action],
+          redoStack,
+        }
+      }
+      const removedIds = new Set(action.strokes.map((stroke) => stroke.id))
+      return {
+        ...page,
+        strokes: page.strokes.filter((stroke) => !removedIds.has(stroke.id)),
+        history: [...(page.history || []), action],
+        redoStack,
+      }
     })
   }
 
@@ -170,7 +233,8 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     updateCurrentPage((page) => ({
       ...page,
       strokes: [],
-      redoStack: page.strokes.length ? [...page.strokes, ...page.redoStack] : page.redoStack,
+      history: page.strokes.length ? [...(page.history || []), { type: "erase", strokes: page.strokes }] : page.history,
+      redoStack: [],
     }))
   }
 
@@ -229,20 +293,6 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
           </div>
         </div>
       </div>
-
-      {devMode && (
-        <div className="grid gap-4 border-t border-white/[0.06] bg-[#15110e] p-4 md:grid-cols-[220px_1fr]">
-          <div>
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8f8982]">
-              Stroke replay preview
-            </p>
-            <StrokeRenderer page={currentPage} width={260} height={336} />
-          </div>
-          <pre className="max-h-64 overflow-auto rounded-[6px] border border-white/[0.06] bg-[#100d0b] p-3 text-[11px] leading-relaxed text-[#9b8f84]">
-            {JSON.stringify({ page: currentPageIndex + 1, strokes: currentPage?.strokes || [] }, null, 2)}
-          </pre>
-        </div>
-      )}
     </div>
   )
 })

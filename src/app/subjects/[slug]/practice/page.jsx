@@ -17,7 +17,6 @@ import {
 } from "lucide-react"
 
 import HandwritingCanvas from "@/components/answering/HandwritingCanvas"
-import StrokeRenderer from "@/components/answering/StrokeRenderer"
 import { useAuth } from "@/components/authProvider"
 import fetcher from "@/lib/fetcher"
 import { cn } from "@/lib/utils"
@@ -155,6 +154,19 @@ function readFileAsDataUrl(file) {
     reader.onerror = () => reject(reader.error)
     reader.readAsDataURL(file)
   })
+}
+
+async function parseJsonResponse(response) {
+  const text = await response.text()
+  if (!text) return {}
+  try {
+    return JSON.parse(text)
+  } catch {
+    return {
+      detail: "Backend returned a non-JSON response.",
+      raw: text.slice(0, 500),
+    }
+  }
 }
 
 function prepareMarkdown(value) {
@@ -576,7 +588,6 @@ function AnswerArea({ markingError, markingLoading, markingResult, onSubmit, que
   const [activeTab, setActiveTab] = useState("type")
   const [typedAnswer, setTypedAnswer] = useState("")
   const [files, setFiles] = useState([])
-  const [handwritingExport, setHandwritingExport] = useState(null)
   const handwritingRef = useRef(null)
 
   async function addFiles(fileList) {
@@ -591,7 +602,6 @@ function AnswerArea({ markingError, markingLoading, markingResult, onSubmit, que
   async function submitAnswer() {
     if (activeTab === "draw" && handwritingRef.current) {
       const exportPayload = await handwritingRef.current.exportAnswer()
-      setHandwritingExport(exportPayload)
       onSubmit({
         files: exportPayload.pages.map((page) => ({
           name: `handwriting-page-${page.page_number}.png`,
@@ -666,9 +676,7 @@ function AnswerArea({ markingError, markingLoading, markingResult, onSubmit, que
       ) : activeTab === "draw" ? (
         <HandwritingCanvas
           ref={handwritingRef}
-          devMode
           questionId={questionId}
-          onSubmit={setHandwritingExport}
         />
       ) : activeTab === "photo" ? (
         <div className="rounded-[3px] border border-white/[0.06] bg-[#1a1714] p-5">
@@ -810,41 +818,6 @@ function AnswerArea({ markingError, markingLoading, markingResult, onSubmit, que
             </div>
           )}
         </div>
-      )}
-
-      {handwritingExport && (
-        <details className="mt-5 rounded-[3px] border border-white/[0.06] bg-[#15110e] p-4">
-          <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
-            Developer handwriting export
-          </summary>
-          <div className="mt-4 grid gap-4 md:grid-cols-[260px_1fr]">
-            <div className="grid gap-3">
-              {handwritingExport.pages.map((page) => (
-                <div key={page.page_number}>
-                  <p className="mb-2 text-[10px] uppercase tracking-[0.1em] text-[#6f6861]">
-                    Page {page.page_number} OCR image
-                  </p>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={page.page_image}
-                    alt={`Rendered handwriting page ${page.page_number}`}
-                    className="w-full rounded-[6px] border border-white/[0.06] bg-white"
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="grid gap-3">
-              <StrokeRenderer
-                page={handwritingExport.stroke_data.pages[0]}
-                width={260}
-                height={336}
-              />
-              <pre className="max-h-96 overflow-auto rounded-[6px] border border-white/[0.06] bg-[#100d0b] p-3 text-[11px] leading-relaxed text-[#9b8f84]">
-                {JSON.stringify(handwritingExport.stroke_data, null, 2)}
-              </pre>
-            </div>
-          </div>
-        </details>
       )}
     </section>
   )
@@ -1107,7 +1080,7 @@ export default function DailyPracticePage() {
         },
         body: JSON.stringify(payload),
       })
-      const data = await response.json()
+      const data = await parseJsonResponse(response)
       if (!response.ok) {
         throw new Error(data.detail || data.message || "Could not mark this response.")
       }

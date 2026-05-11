@@ -16,7 +16,6 @@ export async function exportHandwrittenAnswer({ questionId, pages, width, height
     return {
       page_number: index + 1,
       page_image: canvas.toDataURL("image/png", 0.96),
-      stroke_data: strokeData.pages[index],
     }
   })
 
