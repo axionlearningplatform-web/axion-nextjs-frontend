@@ -23,15 +23,19 @@ function getStrokePath(stroke) {
   }
 
   const outline = getStroke(
-    stroke.points.map((point) => [point.x, point.y, point.pressure || 0.5]),
-    {
-      size: stroke.width,
-      thinning: 0.55,
-      smoothing: 0.58,
-      streamline: 0.45,
-      simulatePressure: false,
-    }
-  )
+  stroke.points.map((point) => [
+    point.x,
+    point.y,
+    point.pressure || 0.5,
+  ]),
+  {
+    size: stroke.width,
+    thinning: 0.42,
+    smoothing: 0.28,
+    streamline: 0.12,
+    simulatePressure: false,
+  }
+)
   const path = new Path2D(getSvgPathFromStroke(outline))
   strokePathCache.set(stroke, {
     path,

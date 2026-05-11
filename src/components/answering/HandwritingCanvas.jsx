@@ -14,6 +14,7 @@ const PEN_COLOR = "#e8d6c4"
 const PEN_WIDTH = 4.4
 const DEFAULT_ERASER_SIZE = 24
 const PAPER_COLOR = "#191410"
+const MIN_POINT_DISTANCE = 0.7
 
 function createPage(index) {
   return {
@@ -146,6 +147,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   const liveFrameRef = useRef(null)
   const activePointerRef = useRef(null)
   const currentStrokeRef = useRef(null)
+  const livePathRef = useRef([])
   const liveDirtyRectRef = useRef(null)
   const skipNextCommittedInkRedrawRef = useRef(null)
   const eraserPreviewRef = useRef({ point: null, strokeIds: new Set() })
@@ -161,9 +163,25 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   const canRedo = Boolean(currentPage?.redoStack?.length)
 
   const canvasScale = useMemo(() => {
-    if (typeof window === "undefined") return 2
-    return Math.min(Math.max(window.devicePixelRatio || 2, 2), 3)
-  }, [])
+  if (typeof window === "undefined") {
+    return 1.5
+  }
+
+  const isIPad =
+    /iPad|Macintosh/.test(
+      navigator.userAgent
+    ) &&
+    navigator.maxTouchPoints > 1
+
+  if (isIPad) {
+    return 1.5
+  }
+
+  return Math.min(
+    window.devicePixelRatio || 2,
+    2
+  )
+}, [])
 
   function commitPages(nextPages) {
     pagesRef.current = nextPages
@@ -220,29 +238,78 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     ctx.restore()
   }, [canvasScale])
 
-  const renderLiveStroke = useCallback(() => {
-    const stroke = currentStrokeRef.current
-    const canvas = liveCanvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext("2d")
-    const previousDirtyRect = liveDirtyRectRef.current
-    const nextDirtyRect = getStrokeBounds(stroke)
-    const clearRect = mergeRects(previousDirtyRect, nextDirtyRect)
+ const renderLiveStroke =
+  useCallback(() => {
+
+Delete the whole function.
+
+Replace with:
+
+const renderLiveStroke =
+  useCallback(() => {
+    const stroke =
+      currentStrokeRef.current
+
+    const canvas =
+      liveCanvasRef.current
+
+    if (!canvas || !stroke) {
+      liveFrameRef.current = null
+      return
+    }
+
+    const ctx =
+      canvas.getContext("2d")
+
+    const points =
+      livePathRef.current
+
+    if (points.length < 2) {
+      liveFrameRef.current = null
+      return
+    }
+
+    const previous =
+      points[points.length - 2]
+
+    const current =
+      points[points.length - 1]
+
     ctx.save()
-    ctx.setTransform(canvasScale, 0, 0, canvasScale, 0, 0)
-    if (clearRect) {
-      ctx.clearRect(clearRect.left, clearRect.top, clearRect.width, clearRect.height)
-    } else {
-      ctx.clearRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT)
-    }
-    if (stroke?.tool === "pen") {
-      drawStroke(ctx, stroke)
-    } else if (stroke?.tool === "pixel-eraser") {
-      drawStroke(ctx, stroke, { color: PAPER_COLOR, tool: "pen" })
-    }
+    ctx.setTransform(
+      canvasScale,
+      0,
+      0,
+      canvasScale,
+      0,
+      0
+    )
+
+    ctx.lineCap = "round"
+    ctx.lineJoin = "round"
+    ctx.strokeStyle =
+      PEN_COLOR
+
+    ctx.lineWidth =
+      PEN_WIDTH
+
+    ctx.beginPath()
+    ctx.moveTo(
+      previous.x,
+      previous.y
+    )
+
+    ctx.lineTo(
+      current.x,
+      current.y
+    )
+
+    ctx.stroke()
+
     ctx.restore()
-    liveDirtyRectRef.current = nextDirtyRect
-    liveFrameRef.current = null
+
+    liveFrameRef.current =
+      null
   }, [canvasScale])
 
   const scheduleLiveRender = useCallback(() => {
@@ -379,6 +446,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     activePointerRef.current = event.pointerId
     canvas.setPointerCapture(event.pointerId)
     const point = createPoint(event, canvas, rect)
+    livePathRef.current = [point]
     currentStrokeRef.current = createStroke({
       tool,
       color: PEN_COLOR,
@@ -392,14 +460,95 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     const canvas = liveCanvasRef.current
     if (!canvas) return
     const rect = canvas.getBoundingClientRect()
-    updateEraserPreview(event, rect)
+    if (
+  tool === "stroke-eraser" ||
+  tool === "pixel-eraser"
+) {
+  updateEraserPreview(
+    event,
+    rect
+  )
+}
     if (activePointerRef.current !== event.pointerId || !currentStrokeRef.current) return
     event.preventDefault()
-    const events = event.getCoalescedEvents?.() || [event]
-    events.forEach((coalescedEvent) => {
-      currentStrokeRef.current.points.push(createPoint(coalescedEvent, canvas, rect))
-    })
-    scheduleLiveRender()
+    const events =
+  event.getCoalescedEvents?.() || [event]
+
+  const predicted =
+  event.getPredictedEvents?.() || []
+
+const points = currentStrokeRef.current.points
+
+events.forEach((coalescedEvent) => {
+  const nextPoint = createPoint(
+    coalescedEvent,
+    canvas,
+    rect
+  )
+
+  const previous =
+    points[points.length - 1]
+
+  if (!previous) {
+    points.push(nextPoint)
+    livePathRef.current.push(
+  nextPoint
+)
+    return
+  }
+
+  const dx =
+    nextPoint.x - previous.x
+
+  const dy =
+    nextPoint.y - previous.y
+
+  const distanceSquared =
+    dx * dx + dy * dy
+
+  if (
+    distanceSquared >
+    MIN_POINT_DISTANCE
+  ) {
+    points.push(nextPoint)
+    livePathRef.current.push(
+  nextPoint
+)
+  }
+})
+
+predicted.forEach((predictedEvent) => {
+  const nextPoint = createPoint(
+    predictedEvent,
+    canvas,
+    rect
+  )
+
+  const previous =
+    points[points.length - 1]
+
+  if (!previous) return
+
+  const dx =
+    nextPoint.x - previous.x
+
+  const dy =
+    nextPoint.y - previous.y
+
+  if (
+    dx * dx + dy * dy >
+    MIN_POINT_DISTANCE
+  ) {
+    points.push(nextPoint)
+    livePathRef.current.push(
+  nextPoint
+)
+  }
+})
+
+    if (!liveFrameRef.current) {
+  scheduleLiveRender()
+}
   }
 
   function finishStroke(event) {
@@ -410,6 +559,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     const completedStroke = currentStrokeRef.current
     activePointerRef.current = null
     currentStrokeRef.current = null
+    livePathRef.current = []
     if (completedStroke.tool === "stroke-eraser") {
       const strokeEraserRadius = Math.max((completedStroke.width || eraserSize * 2) / 2, 1)
       updateCurrentPage((page) => {
@@ -586,6 +736,10 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
             />
             <canvas
               ref={liveCanvasRef}
+              style={{
+    willChange: "transform",
+    transform: "translateZ(0)",
+  }}
               draggable={false}
               className="absolute inset-0 block h-full w-full touch-none rounded-[4px] select-none [-webkit-touch-callout:none] [-webkit-user-drag:none] [-webkit-user-select:none] [touch-action:none]"
               onContextMenu={preventWritingAreaBrowserGesture}
