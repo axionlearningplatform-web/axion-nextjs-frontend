@@ -2,6 +2,9 @@
 
 import { useMemo, useState } from "react"
 import { useParams } from "next/navigation"
+import ReactMarkdown from "react-markdown"
+import remarkMath from "remark-math"
+import rehypeKatex from "rehype-katex"
 import useSWR from "swr"
 import { ChevronRight, Loader2, Plus, Trash2 } from "lucide-react"
 
@@ -22,7 +25,53 @@ function childrenOf(tags, parentId) {
 }
 
 function isMicroskill(tag) {
-  return tag.tag_kind === "microskill" || tag.layer === 4
+  return tag?.tag_kind === "microskill" || tag?.layer === 4
+}
+
+function supportsRichTag(tagOrLayer) {
+  const layer = typeof tagOrLayer === "number" ? tagOrLayer : tagOrLayer?.layer
+  return layer === 3 || layer === 4 || isMicroskill(tagOrLayer)
+}
+
+function MarkdownInline({ value, fallback = "" }) {
+  const content = String(value || fallback || "").trim()
+  if (!content) return null
+
+  return (
+    <span className="axion-question-math font-serif">
+      <ReactMarkdown
+        remarkPlugins={[remarkMath]}
+        rehypePlugins={[rehypeKatex]}
+        components={{
+          p: ({ children }) => <>{children}</>,
+          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+          em: ({ children }) => <em className="italic">{children}</em>,
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </span>
+  )
+}
+
+function TagDetailCard({ tag }) {
+  if (!tag || !supportsRichTag(tag)) return null
+
+  return (
+    <div className="mt-4 rounded-2xl border border-[#c8864a]/20 bg-[#c8864a]/8 p-4">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c8864a]/65">
+        {isMicroskill(tag) ? "Microskill preview" : "Concept preview"}
+      </p>
+      <div className="mt-2 text-[18px] text-[#eee9e4]">
+        <MarkdownInline value={tag.name} />
+      </div>
+      {isMicroskill(tag) && tag.description && (
+        <div className="mt-3 grid gap-2 text-sm leading-6 text-[#bda99c]">
+          <MarkdownInline value={tag.description} />
+        </div>
+      )}
+    </div>
+  )
 }
 
 function TagPill({ tag, active, deleting, onClick, onDelete }) {
@@ -40,7 +89,9 @@ function TagPill({ tag, active, deleting, onClick, onDelete }) {
       )}
     >
       <span className="min-w-0 flex-1 overflow-hidden">
-        <span className="block truncate font-serif text-[17px] font-medium">{tag.name}</span>
+        <span className="block truncate font-serif text-[17px] font-medium">
+          {supportsRichTag(tag) ? <MarkdownInline value={tag.name} /> : tag.name}
+        </span>
         <span className="mt-1 block text-[10px] uppercase tracking-[0.16em] text-[#8c8178]">
           {isMicroskill(tag) ? "Microskill" : `Layer ${tag.layer}`} · {tag.children_count || 0} child tags
         </span>
@@ -67,8 +118,12 @@ function TagPill({ tag, active, deleting, onClick, onDelete }) {
 
 function CreateTagForm({ layer, kind = "taxonomy", parent, subjectId, onCreated }) {
   const [name, setName] = useState("")
+  const [description, setDescription] = useState("")
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [message, setMessage] = useState("")
   const [saving, setSaving] = useState(false)
+  const rich = supportsRichTag(layer)
+  const microskill = kind === "microskill"
 
   async function createTag(event) {
     event.preventDefault()
@@ -85,6 +140,8 @@ function CreateTagForm({ layer, kind = "taxonomy", parent, subjectId, onCreated 
         parent_id: parent?.id || null,
         layer,
         tag_kind: kind,
+        description: microskill ? description.trim() : "",
+        visual: "",
       }),
     })
     const data = await response.json()
@@ -96,21 +153,31 @@ function CreateTagForm({ layer, kind = "taxonomy", parent, subjectId, onCreated 
     }
 
     setName("")
+    setDescription("")
     onCreated()
   }
 
   return (
     <form className="mt-4 rounded-2xl border border-[#3b2a22]/55 bg-[#181410] p-3" onSubmit={createTag}>
       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8c8178]">
-        {kind === "microskill" ? "Root microskill" : parent ? `Under ${parent.name}` : "Root topic"}
+        {microskill ? "Root microskill" : parent ? `Under ${parent.name}` : "Root topic"}
       </p>
       <div className="mt-3 flex gap-2">
-        <input
-          className="h-10 min-w-0 flex-1 rounded-xl border border-white/[0.07] bg-white/[0.035] px-3 text-sm text-[#eee9e4] outline-none transition-colors placeholder:text-[#6f6258] focus:border-[#c8864a]/50"
-          placeholder={`New ${LAYERS[layer - 1].title.replace(/s$/, "").toLowerCase()}`}
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
+        {rich ? (
+          <textarea
+            className="min-h-10 min-w-0 flex-1 resize-y rounded-xl border border-white/[0.07] bg-white/[0.035] px-3 py-2 text-sm leading-6 text-[#eee9e4] outline-none transition-colors placeholder:text-[#6f6258] focus:border-[#c8864a]/50"
+            placeholder={`New ${microskill ? "microskill" : "concept"} with LaTeX, e.g. $\\arg(z)$`}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        ) : (
+          <input
+            className="h-10 min-w-0 flex-1 rounded-xl border border-white/[0.07] bg-white/[0.035] px-3 text-sm text-[#eee9e4] outline-none transition-colors placeholder:text-[#6f6258] focus:border-[#c8864a]/50"
+            placeholder={`New ${LAYERS[layer - 1].title.replace(/s$/, "").toLowerCase()}`}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        )}
         <button
           type="submit"
           disabled={saving || !name.trim()}
@@ -119,6 +186,37 @@ function CreateTagForm({ layer, kind = "taxonomy", parent, subjectId, onCreated 
           {saving ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
         </button>
       </div>
+      {microskill && (
+        <textarea
+          className="mt-2 min-h-20 w-full resize-y rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2 text-sm leading-6 text-[#eee9e4] outline-none placeholder:text-[#6f6258] focus:border-[#c8864a]/50"
+          placeholder="Descriptor for the microskill with LaTeX..."
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+        />
+      )}
+      {rich && (
+        <>
+          <button
+            type="button"
+            className="mt-2 rounded-full border border-[#3b2a22]/55 bg-white/[0.035] px-3 py-1.5 text-xs font-semibold text-[#a28c83] transition-colors hover:text-[#dac1b7]"
+            onClick={() => setPreviewOpen((open) => !open)}
+          >
+            {previewOpen ? "Hide preview" : "Preview"}
+          </button>
+          {previewOpen && (
+            <div className="mt-2 rounded-xl border border-[#3b2a22]/55 bg-[#11100e] p-3 text-[#eee9e4]">
+              <div className="text-[16px]">
+                <MarkdownInline value={name} fallback="Tag name preview" />
+              </div>
+              {microskill && description && (
+                <div className="mt-2 grid gap-1 text-sm text-[#bda99c]">
+                  <MarkdownInline value={description} />
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
       {message && <p className="mt-2 text-xs text-red-200">{message}</p>}
     </form>
   )
@@ -264,6 +362,7 @@ export default function SubjectTagsPage() {
                         </div>
                       )}
                     </div>
+                    <TagDetailCard tag={selected[layer.id]} />
                   </>
                 )}
               </article>

@@ -71,10 +71,11 @@ function candidateToQuestion(candidate, subject) {
     tikz_code: candidate.tikz_code || "",
     diagram_svg: candidate.diagram_svg || "",
     tikz_visuals: candidate.tikz_visuals || [],
+    sample_solution: candidate.sample_solution || "",
     hints: [],
     parts: candidate.parts || [],
     attachments: candidate.attachments || [],
-    marking_criteria: candidate.marking_criteria || [],
+    marking_criteria: [],
     tag_ids: candidate.tag_ids || [],
     import_source: candidate.import_source || "",
   }
@@ -91,10 +92,11 @@ function emptyQuestionDraft(subject, importSource = "") {
     tikz_code: "",
     diagram_svg: "",
     tikz_visuals: [],
+    sample_solution: "",
     hints: [],
     parts: [],
     attachments: [],
-    marking_criteria: [{ mark: 1, text: "" }],
+    marking_criteria: [],
     tag_ids: [],
     import_source: importSource,
   }
@@ -108,6 +110,7 @@ function draftToCandidate(draft, sourceMetadata = {}) {
     tikz_code: draft.tikz_code || "",
     diagram_svg: draft.diagram_svg || "",
     tikz_visuals: draft.tikz_visuals || [],
+    sample_solution: draft.sample_solution || "",
     marks: draft.marks || 1,
     detected_subject: draft.subject || "",
     confidence: 1,
@@ -118,7 +121,7 @@ function draftToCandidate(draft, sourceMetadata = {}) {
     source_metadata: sourceMetadata,
     parts: draft.parts || [],
     attachments: draft.attachments || [],
-    marking_criteria: draft.marking_criteria || [],
+    marking_criteria: [],
     import_source: draft.import_source || "",
     draft,
     review_status: "pending",
@@ -345,9 +348,10 @@ export default function QuestionImportPage() {
       ...emptyQuestionDraft(lockedSubject, draft.import_source || importSource),
       marks: part.marks || 1,
       question_text: part.text || "",
-      hints: part.hints || [],
+      sample_solution: part.sample_solution || "",
+      hints: [],
       attachments: part.attachments || [],
-      marking_criteria: part.marking_criteria || [],
+      marking_criteria: [],
       tag_ids: draft.tag_ids || [],
     }
     const candidate = draftToCandidate(branchedDraft, {
@@ -957,10 +961,10 @@ export default function QuestionImportPage() {
                 subject={draft?.subject || lockedSubject.name}
                 marks={draft?.marks || activeCandidate?.marks || 1}
                 questionText={draft?.question_text || activeCandidate?.question_text || ""}
-                hints={draft?.hints || []}
+                hints={[]}
                 parts={draft?.parts || activeCandidate?.parts || []}
                 attachments={draft?.attachments || activeCandidate?.attachments || []}
-                markingCriteria={draft?.marking_criteria || activeCandidate?.marking_criteria || []}
+                markingCriteria={[]}
                 importSource={draft?.import_source || activeCandidate?.import_source || ""}
                 tags={[]}
                 diagramSvg={draft?.diagram_svg || activeCandidate?.diagram_svg || ""}

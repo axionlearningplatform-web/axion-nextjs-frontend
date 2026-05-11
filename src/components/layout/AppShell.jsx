@@ -40,6 +40,13 @@ function getSubjectInitial(subject) {
   return subjectIcons[subject?.slug] || subject?.name?.slice(0, 2) || "Ax"
 }
 
+function compactSubjectName(name = "") {
+  return name
+    .replace(/^Mathematics Extension 2$/i, "Maths Ext 2")
+    .replace(/^Mathematics Extension 1$/i, "Maths Ext 1")
+    .replace(/^Mathematics Advanced$/i, "Maths Adv")
+}
+
 function getCurrentSubject(pathname, subjectMemberships) {
   const match = pathname.match(/^\/subjects\/([^/]+)/)
   const slug = match?.[1]
@@ -147,7 +154,7 @@ function SubjectSwitcher({ collapsed, currentSubject, subjectMemberships }) {
           <>
             <span className="min-w-0 flex-1">
               <span className="block truncate font-serif text-[15px] font-semibold text-[#e5e2e1]">
-                {currentSubject.subject.name}
+                {compactSubjectName(currentSubject.subject.name)}
               </span>
               <span className="block truncate text-[10px] font-semibold uppercase tracking-wide text-[#a28c83]">
                 Year 12 HSC Syllabus

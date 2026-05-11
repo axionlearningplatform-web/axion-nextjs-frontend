@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Bold, ChevronDown, Italic, Plus, Trash2 } from "lucide-react"
+import ReactMarkdown from "react-markdown"
+import remarkMath from "remark-math"
+import rehypeKatex from "rehype-katex"
 import useSWR from "swr"
 
 import { cn } from "@/lib/utils"
@@ -28,6 +31,7 @@ const emptyPart = (index = 0) => ({
   label: String.fromCharCode(97 + index),
   text: "",
   marks: 1,
+  sample_solution: "",
   tag_ids: [],
   tag_requirements: [],
   attachments: [],
@@ -195,16 +199,68 @@ function DropdownSection({ title, summary, children, defaultOpen = false }) {
   )
 }
 
-function DisabledSection({ title, summary = "Disabled for now" }) {
+function renderableMarkdown(value = "") {
+  return String(value || "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/\\\[((?:.|\n)*?)\\\]/g, (_, expression) => `$$\n${expression.trim()}\n$$`)
+    .replace(/\\\((.+?)\\\)/g, (_, expression) => `$${expression.trim()}$`)
+}
+
+function MarkdownPreview({ value, placeholder = "Preview will appear here." }) {
+  if (!String(value || "").trim()) {
+    return (
+      <p className="font-serif text-sm italic text-[#6f6258]">{placeholder}</p>
+    )
+  }
+
   return (
-    <div
-      aria-disabled="true"
-      className="overflow-hidden rounded-2xl border border-[#3b2a22]/35 bg-[#181410]/55 opacity-45"
-    >
-      <div className="flex cursor-not-allowed list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-[#dac1b7]">
-        <span>{title}</span>
-        <span className="text-xs font-normal text-[#a28c83]">{summary}</span>
+    <div className="axion-question-math prose prose-invert max-w-none break-words font-serif text-[15px] leading-7 text-[#eee9e4]">
+      <ReactMarkdown
+        remarkPlugins={[remarkMath]}
+        rehypePlugins={[rehypeKatex]}
+        components={{
+          p: ({ children }) => <p className="my-3 first:mt-0 last:mb-0">{children}</p>,
+          strong: ({ children }) => <strong className="font-semibold text-[#f3ede6]">{children}</strong>,
+          em: ({ children }) => <em className="italic text-[#efe4da]">{children}</em>,
+          code: ({ children }) => <code className="whitespace-pre-wrap break-words">{children}</code>,
+        }}
+      >
+        {renderableMarkdown(value)}
+      </ReactMarkdown>
+    </div>
+  )
+}
+
+function SampleSolutionEditor({ value, onChange, compact = false }) {
+  const [previewOpen, setPreviewOpen] = useState(false)
+
+  return (
+    <div className="grid gap-3">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          className={cn(
+            "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+            previewOpen
+              ? "border-[#c8864a]/45 bg-[#c8864a]/14 text-[#e6b083]"
+              : "border-[#3b2a22]/55 bg-white/[0.035] text-[#a28c83] hover:text-[#dac1b7]"
+          )}
+          onClick={() => setPreviewOpen((open) => !open)}
+        >
+          {previewOpen ? "Hide preview" : "Preview"}
+        </button>
       </div>
+      <RichTextArea
+        className={cn("p-4 text-[#e5e2e1]", compact ? "min-h-[100px]" : "min-h-[145px]")}
+        value={value}
+        onValueChange={onChange}
+        placeholder="Write the sample solution..."
+      />
+      {previewOpen && (
+        <div className="rounded-2xl border border-[#3b2a22]/55 bg-[#11100e] p-4 shadow-inner shadow-black/20">
+          <MarkdownPreview value={value} placeholder="Your sample solution preview will appear here." />
+        </div>
+      )}
     </div>
   )
 }
@@ -548,63 +604,6 @@ function TagTaxonomyPicker({
   )
 }
 
-function HintsEditor({ hints, onChange }) {
-  return (
-    <div className="grid gap-3">
-      {hints.length === 0 && (
-        <p className="rounded-2xl border border-[#3b2a22]/55 bg-[#181410] px-4 py-3 text-sm text-[#a28c83]">
-          No hints added.
-        </p>
-      )}
-      {hints.map((hint, index) => (
-        <div className="grid gap-2 rounded-2xl border border-[#3b2a22]/55 bg-[#181410] p-3" key={index}>
-          <div className="flex items-center gap-2">
-            <Input
-              className="h-9 w-14 rounded-full border-[#3b2a22]/55 bg-white/[0.035] px-2 text-center text-sm text-[#e5e2e1] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              min="1"
-              type="number"
-              value={hint.mark}
-              onChange={(event) => {
-                const next = [...hints]
-                next[index] = { ...hint, mark: event.target.value }
-                onChange(next)
-              }}
-            />
-            <span className="text-xs text-[#a28c83]">mark hint</span>
-            <Button
-              className="ml-auto rounded-full"
-              size="sm"
-              type="button"
-              variant="destructive"
-              onClick={() => onChange(hints.filter((_, i) => i !== index))}
-            >
-              <Trash2 className="size-4" />
-            </Button>
-          </div>
-          <Textarea
-            className="min-h-16 rounded-2xl border-[#3b2a22]/55 bg-white/[0.035] text-[#e5e2e1]"
-            placeholder="Write a hint for this mark."
-            value={hint.text}
-            onChange={(event) => {
-              const next = [...hints]
-              next[index] = { ...hint, text: event.target.value }
-              onChange(next)
-            }}
-          />
-        </div>
-      ))}
-      <Button
-        className="w-fit rounded-full border border-[#3b2a22]/55 bg-white/[0.035] text-[#dac1b7] hover:bg-[#211913]"
-        type="button"
-        onClick={() => onChange([...hints, { text: "", mark: "1" }])}
-      >
-        <Plus className="size-4" />
-        Add Hint
-      </Button>
-    </div>
-  )
-}
-
 export function QuestionEditor({
   initialData = null,
   subjects = [],
@@ -629,16 +628,17 @@ export function QuestionEditor({
   const [subjectId, setSubjectId] = useState("")
   const [marks, setMarks] = useState("1")
   const [questionText, setQuestionText] = useState("")
+  const [sampleSolution, setSampleSolution] = useState("")
   const [tikzCode, setTikzCode] = useState("")
   const [diagramSvg, setDiagramSvg] = useState("")
   const [tikzVisuals, setTikzVisuals] = useState([])
   const [importSource, setImportSource] = useState("")
-  const [hints, setHints] = useState([{ text: "", mark: "1" }])
   const [parts, setParts] = useState([])
   const [attachments, setAttachments] = useState([])
   const [tagRequirements, setTagRequirements] = useState([])
   const [tagIds, setTagIds] = useState([])
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [validationMessage, setValidationMessage] = useState("")
 
   const tagsUrl = subjectId
     ? `/api/questions/tags/?subject_id=${subjectId}`
@@ -660,6 +660,7 @@ export function QuestionEditor({
     setSubjectId(initialData.subject_id ? String(initialData.subject_id) : "")
     setMarks(String(initialData.marks || "1"))
     setQuestionText(initialData.question_text || "")
+    setSampleSolution(initialData.sample_solution || "")
     const incomingTikzVisuals = initialData.tikz_visuals?.length
       ? initialData.tikz_visuals
       : initialData.tikz_code
@@ -674,29 +675,19 @@ export function QuestionEditor({
     setDiagramSvg("")
     setTikzVisuals(incomingTikzVisuals)
     setImportSource(initialData.import_source || "")
-    setHints(
-      initialData.hints?.length
-        ? initialData.hints.map((hint) => ({
-            text: hint.text || "",
-            mark: String(hint.mark || "1"),
-          }))
-        : [{ text: "", mark: "1" }]
-    )
     setParts(
       (initialData.parts || []).map((part, index) => ({
         id: part.id || crypto.randomUUID(),
         label: part.label || String.fromCharCode(97 + index),
         text: part.text || "",
         marks: Number(part.marks || 1),
+        sample_solution: part.sample_solution || "",
         tag_ids: part.tag_ids || [],
         tag_requirements: part.tag_requirements || [],
         attachments: part.attachments || [],
         tikz_visuals: part.tikz_visuals || [],
         marking_criteria: [],
-        hints: (part.hints || []).map((hint) => ({
-          text: hint.text || "",
-          mark: String(hint.mark || "1"),
-        })),
+        hints: [],
       }))
     )
     setAttachments(initialData.attachments || [])
@@ -723,26 +714,22 @@ export function QuestionEditor({
       tikz_code: tikzCode,
       diagram_svg: diagramSvg,
       tikz_visuals: tikzVisuals,
-      hints: hints.map((hint) => ({
-        text: hint.text,
-        mark: Number(hint.mark),
-      })),
+      hints: [],
       parts: parts.map((part) => ({
         label: part.label,
         text: part.text,
         marks: Number(part.marks) || 1,
+        sample_solution: part.sample_solution || "",
         tag_ids: part.tag_ids || [],
         tag_requirements: syncTagRequirements(part.tag_ids || [], part.tag_requirements || [], tags),
         attachments: part.attachments || [],
         tikz_visuals: part.tikz_visuals || [],
         marking_criteria: [],
-        hints: (part.hints || []).map((hint) => ({
-          text: hint.text,
-          mark: Number(hint.mark),
-        })),
+        hints: [],
       })),
       attachments,
       marking_criteria: [],
+      sample_solution: parts.length ? "" : sampleSolution,
       tag_ids: tagIds,
       tag_requirements: parts.length ? [] : syncTagRequirements(tagIds, tagRequirements, tags),
       import_source: importSource,
@@ -751,14 +738,36 @@ export function QuestionEditor({
 
   function handleSubmit(e) {
     e.preventDefault()
+    const message = validateQuestionDraft()
+    setValidationMessage(message)
+    if (message) return
     onSubmit(payload())
+  }
+
+  function validateQuestionDraft() {
+    if (!subjectId && !subject.trim()) return "Subject is required."
+    if (!Number(marks) || Number(marks) < 1) return "Marks are required."
+    if (!importSource.trim()) return "Source is required."
+    if (!questionText.trim()) return "Question text is required."
+    if (!tagIds.length) return "At least one topic tag is required."
+
+    if (parts.length) {
+      const missingPart = parts.find((part) => !String(part.text || "").trim())
+      if (missingPart) return `Question text is required for part (${missingPart.label || "?"}).`
+      const missingSolution = parts.find((part) => !String(part.sample_solution || "").trim())
+      if (missingSolution) return `Sample solution is required for part (${missingSolution.label || "?"}).`
+      return ""
+    }
+
+    if (!sampleSolution.trim()) return "Sample solution is required."
+    return ""
   }
 
   useEffect(() => {
     if (!onDraftChange) return
     onDraftChange(payload())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject, subjectId, marks, questionText, tikzCode, diagramSvg, tikzVisuals, importSource, hints, parts, attachments, tagIds, tagRequirements, tags])
+  }, [subject, subjectId, marks, questionText, sampleSolution, tikzCode, diagramSvg, tikzVisuals, importSource, parts, attachments, tagIds, tagRequirements, tags])
 
   return (
     <div className={cn("grid gap-8", !hidePreview && "lg:grid-cols-2")}>
@@ -833,6 +842,7 @@ export function QuestionEditor({
                           setSubjectId(value)
                           const found = subjects.find((s) => String(s.id) === value)
                           setSubject(found?.name || "")
+                          if (validationMessage) setValidationMessage("")
                         }}
                       >
                         <option value="">Select subject</option>
@@ -846,7 +856,10 @@ export function QuestionEditor({
                       <Input
                         className="rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-[#a28c83]"
                         value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
+                        onChange={(e) => {
+                          setSubject(e.target.value)
+                          if (validationMessage) setValidationMessage("")
+                        }}
                       />
                     )}
                   </Field>
@@ -860,7 +873,10 @@ export function QuestionEditor({
                       min="1"
                       type="number"
                       value={marks}
-                      onChange={(e) => setMarks(e.target.value)}
+                      onChange={(e) => {
+                        setMarks(e.target.value)
+                        if (validationMessage) setValidationMessage("")
+                      }}
                     />
                     {parts.length > 0 && partMarksTotal !== Number(marks) && (
                       <p className="mt-2 text-xs text-amber-200">
@@ -876,7 +892,10 @@ export function QuestionEditor({
                     className="rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
                     placeholder={sourcePlaceholder}
                     value={importSource}
-                    onChange={(event) => setImportSource(event.target.value)}
+                    onChange={(event) => {
+                      setImportSource(event.target.value)
+                      if (validationMessage) setValidationMessage("")
+                    }}
                   />
                 </Field>
 
@@ -890,7 +909,10 @@ export function QuestionEditor({
                       errors?.question_text && "border-destructive focus-visible:ring-destructive"
                     )}
                     value={questionText}
-                    onValueChange={setQuestionText}
+                    onValueChange={(value) => {
+                      setQuestionText(value)
+                      if (validationMessage) setValidationMessage("")
+                    }}
                     onAfterChange={() => {
                       if (errors?.question_text && onClearErrors) onClearErrors()
                     }}
@@ -1006,6 +1028,7 @@ export function QuestionEditor({
                               const next = [...parts]
                               next[index] = { ...part, text: value }
                               setParts(next)
+                              if (validationMessage) setValidationMessage("")
                             }}
                           />
                         </Field>
@@ -1024,7 +1047,22 @@ export function QuestionEditor({
                           />
                         </DropdownSection>
 
-                        <DisabledSection title="Marking Criteria" summary="Not used in production" />
+                        <DropdownSection
+                          title="Sample Solution"
+                          summary={part.sample_solution?.trim() ? "ready" : "required"}
+                          defaultOpen={!part.sample_solution?.trim()}
+                        >
+                          <SampleSolutionEditor
+                            compact
+                            value={part.sample_solution || ""}
+                            onChange={(value) => {
+                              const next = [...parts]
+                              next[index] = { ...part, sample_solution: value }
+                              setParts(next)
+                              if (validationMessage) setValidationMessage("")
+                            }}
+                          />
+                        </DropdownSection>
 
                         <DropdownSection
                           title="Concepts & Microskills"
@@ -1057,19 +1095,6 @@ export function QuestionEditor({
                           />
                         </DropdownSection>
 
-                        <DropdownSection
-                          title="Hints"
-                          summary={`${part.hints?.filter((item) => item.text)?.length || 0} added`}
-                        >
-                          <HintsEditor
-                            hints={part.hints || []}
-                            onChange={(value) => {
-                              const next = [...parts]
-                              next[index] = { ...part, hints: value }
-                              setParts(next)
-                            }}
-                          />
-                        </DropdownSection>
                       </div>
                     </details>
                   ))}
@@ -1086,12 +1111,18 @@ export function QuestionEditor({
                         onChange={setTikzVisuals}
                       />
                     </DropdownSection>
-                    <DisabledSection title="Marking Criteria" summary="Not used in production" />
                     <DropdownSection
-                      title="Hints"
-                      summary={`${hints.filter((item) => item.text).length} added`}
+                      title="Sample Solution"
+                      summary={sampleSolution.trim() ? "ready" : "required"}
+                      defaultOpen={!sampleSolution.trim()}
                     >
-                      <HintsEditor hints={hints} onChange={setHints} />
+                      <SampleSolutionEditor
+                        value={sampleSolution}
+                        onChange={(value) => {
+                          setSampleSolution(value)
+                          if (validationMessage) setValidationMessage("")
+                        }}
+                      />
                     </DropdownSection>
                   </div>
                 )}
@@ -1111,6 +1142,7 @@ export function QuestionEditor({
                         onChange={(value) => {
                           setTagIds(value)
                           setTagRequirements(syncTagRequirements(value, tagRequirements, tags))
+                          if (validationMessage) setValidationMessage("")
                         }}
                         showDeep={parts.length === 0}
                       />
@@ -1125,6 +1157,12 @@ export function QuestionEditor({
                     )}
                   </div>
                 </Field>
+
+                {validationMessage && (
+                  <p className="rounded-2xl border border-[#c8864a]/30 bg-[#c8864a]/10 px-4 py-3 text-sm text-[#e6b083]">
+                    {validationMessage}
+                  </p>
+                )}
 
                 <Button
                   className="rounded-full bg-[#ccb2a3d3] text-base font-semibold text-[#1a1817] shadow-[0_0_0_1px_rgba(255,255,255,0.03)] transition-all duration-300 hover:bg-[#ddbeaa] hover:text-black hover:shadow-[0_8px_30px_rgba(255,220,200,0.06)] active:scale-[0.995]"
@@ -1167,7 +1205,7 @@ export function QuestionEditor({
       {!hidePreview && (
         <PreviewPanel
           attachments={attachments}
-          hints={hints}
+          hints={[]}
           markingCriteria={[]}
           marks={effectiveMarks}
           parts={parts}
