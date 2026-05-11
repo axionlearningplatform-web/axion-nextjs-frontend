@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useParams } from "next/navigation"
 import ReactMarkdown from "react-markdown"
 import remarkMath from "remark-math"
@@ -16,6 +16,8 @@ import {
   X,
 } from "lucide-react"
 
+import HandwritingCanvas from "@/components/answering/HandwritingCanvas"
+import StrokeRenderer from "@/components/answering/StrokeRenderer"
 import { useAuth } from "@/components/authProvider"
 import fetcher from "@/lib/fetcher"
 import { cn } from "@/lib/utils"
@@ -570,10 +572,12 @@ function DiagramSvg({ svg }) {
   )
 }
 
-function AnswerArea({ markingError, markingLoading, markingResult, onSubmit }) {
+function AnswerArea({ markingError, markingLoading, markingResult, onSubmit, questionId }) {
   const [activeTab, setActiveTab] = useState("type")
   const [typedAnswer, setTypedAnswer] = useState("")
   const [files, setFiles] = useState([])
+  const [handwritingExport, setHandwritingExport] = useState(null)
+  const handwritingRef = useRef(null)
 
   async function addFiles(fileList) {
     const nextFiles = await Promise.all(Array.from(fileList || []).map(readFileAsDataUrl))
@@ -584,7 +588,21 @@ function AnswerArea({ markingError, markingLoading, markingResult, onSubmit }) {
     setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))
   }
 
-  function submitAnswer() {
+  async function submitAnswer() {
+    if (activeTab === "draw" && handwritingRef.current) {
+      const exportPayload = await handwritingRef.current.exportAnswer()
+      setHandwritingExport(exportPayload)
+      onSubmit({
+        files: exportPayload.pages.map((page) => ({
+          name: `handwriting-page-${page.page_number}.png`,
+          mime_type: "image/png",
+          data_url: page.page_image,
+        })),
+        handwriting_submission: exportPayload,
+      })
+      return
+    }
+
     const payloadFiles = [...files]
     if (typedAnswer.trim()) {
       payloadFiles.push({
@@ -645,6 +663,13 @@ function AnswerArea({ markingError, markingLoading, markingResult, onSubmit }) {
             </span>
           </div>
         </div>
+      ) : activeTab === "draw" ? (
+        <HandwritingCanvas
+          ref={handwritingRef}
+          devMode
+          questionId={questionId}
+          onSubmit={setHandwritingExport}
+        />
       ) : activeTab === "photo" ? (
         <div className="rounded-[3px] border border-white/[0.06] bg-[#1a1714] p-5">
           <label className="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-[3px] border border-dashed border-white/[0.09] px-4 py-8 text-center text-[13px] tracking-[0.04em] text-[#6f6861] transition-colors hover:border-[#9b673d]/45 hover:text-[#dba476]">
@@ -715,7 +740,21 @@ function AnswerArea({ markingError, markingLoading, markingResult, onSubmit }) {
                 <span className="text-[#4f4a45]">question marks</span>
                 <span className="text-[#5b5048]">·</span>
                 <span>{markingResult.tag_score}/{markingResult.tag_score_possible} tag score</span>
+                {markingResult.confidence !== undefined && (
+                  <>
+                    <span className="text-[#5b5048]">·</span>
+                    <span>{Math.round(Number(markingResult.confidence || 0) * 100)}% confidence</span>
+                  </>
+                )}
               </div>
+              {(markingResult.feedback || markingResult.next_step_advice) && (
+                <div className="grid gap-2 rounded-[4px] border border-white/[0.06] bg-[#120f0d] p-3 text-[13px] leading-relaxed text-[#b7aca1]">
+                  {markingResult.feedback && <p>{markingResult.feedback}</p>}
+                  {markingResult.next_step_advice && (
+                    <p className="text-[#dba476]">{markingResult.next_step_advice}</p>
+                  )}
+                </div>
+              )}
               {(markingResult.parts || []).map((part) => (
                 <div key={part.label} className="border-t border-white/[0.06] pt-4">
                   <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
@@ -736,9 +775,76 @@ function AnswerArea({ markingError, markingLoading, markingResult, onSubmit }) {
                   )}
                 </div>
               ))}
+              {markingResult.detected_reasoning_steps?.length > 0 && (
+                <details className="rounded-[4px] border border-white/[0.06] bg-[#120f0d]">
+                  <summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
+                    Step breakdown
+                  </summary>
+                  <ul className="grid gap-2 border-t border-white/[0.06] p-3">
+                    {markingResult.detected_reasoning_steps.map((step, index) => (
+                      <li key={index} className="text-[13px] leading-relaxed text-[#9b8f84]">
+                        {step.step || step.explanation || JSON.stringify(step)}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              {markingResult.ocr_crop_requests?.length > 0 && (
+                <details className="rounded-[4px] border border-white/[0.06] bg-[#120f0d]">
+                  <summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
+                    OCR crop requests
+                  </summary>
+                  <pre className="max-h-52 overflow-auto border-t border-white/[0.06] p-3 text-[11px] leading-relaxed text-[#9b8f84]">
+                    {JSON.stringify(markingResult.ocr_crop_requests, null, 2)}
+                  </pre>
+                </details>
+              )}
+              <details className="rounded-[4px] border border-white/[0.06] bg-[#120f0d]">
+                <summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
+                  Developer marking JSON
+                </summary>
+                <pre className="max-h-72 overflow-auto border-t border-white/[0.06] p-3 text-[11px] leading-relaxed text-[#9b8f84]">
+                  {JSON.stringify(markingResult, null, 2)}
+                </pre>
+              </details>
             </div>
           )}
         </div>
+      )}
+
+      {handwritingExport && (
+        <details className="mt-5 rounded-[3px] border border-white/[0.06] bg-[#15110e] p-4">
+          <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
+            Developer handwriting export
+          </summary>
+          <div className="mt-4 grid gap-4 md:grid-cols-[260px_1fr]">
+            <div className="grid gap-3">
+              {handwritingExport.pages.map((page) => (
+                <div key={page.page_number}>
+                  <p className="mb-2 text-[10px] uppercase tracking-[0.1em] text-[#6f6861]">
+                    Page {page.page_number} OCR image
+                  </p>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={page.page_image}
+                    alt={`Rendered handwriting page ${page.page_number}`}
+                    className="w-full rounded-[6px] border border-white/[0.06] bg-white"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="grid gap-3">
+              <StrokeRenderer
+                page={handwritingExport.stroke_data.pages[0]}
+                width={260}
+                height={336}
+              />
+              <pre className="max-h-96 overflow-auto rounded-[6px] border border-white/[0.06] bg-[#100d0b] p-3 text-[11px] leading-relaxed text-[#9b8f84]">
+                {JSON.stringify(handwritingExport.stroke_data, null, 2)}
+              </pre>
+            </div>
+          </div>
+        </details>
       )}
     </section>
   )
@@ -893,6 +999,7 @@ function QuestionView({
         markingLoading={markingLoading}
         markingResult={markingResult}
         onSubmit={onSubmitAnswer}
+        questionId={question.id}
       />
     </main>
   )
