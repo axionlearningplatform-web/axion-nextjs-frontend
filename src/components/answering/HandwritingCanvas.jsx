@@ -14,7 +14,7 @@ const PEN_COLOR = "#e8d6c4"
 const PEN_WIDTH = 4.4
 const DEFAULT_ERASER_SIZE = 24
 const PAPER_COLOR = "#191410"
-const MIN_POINT_DISTANCE = 0.7
+const MIN_POINT_DISTANCE = 1.8
 
 function createPage(index) {
   return {
@@ -164,7 +164,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
 
   const canvasScale = useMemo(() => {
   if (typeof window === "undefined") {
-    return 1.5
+    return 1.2
   }
 
   const isIPad =
@@ -174,7 +174,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     navigator.maxTouchPoints > 1
 
   if (isIPad) {
-    return 1.5
+    return 1.2
   }
 
   return Math.min(
@@ -280,11 +280,26 @@ const renderLiveStroke =
 
     ctx.lineCap = "round"
     ctx.lineJoin = "round"
-    ctx.strokeStyle =
-      PEN_COLOR
+    const isErasing =
+  stroke.tool ===
+    "stroke-eraser" ||
+  stroke.tool ===
+    "pixel-eraser"
 
-    ctx.lineWidth =
-      PEN_WIDTH
+ctx.globalCompositeOperation =
+  isErasing
+    ? "destination-out"
+    : "source-over"
+
+ctx.strokeStyle =
+  isErasing
+    ? PAPER_COLOR
+    : PEN_COLOR
+
+ctx.lineWidth =
+  isErasing
+    ? eraserSize * 2
+    : PEN_WIDTH
 
     ctx.beginPath()
     ctx.moveTo(
@@ -467,9 +482,6 @@ const renderLiveStroke =
     const events =
   event.getCoalescedEvents?.() || [event]
 
-  const predicted =
-  event.getPredictedEvents?.() || []
-
 const points = currentStrokeRef.current.points
 
 events.forEach((coalescedEvent) => {
@@ -510,37 +522,8 @@ events.forEach((coalescedEvent) => {
   }
 })
 
-predicted.forEach((predictedEvent) => {
-  const nextPoint = createPoint(
-    predictedEvent,
-    canvas,
-    rect
-  )
-
-  const previous =
-    points[points.length - 1]
-
-  if (!previous) return
-
-  const dx =
-    nextPoint.x - previous.x
-
-  const dy =
-    nextPoint.y - previous.y
-
-  if (
-    dx * dx + dy * dy >
-    MIN_POINT_DISTANCE
-  ) {
-    points.push(nextPoint)
-    livePathRef.current.push(
-  nextPoint
-)
-  }
-})
-
     if (!liveFrameRef.current) {
-  scheduleLiveRender()
+renderLiveStroke()
 }
   }
 
