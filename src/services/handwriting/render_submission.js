@@ -1,5 +1,7 @@
 import { getStroke } from "perfect-freehand"
 
+const strokePathCache = new WeakMap()
+
 function getSvgPathFromStroke(points) {
   if (!points.length) return ""
   const d = points.reduce(
@@ -14,8 +16,11 @@ function getSvgPathFromStroke(points) {
   return d.join(" ")
 }
 
-export function drawStroke(ctx, stroke, { clean = false } = {}) {
-  if (!stroke?.points?.length) return
+function getStrokePath(stroke) {
+  const cached = strokePathCache.get(stroke)
+  if (cached && cached.pointCount === stroke.points.length && cached.width === stroke.width) {
+    return cached.path
+  }
 
   const outline = getStroke(
     stroke.points.map((point) => [point.x, point.y, point.pressure || 0.5]),
@@ -27,11 +32,36 @@ export function drawStroke(ctx, stroke, { clean = false } = {}) {
       simulatePressure: false,
     }
   )
-
   const path = new Path2D(getSvgPathFromStroke(outline))
+  strokePathCache.set(stroke, {
+    path,
+    pointCount: stroke.points.length,
+    width: stroke.width,
+  })
+  return path
+}
+
+export function drawStroke(ctx, stroke, { clean = false, color = null, tool = null } = {}) {
+  if (!stroke?.points?.length) return
+  const strokeTool = tool || stroke.tool
+  const strokeColor = color || stroke.color || "#e8d8c7"
+
+  if (stroke.points.length === 1) {
+    const [point] = stroke.points
+    ctx.save()
+    ctx.globalCompositeOperation = strokeTool === "pixel-eraser" ? "destination-out" : "source-over"
+    ctx.fillStyle = clean ? "#050505" : strokeColor
+    ctx.beginPath()
+    ctx.arc(point.x, point.y, Math.max((stroke.width || 4) / 2, 1.5), 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+    return
+  }
+
+  const path = getStrokePath(stroke)
   ctx.save()
-  ctx.globalCompositeOperation = stroke.tool === "pixel-eraser" ? "destination-out" : "source-over"
-  ctx.fillStyle = clean ? "#050505" : stroke.color || "#e8d8c7"
+  ctx.globalCompositeOperation = strokeTool === "pixel-eraser" ? "destination-out" : "source-over"
+  ctx.fillStyle = clean ? "#050505" : strokeColor
   ctx.fill(path)
   ctx.restore()
 }

@@ -8,13 +8,12 @@ export function createStroke({ tool, color, width, points }) {
   }
 }
 
-export function createPoint(event, canvas) {
-  const rect = canvas.getBoundingClientRect()
+export function createPoint(event, canvas, rect = canvas.getBoundingClientRect()) {
   return {
     x: event.clientX - rect.left,
     y: event.clientY - rect.top,
     pressure: event.pressure || 0.5,
-    timestamp: Date.now(),
+    timestamp: event.timeStamp || Date.now(),
   }
 }
 
@@ -27,4 +26,3 @@ export function serializeAnswer({ questionId, pages }) {
     })),
   }
 }
-
