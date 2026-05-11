@@ -38,7 +38,7 @@ function MarkdownInline({ value, fallback = "" }) {
   if (!content) return null
 
   return (
-    <span className="axion-question-math font-serif">
+    <span className="axion-question-math min-w-0 break-words font-serif [overflow-wrap:anywhere] [&_.katex]:whitespace-normal">
       <ReactMarkdown
         remarkPlugins={[remarkMath]}
         rehypePlugins={[rehypeKatex]}
@@ -58,14 +58,14 @@ function TagDetailCard({ tag }) {
   if (!tag || !supportsRichTag(tag)) return null
 
   return (
-    <div className="mt-4 rounded-2xl border border-[#c8864a]/20 bg-[#c8864a]/8 p-4">
+    <div className="mt-4 min-w-0 rounded-2xl border border-[#c8864a]/20 bg-[#c8864a]/8 p-4">
       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c8864a]/65">
         {isMicroskill(tag) ? "Microskill preview" : "Concept preview"}
       </p>
-      <div className="mt-2 text-[18px] text-[#eee9e4]">
+      <div className="mt-2 min-w-0 break-words text-[18px] leading-snug text-[#eee9e4] [overflow-wrap:anywhere]">
         <MarkdownInline value={tag.name} />
       </div>
-      {isMicroskill(tag) && tag.description && (
+      {tag.description && (
         <div className="mt-3 grid gap-2 text-sm leading-6 text-[#bda99c]">
           <MarkdownInline value={tag.description} />
         </div>
@@ -75,6 +75,8 @@ function TagDetailCard({ tag }) {
 }
 
 function TagPill({ tag, active, deleting, onClick, onDelete }) {
+  const terminalTag = supportsRichTag(tag)
+
   return (
     <button
       type="button"
@@ -89,11 +91,12 @@ function TagPill({ tag, active, deleting, onClick, onDelete }) {
       )}
     >
       <span className="min-w-0 flex-1 overflow-hidden">
-        <span className="block truncate font-serif text-[17px] font-medium">
+        <span className="block min-w-0 whitespace-normal break-words font-serif text-[17px] font-medium leading-snug [overflow-wrap:anywhere]">
           {supportsRichTag(tag) ? <MarkdownInline value={tag.name} /> : tag.name}
         </span>
         <span className="mt-1 block text-[10px] uppercase tracking-[0.16em] text-[#8c8178]">
-          {isMicroskill(tag) ? "Microskill" : `Layer ${tag.layer}`} · {tag.children_count || 0} child tags
+          {isMicroskill(tag) ? "Microskill" : `Layer ${tag.layer}`}
+          {!terminalTag && <> · {tag.children_count || 0} child tags</>}
         </span>
       </span>
       <span className="flex shrink-0 items-center gap-2">
@@ -140,7 +143,7 @@ function CreateTagForm({ layer, kind = "taxonomy", parent, subjectId, onCreated 
         parent_id: parent?.id || null,
         layer,
         tag_kind: kind,
-        description: microskill ? description.trim() : "",
+        description: rich ? description.trim() : "",
         visual: "",
       }),
     })
@@ -186,10 +189,10 @@ function CreateTagForm({ layer, kind = "taxonomy", parent, subjectId, onCreated 
           {saving ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
         </button>
       </div>
-      {microskill && (
+      {rich && (
         <textarea
           className="mt-2 min-h-20 w-full resize-y rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2 text-sm leading-6 text-[#eee9e4] outline-none placeholder:text-[#6f6258] focus:border-[#c8864a]/50"
-          placeholder="Descriptor for the microskill with LaTeX..."
+          placeholder={microskill ? "Descriptor for the microskill with LaTeX..." : "Optional"}
           value={description}
           onChange={(event) => setDescription(event.target.value)}
         />
@@ -208,7 +211,7 @@ function CreateTagForm({ layer, kind = "taxonomy", parent, subjectId, onCreated 
               <div className="text-[16px]">
                 <MarkdownInline value={name} fallback="Tag name preview" />
               </div>
-              {microskill && description && (
+              {description && (
                 <div className="mt-2 grid gap-1 text-sm text-[#bda99c]">
                   <MarkdownInline value={description} />
                 </div>
@@ -245,7 +248,13 @@ export default function SubjectTagsPage() {
 
   function selectTag(layer, tag) {
     setSelected((current) => {
-      const next = { ...current, [layer]: tag }
+      const alreadySelected = current[layer]?.id === tag.id
+      const next = { ...current }
+      if (alreadySelected) {
+        delete next[layer]
+      } else {
+        next[layer] = tag
+      }
       if (layer === 1) {
         delete next[2]
         delete next[3]
@@ -347,14 +356,16 @@ export default function SubjectTagsPage() {
                         </div>
                       )}
                       {items.map((tag) => (
-                        <TagPill
-                          key={tag.id}
-                          tag={tag}
-                          active={selected[layer.id]?.id === tag.id}
-                          deleting={deletingTagId === tag.id}
-                          onClick={() => selectTag(layer.id, tag)}
-                          onDelete={() => deleteTag(tag)}
-                        />
+                        <div key={tag.id}>
+                          <TagPill
+                            tag={tag}
+                            active={selected[layer.id]?.id === tag.id}
+                            deleting={deletingTagId === tag.id}
+                            onClick={() => selectTag(layer.id, tag)}
+                            onDelete={() => deleteTag(tag)}
+                          />
+                          {selected[layer.id]?.id === tag.id && <TagDetailCard tag={tag} />}
+                        </div>
                       ))}
                       {!items.length && !isLoading && (
                         <div className="rounded-2xl border border-dashed border-[#3b2a22]/55 p-4 text-sm leading-6 text-[#8c8178]">
@@ -362,7 +373,6 @@ export default function SubjectTagsPage() {
                         </div>
                       )}
                     </div>
-                    <TagDetailCard tag={selected[layer.id]} />
                   </>
                 )}
               </article>

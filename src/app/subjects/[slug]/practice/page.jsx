@@ -584,7 +584,51 @@ function DiagramSvg({ svg }) {
   )
 }
 
-function AnswerArea({ markingError, markingLoading, markingResult, onSubmit, questionId }) {
+function sampleAnswersForQuestion(question) {
+  const partAnswers = (question?.parts || [])
+    .map((part, index) => ({
+      content: String(part.sample_solution || "").trim(),
+      label: `Part ${part.label || String.fromCharCode(97 + index)}`,
+    }))
+    .filter((item) => item.content)
+
+  if (partAnswers.length) return partAnswers
+
+  const wholeQuestionAnswer = String(question?.sample_solution || "").trim()
+  return wholeQuestionAnswer
+    ? [{ content: wholeQuestionAnswer, label: "Sample answer" }]
+    : []
+}
+
+function SampleAnswers({ question }) {
+  const sampleAnswers = sampleAnswersForQuestion(question)
+  if (!sampleAnswers.length) return null
+
+  return (
+    <section className="mt-5 rounded-[3px] border border-[#7c573a]/35 bg-[#17110e] p-5">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#dba476]">
+        Sample answers
+      </p>
+      <div className="mt-4 grid gap-4">
+        {sampleAnswers.map((answer) => (
+          <article
+            key={answer.label}
+            className="rounded-[4px] border border-white/[0.06] bg-[#120f0d] p-4"
+          >
+            <p className="mb-3 text-[12px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
+              {answer.label}
+            </p>
+            <MarkdownMath className="text-[13px] leading-relaxed text-[#d8c4b0]">
+              {answer.content}
+            </MarkdownMath>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function AnswerArea({ markingError, markingLoading, markingResult, onSubmit, question, questionId }) {
   const [activeTab, setActiveTab] = useState("type")
   const [typedAnswer, setTypedAnswer] = useState("")
   const [files, setFiles] = useState([])
@@ -735,12 +779,13 @@ function AnswerArea({ markingError, markingLoading, markingResult, onSubmit, que
       </div>
 
       {(markingError || markingResult) && (
-        <div className="mt-5 rounded-[3px] border border-white/[0.06] bg-[#1a1714] p-5">
-          {markingError && (
-            <p className="text-[13px] text-[#d99658]">{markingError}</p>
-          )}
-          {markingResult && (
-            <div className="grid gap-4">
+        <>
+          <div className="mt-5 rounded-[3px] border border-white/[0.06] bg-[#1a1714] p-5">
+            {markingError && (
+              <p className="text-[13px] text-[#d99658]">{markingError}</p>
+            )}
+            {markingResult && (
+              <div className="grid gap-4">
               <div className="flex flex-wrap items-center gap-3 text-[13px] text-[#b7aca1]">
                 <span className="font-serif text-[22px] text-[#eee9e4]">
                   {markingResult.marks_awarded}/{markingResult.marks_possible}
@@ -797,27 +842,21 @@ function AnswerArea({ markingError, markingLoading, markingResult, onSubmit, que
                   </ul>
                 </details>
               )}
-              {markingResult.ocr_crop_requests?.length > 0 && (
-                <details className="rounded-[4px] border border-white/[0.06] bg-[#120f0d]">
-                  <summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
-                    OCR crop requests
-                  </summary>
-                  <pre className="max-h-52 overflow-auto border-t border-white/[0.06] p-3 text-[11px] leading-relaxed text-[#9b8f84]">
-                    {JSON.stringify(markingResult.ocr_crop_requests, null, 2)}
-                  </pre>
-                </details>
-              )}
-              <details className="rounded-[4px] border border-white/[0.06] bg-[#120f0d]">
-                <summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
-                  Developer marking JSON
-                </summary>
-                <pre className="max-h-72 overflow-auto border-t border-white/[0.06] p-3 text-[11px] leading-relaxed text-[#9b8f84]">
-                  {JSON.stringify(markingResult, null, 2)}
-                </pre>
-              </details>
-            </div>
-          )}
-        </div>
+                {markingResult.ocr_crop_requests?.length > 0 && (
+                  <details className="rounded-[4px] border border-white/[0.06] bg-[#120f0d]">
+                    <summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
+                      OCR crop requests
+                    </summary>
+                    <pre className="max-h-52 overflow-auto border-t border-white/[0.06] p-3 text-[11px] leading-relaxed text-[#9b8f84]">
+                      {JSON.stringify(markingResult.ocr_crop_requests, null, 2)}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            )}
+          </div>
+          {markingResult && <SampleAnswers question={question} />}
+        </>
       )}
     </section>
   )
@@ -972,6 +1011,7 @@ function QuestionView({
         markingLoading={markingLoading}
         markingResult={markingResult}
         onSubmit={onSubmitAnswer}
+        question={question}
         questionId={question.id}
       />
     </main>

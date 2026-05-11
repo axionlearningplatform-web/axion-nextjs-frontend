@@ -30,10 +30,20 @@ export function drawStroke(ctx, stroke, { clean = false } = {}) {
 
   const path = new Path2D(getSvgPathFromStroke(outline))
   ctx.save()
-  ctx.globalCompositeOperation = "source-over"
+  ctx.globalCompositeOperation = stroke.tool === "pixel-eraser" ? "destination-out" : "source-over"
   ctx.fillStyle = clean ? "#050505" : stroke.color || "#e8d8c7"
   ctx.fill(path)
   ctx.restore()
+}
+
+export function drawPageStrokes(ctx, strokes, { clean = false, height, pixelRatio = 1, width }) {
+  const layer = document.createElement("canvas")
+  layer.width = Math.round(width * pixelRatio)
+  layer.height = Math.round(height * pixelRatio)
+  const layerCtx = layer.getContext("2d")
+  layerCtx.scale(pixelRatio, pixelRatio)
+  ;(strokes || []).forEach((stroke) => drawStroke(layerCtx, stroke, { clean }))
+  ctx.drawImage(layer, 0, 0, width, height)
 }
 
 export function renderPageToCanvas({ page, width, height, scale = 1, clean = false }) {
@@ -56,6 +66,6 @@ export function renderPageToCanvas({ page, width, height, scale = 1, clean = fal
     }
   }
 
-  ;(page.strokes || []).forEach((stroke) => drawStroke(ctx, stroke, { clean }))
+  drawPageStrokes(ctx, page.strokes || [], { clean, height, pixelRatio: scale, width })
   return canvas
 }

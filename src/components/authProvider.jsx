@@ -5,7 +5,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 
 const AuthContext = createContext(null);
 
-const LOGIN_REDIRECT_URL = "/"
+const LOGIN_REDIRECT_URL = "/dashboard"
 const LOGOUT_REDIRECT_URL = "/login"
 const LOGIN_REQUIRED_URL = "/login"
 const ME_URL = "/api/me"
@@ -71,18 +71,17 @@ export function AuthProvider({children}){
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    const login = async () => {
+    const login = async (nextOverride = null) => {
         await refreshUser()
-        const nextUrl = searchParams.get("next")
+        const nextUrl = nextOverride || searchParams.get("next")
         const invalidNextUrl = ['/login', '/logout']
-        const nextUrlValid = nextUrl && nextUrl.startsWith("/") && !invalidNextUrl.includes(nextUrl)
-        if(nextUrlValid){
-            router.replace(nextUrl)
-            return
-        } else{
-            router.replace(LOGIN_REDIRECT_URL)
-            return
-        }    
+        const nextUrlValid =
+            nextUrl &&
+            nextUrl.startsWith("/") &&
+            !nextUrl.startsWith("//") &&
+            !invalidNextUrl.some((url) => nextUrl === url || nextUrl.startsWith(`${url}?`))
+        router.replace(nextUrlValid ? nextUrl : LOGIN_REDIRECT_URL)
+        router.refresh()
     }
     const logout = () => {
         clearUserContext()

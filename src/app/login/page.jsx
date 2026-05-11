@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { useState } from "react"
 
 import { useAuth } from "@/components/authProvider"
@@ -29,6 +30,7 @@ function GoogleIcon() {
 
 export default function LoginPage() {
   const auth = useAuth()
+  const searchParams = useSearchParams()
   const [message, setMessage] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -48,7 +50,7 @@ export default function LoginPage() {
       })
 
       if (response.ok) {
-        await auth.login()
+        await auth.login(searchParams.get("next"))
         return
       }
 
