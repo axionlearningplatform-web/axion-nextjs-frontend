@@ -7,6 +7,13 @@ import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
 import useSWR from "swr"
 
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+
 import { cn } from "@/lib/utils"
 import fetcher from "@/lib/fetcher"
 
@@ -55,6 +62,42 @@ function SectionTitle({ children }) {
   )
 }
 
+function EditorToolbarButton({
+  onClick,
+  label,
+  shortcut,
+  children,
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex h-8 min-w-8 items-center justify-center rounded-md px-2 text-[#a28c83] transition-colors hover:bg-[#2d2d2d] hover:text-[#ffb595]"
+          onClick={onClick}
+        >
+          {children}
+        </button>
+      </TooltipTrigger>
+
+      <TooltipContent
+        side="top"
+        className="rounded-xl border-[#3b2a22] bg-[#171310] text-[#e5e2e1]"
+      >
+        <div className="flex items-center gap-3">
+          <span>{label}</span>
+
+          {shortcut && (
+            <kbd className="rounded-md border border-[#4a3a30] bg-[#211913] px-2 py-0.5 text-[11px] text-[#ffb595]">
+              {shortcut}
+            </kbd>
+          )}
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 function RichTextArea({ value, onValueChange, className, onAfterChange, ...props }) {
   const textareaRef = useRef(null)
 
@@ -83,7 +126,9 @@ function RichTextArea({ value, onValueChange, className, onAfterChange, ...props
       cursorStart = start
       cursorEnd = start + unwrapped.length
     } else {
-      const insert = selected || fallback
+      const insert = selected.length
+  ? selected
+  : fallback
       const opening = block && start > 0 && value[start - 1] !== "\n" ? `\n\n${before}` : before
       const closing = block && value[end] && value[end] !== "\n" ? `${after}\n\n` : after
       next = `${value.slice(0, start)}${opening}${insert}${closing}${value.slice(end)}`
@@ -125,47 +170,204 @@ function RichTextArea({ value, onValueChange, className, onAfterChange, ...props
     })
   }
 
+  function handleKeyDown(event) {
+  const isMac = navigator.platform.toUpperCase().includes("MAC")
+  const modifier = isMac ? event.metaKey : event.ctrlKey
+
+  // CMD/CTRL + B
+  if (modifier && event.key.toLowerCase() === "b") {
+    event.preventDefault()
+    applyMarker("**")
+    return
+  }
+
+  // CMD/CTRL + I
+  if (modifier && event.key.toLowerCase() === "i") {
+    event.preventDefault()
+    applyMarker("*")
+    return
+  }
+
+  // Shift + 4 ($)
+  if (event.shiftKey && event.key === "$") {
+    const textarea = textareaRef.current
+    if (!textarea) return
+
+    const start = textarea.selectionStart ?? 0
+    const end = textarea.selectionEnd ?? 0
+
+    // only hijack if text is selected
+    if (start !== end) {
+      event.preventDefault()
+
+      const selected = value.slice(start, end)
+
+      const next =
+        value.slice(0, start) +
+        `$${selected}$` +
+        value.slice(end)
+
+      onValueChange(next)
+      onAfterChange?.()
+
+      requestAnimationFrame(() => {
+        textarea.focus()
+        textarea.setSelectionRange(
+          start + 1,
+          start + 1 + selected.length
+        )
+      })
+    }
+  }
+
+
+  // Shift + Alt + 4 => block math
+if (event.shiftKey && event.altKey && event.key === "$") {
+  const textarea = textareaRef.current
+  if (!textarea) return
+
+  const start = textarea.selectionStart ?? 0
+  const end = textarea.selectionEnd ?? 0
+
+  event.preventDefault()
+
+  const selected = value.slice(start, end) || "x^2 + y^2 = r^2"
+
+  const wrapped =
+`$$
+${selected}
+$$`
+
+  const next =
+    value.slice(0, start) +
+    wrapped +
+    value.slice(end)
+
+  onValueChange(next)
+  onAfterChange?.()
+
+  requestAnimationFrame(() => {
+    textarea.focus()
+    textarea.setSelectionRange(
+      start + 4,
+      start + 4 + selected.length
+    )
+  })
+}
+
+// TAB snippets
+if (event.key === "Tab") {
+  const textarea = textareaRef.current
+  if (!textarea) return
+
+  const cursor = textarea.selectionStart
+  const before = value.slice(0, cursor)
+
+  const snippets = {
+    "align": `$$
+\\begin{align*}
+x &= y \\\\
+x + 1 &= 2
+\\end{align*}
+$$`,
+
+    "cases": `\\begin{cases}
+
+\\end{cases}`,
+
+    "tikz": `\\begin{tikzpicture}
+
+\\end{tikzpicture}`,
+
+    "matrix": `\\begin{bmatrix}
+
+\\end{bmatrix}`,
+  }
+
+  for (const key in snippets) {
+    if (before.endsWith(key)) {
+      event.preventDefault()
+
+      const replacement = snippets[key]
+
+      const next =
+        value.slice(0, cursor - key.length) +
+        replacement +
+        value.slice(cursor)
+
+      onValueChange(next)
+
+      requestAnimationFrame(() => {
+        textarea.focus()
+
+        const position =
+          cursor -
+          key.length +
+          replacement.indexOf("\n\n") +
+          1
+
+        textarea.setSelectionRange(position, position)
+      })
+
+      return
+    }
+  }
+}
+}
+
   return (
     <div className="overflow-hidden rounded-3xl border border-[#3b2a22]/55 bg-white/[0.035] focus-within:ring-3 focus-within:ring-[#ffb595]/40">
+      <TooltipProvider delayDuration={180}>
       <div className="flex items-center gap-1 border-b border-[#3a302b] px-3 py-2">
-        <button
-          type="button"
-          className="inline-flex size-8 items-center justify-center rounded-md text-[#a28c83] transition-colors hover:bg-[#2d2d2d] hover:text-[#ffb595]"
-          onClick={() => applyMarker("**")}
-          aria-label="Bold"
-        >
-          <Bold className="size-4" />
-        </button>
-        <button
-          type="button"
-          className="inline-flex size-8 items-center justify-center rounded-md text-[#a28c83] transition-colors hover:bg-[#2d2d2d] hover:text-[#ffb595]"
-          onClick={() => applyMarker("*")}
-          aria-label="Italic"
-        >
-          <Italic className="size-4" />
-        </button>
-        <button
-          type="button"
-          className="inline-flex h-8 items-center justify-center rounded-md px-2 font-serif text-[13px] text-[#a28c83] transition-colors hover:bg-[#2d2d2d] hover:text-[#ffb595]"
-          onClick={applyInlineMath}
-          aria-label="Inline LaTeX"
-          title="Inline LaTeX"
-        >
-          $x$
-        </button>
-        <button
-          type="button"
-          className="inline-flex h-8 items-center justify-center rounded-md px-2 font-serif text-[13px] text-[#a28c83] transition-colors hover:bg-[#2d2d2d] hover:text-[#ffb595]"
-          onClick={applyBlockMath}
-          aria-label="Block LaTeX"
-          title="Block LaTeX"
-        >
-          $$
-        </button>
+        <EditorToolbarButton
+  label="Bold"
+  shortcut="⌘B"
+  onClick={() => applyMarker("**")}
+>
+  <Bold className="size-4" />
+</EditorToolbarButton>
+       <EditorToolbarButton
+  label="Italic"
+  shortcut="⌘I"
+  onClick={() => applyMarker("*")}
+>
+  <Italic className="size-4" />
+</EditorToolbarButton>
+        <EditorToolbarButton
+  label="Align Environment"
+  shortcut="align + Tab"
+  onClick={() =>
+  applyWrap({
+    before: "$$\n\\begin{align*}\n",
+    after: "\n\\end{align*}\n$$",
+    fallback: "x &= y",
+    block: true,
+  })
+}
+>
+  <span className="font-serif text-[12px]">
+    align
+  </span>
+</EditorToolbarButton>
+        <EditorToolbarButton
+  label="Inline LaTeX"
+  shortcut="$"
+  onClick={applyInlineMath}
+>
+  <span className="font-serif text-[13px]">$x$</span>
+</EditorToolbarButton>
+        <EditorToolbarButton
+  label="Block Math"
+  shortcut="⌥⇧$"
+  onClick={applyBlockMath}
+>
+  <span className="font-serif text-[13px]">$$</span>
+</EditorToolbarButton>
         <span className="ml-2 text-[11px] text-[#6f6258]">Markdown + LaTeX</span>
       </div>
       <Textarea
         ref={textareaRef}
+        onKeyDown={handleKeyDown}
         className={cn(
           "rounded-none border-0 bg-transparent focus-visible:ring-0",
           className
@@ -177,6 +379,7 @@ function RichTextArea({ value, onValueChange, className, onAfterChange, ...props
         }}
         {...props}
       />
+      </TooltipProvider>
     </div>
   )
 }
