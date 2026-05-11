@@ -238,13 +238,6 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     ctx.restore()
   }, [canvasScale])
 
- const renderLiveStroke =
-  useCallback(() => {
-
-Delete the whole function.
-
-Replace with:
-
 const renderLiveStroke =
   useCallback(() => {
     const stroke =
