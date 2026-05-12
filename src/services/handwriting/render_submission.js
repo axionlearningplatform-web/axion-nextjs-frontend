@@ -1,13 +1,13 @@
-// render_submission.js
+// render_submission.js — v3
 //
-// This module is now COMMIT-ONLY — it handles:
-//   • Drawing finished (committed) strokes with perfect-freehand
-//   • Eraser highlight rendering
-//   • Export / renderPageToCanvas
+// Commit-only renderer. All active stroke rendering has moved to
+// HandwritingCanvas (inkCanvas append model). This module handles:
+//   • Drawing finished strokes (perfect-freehand quality)
+//   • Eraser highlights
+//   • Export / renderPageToCanvas for AI marking
 //
-// Active stroke rendering has been moved entirely to HandwritingCanvas
-// using raw quadratic bezier paths (no perfect-freehand) for zero latency.
-// perfect-freehand is called exactly once per stroke, at pointerup.
+// perfect-freehand is called at most once per stroke (result is cached
+// on stroke._outline). Undo/redo never recomputes old strokes.
 
 import { getStroke } from "perfect-freehand"
 
@@ -17,10 +17,10 @@ import { getStroke } from "perfect-freehand"
 function getSvgPathFromStroke(points) {
   if (!points.length) return ""
   const d = points.reduce(
-    (path, [x0, y0], i, arr) => {
+    (acc, [x0, y0], i, arr) => {
       const [x1, y1] = arr[(i + 1) % arr.length]
-      path.push(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2)
-      return path
+      acc.push(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2)
+      return acc
     },
     ["M", ...points[0], "Q"]
   )
@@ -29,9 +29,9 @@ function getSvgPathFromStroke(points) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Stroke options — committed quality only (active uses raw bezier now)
+// Stroke options — high quality, used only at commit time
 // ─────────────────────────────────────────────────────────────────────────────
-function getCommittedStrokeOptions(width) {
+function getStrokeOptions(width) {
   return {
     size: width,
     thinning: 0.618,
@@ -46,12 +46,12 @@ function getCommittedStrokeOptions(width) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Outline cache — computed once per stroke, stored on stroke._outline
+// Outline cache — built once per stroke, stored on stroke._outline
 // ─────────────────────────────────────────────────────────────────────────────
 function getOrBuildOutline(stroke) {
   if (!stroke._outline) {
     const pts = stroke.points.map((p) => [p.x, p.y, p.pressure ?? 0.5])
-    stroke._outline = getStroke(pts, getCommittedStrokeOptions(stroke.width))
+    stroke._outline = getStroke(pts, getStrokeOptions(stroke.width))
   }
   return stroke._outline
 }
@@ -64,17 +64,16 @@ export function drawStroke(ctx, stroke, { clean = false } = {}) {
   const outline = getOrBuildOutline(stroke)
   if (!outline?.length) return
 
-  const path = new Path2D(getSvgPathFromStroke(outline))
   ctx.save()
   ctx.globalCompositeOperation =
     stroke.tool === "pixel-eraser" ? "destination-out" : "source-over"
   ctx.fillStyle = clean ? "#050505" : stroke.color || "#e8d8c7"
-  ctx.fill(path)
+  ctx.fill(new Path2D(getSvgPathFromStroke(outline)))
   ctx.restore()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Stroke eraser highlight — thin amber ring, no fill blob
+// Stroke eraser highlight — amber ring, no fill blob
 // ─────────────────────────────────────────────────────────────────────────────
 export function drawEraserHighlight(ctx, stroke) {
   if (!stroke?.points?.length) return
@@ -82,7 +81,7 @@ export function drawEraserHighlight(ctx, stroke) {
 
   const makeOutline = (extra) =>
     getStroke(pts, {
-      ...getCommittedStrokeOptions(stroke.width + extra),
+      ...getStrokeOptions(stroke.width + extra),
       thinning: 0,
       taperStart: 0,
       taperEnd: 0,
@@ -93,19 +92,13 @@ export function drawEraserHighlight(ctx, stroke) {
   if (!outer?.length) return
 
   ctx.save()
-
-  // Diffuse glow
   ctx.globalAlpha = 0.15
   ctx.fillStyle = "#f6c8aa"
   ctx.fill(new Path2D(getSvgPathFromStroke(outer)))
-
-  // Punch out centre to make ring
   ctx.globalCompositeOperation = "destination-out"
   ctx.globalAlpha = 1
   const innerPath = new Path2D(getSvgPathFromStroke(inner))
   ctx.fill(innerPath)
-
-  // Crisp amber border line
   ctx.globalCompositeOperation = "source-over"
   ctx.globalAlpha = 0.75
   ctx.fillStyle = "#f6c8aa"
@@ -116,28 +109,26 @@ export function drawEraserHighlight(ctx, stroke) {
     ctx.globalAlpha = 1
     ctx.fill(innerPath)
   }
-
   ctx.restore()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Draw all strokes for a page — used for full committed-canvas redraws
+// Draw all strokes for a page
 // ─────────────────────────────────────────────────────────────────────────────
 export function drawPageStrokes(ctx, strokes, { clean = false } = {}) {
   ;(strokes || []).forEach((stroke) => drawStroke(ctx, stroke, { clean }))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Blit a single committed stroke — used after finishStroke for instant commit
+// Export: render page to offscreen canvas for AI marking
 // ─────────────────────────────────────────────────────────────────────────────
-export function blitStrokeToContext(ctx, stroke, { clean = false } = {}) {
-  drawStroke(ctx, stroke, { clean })
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Export: render a page to an offscreen canvas for AI marking
-// ─────────────────────────────────────────────────────────────────────────────
-export function renderPageToCanvas({ page, width, height, scale = 1, clean = false }) {
+export function renderPageToCanvas({
+  page,
+  width,
+  height,
+  scale = 1,
+  clean = false,
+}) {
   const canvas = document.createElement("canvas")
   canvas.width = Math.round(width * scale)
   canvas.height = Math.round(height * scale)
@@ -148,7 +139,7 @@ export function renderPageToCanvas({ page, width, height, scale = 1, clean = fal
   ctx.fillStyle = clean ? "#ffffff" : "#191410"
   ctx.fillRect(0, 0, width, height)
 
-  // Ruled lines (skipped for clean export)
+  // Ruled lines (skipped for clean/AI export)
   if (!clean) {
     ctx.strokeStyle = "rgba(232, 216, 199, 0.08)"
     ctx.lineWidth = 1
@@ -165,9 +156,12 @@ export function renderPageToCanvas({ page, width, height, scale = 1, clean = fal
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// drawActiveStroke — kept for any external callers but no longer used internally.
-// Active stroke rendering now lives entirely in HandwritingCanvas as raw bezier.
+// Kept for API compatibility — active stroke now uses inkCanvas append model
 // ─────────────────────────────────────────────────────────────────────────────
 export function drawActiveStroke() {
-  // Intentionally empty — see HandwritingCanvas drawRawActivePenStroke
+  // Intentionally empty.
+  // Active strokes are rendered in HandwritingCanvas via append-only inkCanvas.
 }
+
+// Alias for internal callers
+export { drawStroke as blitStrokeToContext }
