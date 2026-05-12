@@ -163,8 +163,11 @@ async function parseJsonResponse(response) {
     return JSON.parse(text)
   } catch {
     return {
-      detail: "Backend returned a non-JSON response.",
-      raw: text.slice(0, 500),
+      detail:
+        "Server returned a non-JSON response (often HTML from a gateway timeout or crash). Check API logs and payload size.",
+      message: "non-json",
+      raw: text.slice(0, 800),
+      status: response.status,
     }
   }
 }
@@ -801,10 +804,16 @@ function AnswerArea({ markingError, markingLoading, markingResult, onSubmit, que
                 )}
               </div>
               {(markingResult.feedback || markingResult.next_step_advice) && (
-                <div className="grid gap-2 rounded-[4px] border border-white/[0.06] bg-[#120f0d] p-3 text-[13px] leading-relaxed text-[#b7aca1]">
-                  {markingResult.feedback && <p>{markingResult.feedback}</p>}
+                <div className="grid gap-3 rounded-[4px] border border-white/[0.06] bg-[#120f0d] p-3 text-[13px] leading-relaxed text-[#b7aca1]">
+                  {markingResult.feedback && (
+                    <MarkdownMath className="text-[13px] leading-relaxed text-[#b7aca1] [&_.katex]:text-[#e8e4dc]">
+                      {markingResult.feedback}
+                    </MarkdownMath>
+                  )}
                   {markingResult.next_step_advice && (
-                    <p className="text-[#dba476]">{markingResult.next_step_advice}</p>
+                    <MarkdownMath className="text-[13px] leading-relaxed text-[#dba476] [&_.katex]:text-[#f0d8ba]">
+                      {markingResult.next_step_advice}
+                    </MarkdownMath>
                   )}
                 </div>
               )}
@@ -818,8 +827,13 @@ function AnswerArea({ markingError, markingLoading, markingResult, onSubmit, que
                       {part.lost_tags.map((item) => (
                         <li key={item.tag} className="text-[13px] leading-relaxed text-[#9b8f84]">
                           <span className="text-[#dba476]">{item.tag}</span>
-                          <span className="text-[#5b5048]"> {item.score}/{item.max_score}: </span>
-                          {item.reason}
+                          <span className="text-[#5b5048]">
+                            {" "}
+                            {item.score}/{item.max_score}:{" "}
+                          </span>
+                          <MarkdownMath className="inline-block max-w-full text-[13px] leading-relaxed [&_.katex]:text-[#cfc3b8] [&_p]:my-0 [&_p]:inline">
+                            {item.reason || ""}
+                          </MarkdownMath>
                         </li>
                       ))}
                     </ul>
@@ -836,7 +850,57 @@ function AnswerArea({ markingError, markingLoading, markingResult, onSubmit, que
                   <ul className="grid gap-2 border-t border-white/[0.06] p-3">
                     {markingResult.detected_reasoning_steps.map((step, index) => (
                       <li key={index} className="text-[13px] leading-relaxed text-[#9b8f84]">
-                        {step.step || step.explanation || JSON.stringify(step)}
+                        <MarkdownMath className="text-[13px] leading-relaxed [&_.katex]:text-[#cfc3b8] [&_p]:my-1">
+                          {String(
+                            step.step ||
+                              step.explanation ||
+                              JSON.stringify(step)
+                          )}
+                        </MarkdownMath>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              {markingResult.mistakes?.length > 0 && (
+                <details className="rounded-[4px] border border-white/[0.06] bg-[#120f0d]">
+                  <summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
+                    Mistakes noted
+                  </summary>
+                  <ul className="grid gap-2 border-t border-white/[0.06] p-3">
+                    {markingResult.mistakes.map((item, index) => (
+                      <li key={index} className="text-[13px] leading-relaxed text-[#9b8f84]">
+                        <MarkdownMath className="text-[13px] leading-relaxed [&_.katex]:text-[#cfc3b8] [&_p]:my-1">
+                          {typeof item === "string"
+                            ? item
+                            : String(
+                                item?.description ||
+                                  item?.detail ||
+                                  JSON.stringify(item)
+                              )}
+                        </MarkdownMath>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              {markingResult.rubric_breakdown?.length > 0 && (
+                <details className="rounded-[4px] border border-white/[0.06] bg-[#120f0d]">
+                  <summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
+                    Rubric breakdown
+                  </summary>
+                  <ul className="grid gap-2 border-t border-white/[0.06] p-3">
+                    {markingResult.rubric_breakdown.map((row, index) => (
+                      <li key={index} className="text-[13px] leading-relaxed text-[#9b8f84]">
+                        <MarkdownMath className="text-[13px] leading-relaxed [&_.katex]:text-[#cfc3b8] [&_p]:my-1">
+                          {typeof row === "string"
+                            ? row
+                            : String(
+                                row?.criterion ||
+                                  row?.label ||
+                                  JSON.stringify(row)
+                              )}
+                        </MarkdownMath>
                       </li>
                     ))}
                   </ul>
@@ -1114,6 +1178,7 @@ export default function DailyPracticePage() {
     try {
       const response = await fetch(`${QUESTIONS_API_URL}${question.id}/mark/`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
@@ -1122,7 +1187,13 @@ export default function DailyPracticePage() {
       })
       const data = await parseJsonResponse(response)
       if (!response.ok) {
-        throw new Error(data.detail || data.message || "Could not mark this response.")
+        const hint =
+          data.detail ||
+          data.message ||
+          (typeof data.error === "string" ? data.error : null)
+        throw new Error(
+          hint || `Could not mark this response (HTTP ${response.status}).`
+        )
       }
       setMarkingResult(data)
     } catch (error) {
