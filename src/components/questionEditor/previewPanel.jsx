@@ -320,6 +320,10 @@ function MarkdownBlock({ children }) {
   )
 }
 
+function omitDeleted(items) {
+  return (items || []).filter((item) => !item?.deleted)
+}
+
 function PreviewPanelBase({
   subject,
   marks,
@@ -334,9 +338,20 @@ function PreviewPanelBase({
   tikzCode = "",
   tikzVisuals = [],
 }) {
-  const hasParts = parts.length > 0
-  const hasHint = hints.some((hint) => hint.text) ||
-    parts.some((part) => (part.hints || []).some((hint) => hint.text))
+  const rootAttachments = useMemo(() => omitDeleted(attachments), [attachments])
+  const rootHints = useMemo(() => omitDeleted(hints), [hints])
+  const visibleParts = useMemo(
+    () =>
+      omitDeleted(parts).map((part) => ({
+        ...part,
+        hints: omitDeleted(part.hints),
+        attachments: omitDeleted(part.attachments),
+      })),
+    [parts]
+  )
+  const hasParts = visibleParts.length > 0
+  const hasHint = rootHints.some((hint) => hint.text) ||
+    visibleParts.some((part) => (part.hints || []).some((hint) => hint.text))
   const displayQuestionText = questionText?.trim()
     ? (/^Q\)\./i.test(questionText.trim()) ? questionText : `Q). ${questionText}`)
     : ""
@@ -403,7 +418,7 @@ function PreviewPanelBase({
               </p>
             )}
 
-            {attachments.map((attachment) => (
+            {rootAttachments.map((attachment) => (
               <AttachmentPreview attachment={attachment} key={attachment.id || attachment.name} />
             ))}
 
@@ -419,7 +434,7 @@ function PreviewPanelBase({
 
             {hasParts && (
               <div className="mt-8 grid gap-6">
-                {parts.map((part, index) => (
+                {visibleParts.map((part, index) => (
                   <section
                     className="grid gap-3 md:grid-cols-[30px_1fr]"
                     key={part.id || part.label || index}

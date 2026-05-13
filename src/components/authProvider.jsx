@@ -19,6 +19,7 @@ export function AuthProvider({children}){
     const [subjectMemberships, setSubjectMemberships] = useState([])
     const [activeRole, setActiveRole] = useState(null)
     const [permissions, setPermissions] = useState([])
+    const [markingSystemEnabled, setMarkingSystemEnabled] = useState(true)
     const [isLoading, setIsLoading] = useState(true)
     const router = useRouter()
     const pathname = usePathname()
@@ -31,6 +32,7 @@ export function AuthProvider({children}){
         setSubjectMemberships(context?.subject_memberships || [])
         setActiveRole(context?.active_role || null)
         setPermissions(context?.permissions || [])
+        setMarkingSystemEnabled(context?.marking_system_enabled !== false)
         setIsAuthenticated(Boolean(context?.is_authenticated))
     }
 
@@ -41,6 +43,7 @@ export function AuthProvider({children}){
         setSubjectMemberships([])
         setActiveRole(null)
         setPermissions([])
+        setMarkingSystemEnabled(true)
         setIsAuthenticated(false)
     }
 
@@ -112,6 +115,7 @@ export function AuthProvider({children}){
         activeRole,
         permissions,
         can,
+        markingSystemEnabled,
     }}>
         {children}
     </AuthContext.Provider>

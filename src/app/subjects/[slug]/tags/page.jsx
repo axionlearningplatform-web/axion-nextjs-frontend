@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 import ReactMarkdown from "react-markdown"
 import remarkMath from "remark-math"
@@ -71,6 +71,87 @@ function TagDetailCard({ tag }) {
         </div>
       )}
     </div>
+  )
+}
+
+function TagEditPanel({ tag, onUpdated }) {
+  const [name, setName] = useState(tag.name)
+  const [description, setDescription] = useState(tag.description || "")
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState("")
+
+  useEffect(() => {
+    setName(tag.name)
+    setDescription(tag.description || "")
+  }, [tag.id, tag.name, tag.description])
+
+  async function saveTag(event) {
+    event.preventDefault()
+    if (!name.trim()) return
+    setSaving(true)
+    setMessage("")
+
+    const body = { name: name.trim() }
+    if (supportsRichTag(tag)) {
+      body.description = description.trim()
+    }
+
+    const response = await fetch(`${TAGS_API_URL}${tag.id}/`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+    const data = await response.json()
+    setSaving(false)
+
+    if (!response.ok) {
+      setMessage(data.detail || "Could not update tag.")
+      return
+    }
+
+    onUpdated()
+  }
+
+  return (
+    <form
+      className="mt-3 rounded-2xl border border-[#3b2a22]/55 bg-[#14110f] p-3"
+      onSubmit={saveTag}
+    >
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8c8178]">
+        Edit tag
+      </p>
+      <div className="mt-2 grid gap-2">
+        {supportsRichTag(tag) ? (
+          <textarea
+            className="min-h-[72px] w-full resize-y rounded-xl border border-white/[0.07] bg-white/[0.035] px-3 py-2 text-sm text-[#eee9e4] outline-none focus:border-[#c8864a]/50"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        ) : (
+          <input
+            className="h-10 w-full rounded-xl border border-white/[0.07] bg-white/[0.035] px-3 text-sm text-[#eee9e4] outline-none focus:border-[#c8864a]/50"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        )}
+        {supportsRichTag(tag) && (
+          <textarea
+            className="min-h-[72px] w-full resize-y rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2 text-sm text-[#eee9e4] outline-none focus:border-[#c8864a]/50"
+            placeholder="Descriptor"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+          />
+        )}
+      </div>
+      {message && <p className="mt-2 text-xs text-red-200">{message}</p>}
+      <button
+        type="submit"
+        disabled={saving || !name.trim()}
+        className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-[#c8864a]/30 bg-[#c8864a]/12 py-2 text-sm font-semibold text-[#e6b083] transition-colors hover:bg-[#c8864a]/20 disabled:opacity-50"
+      >
+        {saving ? <Loader2 className="size-4 animate-spin" /> : "Save changes"}
+      </button>
+    </form>
   )
 }
 
@@ -365,6 +446,9 @@ export default function SubjectTagsPage() {
                             onDelete={() => deleteTag(tag)}
                           />
                           {selected[layer.id]?.id === tag.id && <TagDetailCard tag={tag} />}
+                          {selected[layer.id]?.id === tag.id && (
+                            <TagEditPanel tag={tag} onUpdated={mutate} />
+                          )}
                         </div>
                       ))}
                       {!items.length && !isLoading && (

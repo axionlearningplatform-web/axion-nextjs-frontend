@@ -92,6 +92,7 @@ export default function Questions() {
         <QuestionEditor
           subjects={subjects}
           lockedSubject={lockedSubject}
+          taggingMode="hidden"
 
           submitLabel="Create Question"
 

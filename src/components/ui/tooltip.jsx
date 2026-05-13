@@ -18,6 +18,7 @@ function Tooltip({
 }
 
 function TooltipTrigger({
+  asChild: _asChild,
   ...props
 }) {
   return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />;

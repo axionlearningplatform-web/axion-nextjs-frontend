@@ -939,6 +939,7 @@ export default function QuestionImportPage() {
                   key={activeCandidate.temporary_id}
                   initialData={activeQuestion}
                   lockedSubject={lockedSubject}
+                  taggingMode="hidden"
                   submitLabel={activeCandidate?.saved_id ? "Save Changes" : "Accept & Save"}
                   statusLabels={{
                     loading: "Saving question...",

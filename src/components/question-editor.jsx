@@ -16,6 +16,7 @@ import {
 
 import { cn } from "@/lib/utils"
 import fetcher from "@/lib/fetcher"
+import { subjectIsMathematics } from "@/lib/subjectMath"
 
 import { Button } from "@/components/ui/button"
 import { PreviewPanel } from "@/components/questionEditor/previewPanel"
@@ -70,14 +71,12 @@ function EditorToolbarButton({
 }) {
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          className="inline-flex h-8 min-w-8 items-center justify-center rounded-md px-2 text-[#a28c83] transition-colors hover:bg-[#2d2d2d] hover:text-[#ffb595]"
-          onClick={onClick}
-        >
-          {children}
-        </button>
+      <TooltipTrigger
+        type="button"
+        className="inline-flex h-8 min-w-8 items-center justify-center rounded-md px-2 text-[#a28c83] transition-colors hover:bg-[#2d2d2d] hover:text-[#ffb595]"
+        onClick={onClick}
+      >
+        {children}
       </TooltipTrigger>
 
       <TooltipContent
@@ -98,7 +97,7 @@ function EditorToolbarButton({
   )
 }
 
-function RichTextArea({ value, onValueChange, className, onAfterChange, ...props }) {
+function RichTextArea({ value, onValueChange, className, onAfterChange, toolbarHint, ...props }) {
   const textareaRef = useRef(null)
 
   function applyWrap({ before, after = before, fallback, block = false }) {
@@ -363,7 +362,9 @@ $$`,
 >
   <span className="font-serif text-[13px]">$$</span>
 </EditorToolbarButton>
-        <span className="ml-2 text-[11px] text-[#6f6258]">Markdown + LaTeX</span>
+        <span className="ml-2 text-[11px] text-[#6f6258]">
+          {toolbarHint || "Markdown + LaTeX"}
+        </span>
       </div>
       <Textarea
         ref={textareaRef}
@@ -409,6 +410,16 @@ function renderableMarkdown(value = "") {
     .replace(/\\\((.+?)\\\)/g, (_, expression) => `$${expression.trim()}$`)
 }
 
+function latexFirstPrepare(value = "") {
+  const raw = String(value || "")
+  const trimmed = raw.trim()
+  if (!trimmed || trimmed.includes("$$")) return raw
+  if (trimmed.startsWith("\\begin") && !trimmed.startsWith("$")) {
+    return `\n$$\n${trimmed}\n$$\n`
+  }
+  return raw
+}
+
 function MarkdownPreview({ value, placeholder = "Preview will appear here." }) {
   if (!String(value || "").trim()) {
     return (
@@ -428,7 +439,7 @@ function MarkdownPreview({ value, placeholder = "Preview will appear here." }) {
           code: ({ children }) => <code className="whitespace-pre-wrap break-words">{children}</code>,
         }}
       >
-        {renderableMarkdown(value)}
+        {renderableMarkdown(latexFirstPrepare(value))}
       </ReactMarkdown>
     </div>
   )
@@ -457,7 +468,8 @@ function SampleSolutionEditor({ value, onChange, compact = false }) {
         className={cn("p-4 text-[#e5e2e1]", compact ? "min-h-[100px]" : "min-h-[145px]")}
         value={value}
         onValueChange={onChange}
-        placeholder="Write the sample solution..."
+        toolbarHint="LaTeX"
+        placeholder="Write the sample solution (LaTeX environments do not need $$ wrappers)..."
       />
       {previewOpen && (
         <div className="rounded-2xl border border-[#3b2a22]/55 bg-[#11100e] p-4 shadow-inner shadow-black/20">
@@ -807,10 +819,51 @@ function TagTaxonomyPicker({
   )
 }
 
+function normalizeCriteriaRows(marks, existing = []) {
+  const n = Math.max(1, Number(marks) || 1)
+  const rows = Array.isArray(existing) ? [...existing] : []
+  const out = []
+  for (let i = 0; i < n; i += 1) {
+    const prev = rows[i]
+    const text = typeof prev === "string" ? prev : prev?.text || ""
+    out.push({ mark: i + 1, text })
+  }
+  return out
+}
+
+function MarkingCriteriaFields({ rows, onChange, compact }) {
+  return (
+    <div className="grid gap-3">
+      <p className="text-xs leading-relaxed text-[#a28c83]">
+        Non-mathematics subjects require one criterion per mark (what earns each mark).
+      </p>
+      {rows.map((row, index) => (
+        <Field key={row.mark}>
+          <FieldLabel className="text-[#dac1b7]">Mark {row.mark}</FieldLabel>
+          <Textarea
+            className={cn(
+              "min-h-[72px] rounded-2xl border-[#3b2a22]/55 bg-white/[0.035] p-3 text-sm text-[#e5e2e1] focus-visible:ring-[#ffb595]/40",
+              compact && "min-h-[60px]"
+            )}
+            placeholder={`What earns mark ${row.mark}?`}
+            value={row.text || ""}
+            onChange={(event) => {
+              const next = [...rows]
+              next[index] = { ...row, text: event.target.value }
+              onChange(next)
+            }}
+          />
+        </Field>
+      ))}
+    </div>
+  )
+}
+
 export function QuestionEditor({
   initialData = null,
   subjects = [],
   lockedSubject = null,
+  taggingMode = "full",
   submitLabel = "Create Question",
   statusLabels = {
     loading: "Submitting question...",
@@ -840,8 +893,21 @@ export function QuestionEditor({
   const [attachments, setAttachments] = useState([])
   const [tagRequirements, setTagRequirements] = useState([])
   const [tagIds, setTagIds] = useState([])
+  const [rootMarkingCriteria, setRootMarkingCriteria] = useState([])
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [validationMessage, setValidationMessage] = useState("")
+
+  const showTagging = taggingMode !== "hidden"
+
+  const resolvedSubject = useMemo(() => {
+    if (lockedSubject) return lockedSubject
+    return subjects.find((s) => String(s.id) === String(subjectId))
+  }, [lockedSubject, subjects, subjectId])
+
+  const isMathSubject = useMemo(
+    () => subjectIsMathematics(resolvedSubject),
+    [resolvedSubject]
+  )
 
   const tagsUrl = subjectId
     ? `/api/questions/tags/?subject_id=${subjectId}`
@@ -889,14 +955,25 @@ export function QuestionEditor({
         tag_requirements: part.tag_requirements || [],
         attachments: part.attachments || [],
         tikz_visuals: part.tikz_visuals || [],
-        marking_criteria: [],
+        marking_criteria: normalizeCriteriaRows(
+          part.marks || 1,
+          part.marking_criteria || []
+        ),
         hints: [],
       }))
     )
     setAttachments(initialData.attachments || [])
     setTagRequirements(initialData.tag_requirements || [])
     setTagIds(initialData.tag_ids || [])
+    setRootMarkingCriteria(
+      normalizeCriteriaRows(initialData.marks || 1, initialData.marking_criteria || [])
+    )
   }, [initialData])
+
+  useEffect(() => {
+    if (parts.length) return
+    setRootMarkingCriteria((prev) => normalizeCriteriaRows(Number(marks) || 1, prev))
+  }, [marks, parts.length])
 
   useEffect(() => {
     if (!lockedSubject) return
@@ -927,11 +1004,11 @@ export function QuestionEditor({
         tag_requirements: syncTagRequirements(part.tag_ids || [], part.tag_requirements || [], tags),
         attachments: part.attachments || [],
         tikz_visuals: part.tikz_visuals || [],
-        marking_criteria: [],
+        marking_criteria: normalizeCriteriaRows(part.marks || 1, part.marking_criteria || []),
         hints: [],
       })),
       attachments,
-      marking_criteria: [],
+      marking_criteria: parts.length ? [] : normalizeCriteriaRows(Number(marks) || 1, rootMarkingCriteria),
       sample_solution: parts.length ? "" : sampleSolution,
       tag_ids: tagIds,
       tag_requirements: parts.length ? [] : syncTagRequirements(tagIds, tagRequirements, tags),
@@ -952,7 +1029,24 @@ export function QuestionEditor({
     if (!Number(marks) || Number(marks) < 1) return "Marks are required."
     if (!importSource.trim()) return "Source is required."
     if (!questionText.trim()) return "Question text is required."
-    if (!tagIds.length) return "At least one topic tag is required."
+    if (showTagging && !tagIds.length) return "At least one topic tag is required."
+
+    if (!isMathSubject) {
+      if (parts.length) {
+        for (const part of parts) {
+          const need = Number(part.marks) || 1
+          const crits = normalizeCriteriaRows(need, part.marking_criteria || [])
+          if (crits.some((c) => !String(c.text || "").trim())) {
+            return `Marking criteria required for every mark in part (${part.label || "?"}).`
+          }
+        }
+      } else {
+        const crits = normalizeCriteriaRows(Number(marks) || 1, rootMarkingCriteria)
+        if (crits.some((c) => !String(c.text || "").trim())) {
+          return "Marking criteria required for every mark."
+        }
+      }
+    }
 
     if (parts.length) {
       const missingPart = parts.find((part) => !String(part.text || "").trim())
@@ -970,7 +1064,7 @@ export function QuestionEditor({
     if (!onDraftChange) return
     onDraftChange(payload())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject, subjectId, marks, questionText, sampleSolution, tikzCode, diagramSvg, tikzVisuals, importSource, parts, attachments, tagIds, tagRequirements, tags])
+  }, [subject, subjectId, marks, questionText, sampleSolution, tikzCode, diagramSvg, tikzVisuals, importSource, parts, attachments, tagIds, tagRequirements, tags, rootMarkingCriteria])
 
   return (
     <div className={cn("grid gap-8", !hidePreview && "lg:grid-cols-2")}>
@@ -1172,21 +1266,25 @@ export function QuestionEditor({
                             onBlur={() => {
                               if (part.marks === "" || Number(part.marks) < 1) {
                                 const next = [...parts]
-                              next[index] = {
-                                ...part,
-                                marks: 1,
-                                  marking_criteria: [],
-                              }
-                              setParts(next)
+                                next[index] = {
+                                  ...part,
+                                  marks: 1,
+                                  marking_criteria: normalizeCriteriaRows(1, part.marking_criteria || []),
+                                }
+                                setParts(next)
                               }
                             }}
                             onChange={(event) => {
                               const rawValue = event.target.value
                               const next = [...parts]
+                              const nextMarks = rawValue === "" ? "" : Math.max(1, Number(rawValue) || 1)
                               next[index] = {
                                 ...part,
-                                marks: rawValue,
-                                marking_criteria: [],
+                                marks: nextMarks,
+                                marking_criteria:
+                                  nextMarks === ""
+                                    ? part.marking_criteria || []
+                                    : normalizeCriteriaRows(nextMarks, part.marking_criteria || []),
                               }
                               setParts(next)
                             }}
@@ -1267,6 +1365,25 @@ export function QuestionEditor({
                           />
                         </DropdownSection>
 
+                        {!isMathSubject && (
+                          <DropdownSection
+                            title="Marking Criteria"
+                            summary={`${(part.marking_criteria || []).filter((c) => String(c.text || "").trim()).length}/${Number(part.marks) || 1}`}
+                            defaultOpen
+                          >
+                            <MarkingCriteriaFields
+                              compact
+                              rows={normalizeCriteriaRows(part.marks || 1, part.marking_criteria || [])}
+                              onChange={(rows) => {
+                                const next = [...parts]
+                                next[index] = { ...part, marking_criteria: rows }
+                                setParts(next)
+                              }}
+                            />
+                          </DropdownSection>
+                        )}
+
+                        {showTagging && (
                         <DropdownSection
                           title="Concepts & Microskills"
                           summary={`${selectedGranularTagCount(part.tag_ids || [], tags)} selected`}
@@ -1297,6 +1414,7 @@ export function QuestionEditor({
                             }}
                           />
                         </DropdownSection>
+                        )}
 
                       </div>
                     </details>
@@ -1327,9 +1445,22 @@ export function QuestionEditor({
                         }}
                       />
                     </DropdownSection>
+                    {!isMathSubject && (
+                      <DropdownSection
+                        title="Marking Criteria"
+                        summary={`${rootMarkingCriteria.filter((c) => String(c.text || "").trim()).length}/${Number(marks) || 1}`}
+                        defaultOpen
+                      >
+                        <MarkingCriteriaFields
+                          rows={normalizeCriteriaRows(Number(marks) || 1, rootMarkingCriteria)}
+                          onChange={setRootMarkingCriteria}
+                        />
+                      </DropdownSection>
+                    )}
                   </div>
                 )}
 
+                {showTagging && (
                 <Field>
                   <FieldLabel className="text-[#dac1b7]">Tags</FieldLabel>
                   <div className="flex flex-wrap gap-2 rounded-2xl border border-[#3b2a22]/55 bg-[#181410] p-3">
@@ -1360,6 +1491,7 @@ export function QuestionEditor({
                     )}
                   </div>
                 </Field>
+                )}
 
                 {validationMessage && (
                   <p className="rounded-2xl border border-[#c8864a]/30 bg-[#c8864a]/10 px-4 py-3 text-sm text-[#e6b083]">

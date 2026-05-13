@@ -189,8 +189,18 @@ function prepareMarkdown(value) {
     .replace(/(?<!\n)\n(?!\n)/g, "  \n")
 }
 
+function latexFirstPrepare(value) {
+  const raw = String(value || "")
+  const trimmed = raw.trim()
+  if (!trimmed || trimmed.includes("$$")) return raw
+  if (trimmed.startsWith("\\begin") && !trimmed.startsWith("$")) {
+    return `\n$$\n${trimmed}\n$$\n`
+  }
+  return raw
+}
+
 function MarkdownMath({ children, className }) {
-  const markdown = prepareMarkdown(children)
+  const markdown = prepareMarkdown(latexFirstPrepare(children))
 
   return (
     <div className={cn("axion-question-math prose prose-invert max-w-none text-[#eee9e4]", className)}>
@@ -631,7 +641,17 @@ function SampleAnswers({ question }) {
   )
 }
 
-function AnswerArea({ markingError, markingLoading, markingResult, onSubmit, question, questionId }) {
+function AnswerArea({
+  betaSampleRevealed,
+  markingDisabled,
+  markingError,
+  markingLoading,
+  markingResult,
+  onBetaReveal,
+  onSubmit,
+  question,
+  questionId,
+}) {
   const [activeTab, setActiveTab] = useState("type")
   const [typedAnswer, setTypedAnswer] = useState("")
   const [files, setFiles] = useState([])
@@ -647,6 +667,10 @@ function AnswerArea({ markingError, markingLoading, markingResult, onSubmit, que
   }
 
   async function submitAnswer() {
+    if (markingDisabled) {
+      onBetaReveal?.()
+      return
+    }
     if (activeTab === "draw" && handwritingRef.current) {
       const exportPayload = await handwritingRef.current.exportAnswer()
       onSubmit({
@@ -674,6 +698,16 @@ function AnswerArea({ markingError, markingLoading, markingResult, onSubmit, que
 
   return (
     <section className="border-t border-white/[0.06] px-6 py-6 md:px-12">
+      {markingDisabled && (
+        <div className="mb-6 rounded-[4px] border border-[#7c573a]/35 bg-[#1a1511] px-5 py-4 text-[13px] leading-relaxed text-[#c4b5a8]">
+          <p className="font-semibold tracking-[0.04em] text-[#dba476]">Marking unavailable</p>
+          <p className="mt-2 text-[#9b8f84]">
+            AI marking is currently unavailable during beta. Submit to view the sample solution only — no answer is stored and no external marking is requested.
+          </p>
+        </div>
+      )}
+
+      {!markingDisabled && (
       <div className="mb-5 flex gap-8 border-b border-white/[0.06]">
         {["type", "draw", "photo"].map((tab) => (
           <button
@@ -691,8 +725,13 @@ function AnswerArea({ markingError, markingLoading, markingResult, onSubmit, que
           </button>
         ))}
       </div>
+      )}
 
-      {activeTab === "type" ? (
+      {markingDisabled ? (
+        <div className="rounded-[3px] border border-white/[0.06] bg-[#1b1713] px-5 py-6 text-[13px] leading-relaxed text-[#7a726b]">
+          When you are ready, use Submit Answer to reveal the sample solution. Your working is not saved during beta.
+        </div>
+      ) : activeTab === "type" ? (
         <div className="rounded-[3px] border border-white/[0.06] bg-[#1b1713] p-5">
           <textarea
             value={typedAnswer}
@@ -919,7 +958,20 @@ function AnswerArea({ markingError, markingLoading, markingResult, onSubmit, que
               </div>
             )}
           </div>
-          {markingResult && <SampleAnswers question={question} />}
+        </>
+      )}
+      {(markingResult || betaSampleRevealed) && (
+        <>
+          <SampleAnswers question={question} />
+          {betaSampleRevealed && sampleAnswersForQuestion(question).length === 0 && (
+            <div className="mt-5 rounded-[3px] border border-white/[0.06] bg-[#1a1714] p-5 text-[13px] leading-relaxed text-[#9b8f84]">
+              <p className="font-semibold text-[#dba476]">Sample solution</p>
+              <p className="mt-2">
+                There is no sample solution on file for this question yet. Ask your coordinator to add one in the
+                question editor.
+              </p>
+            </div>
+          )}
         </>
       )}
     </section>
@@ -927,12 +979,15 @@ function AnswerArea({ markingError, markingLoading, markingResult, onSubmit, que
 }
 
 function QuestionView({
+  betaSampleRevealed,
   config,
   loading,
+  markingDisabled,
   markingError,
   markingLoading,
   markingResult,
   onBack,
+  onBetaReveal,
   onSubmitAnswer,
   question,
   timer,
@@ -1071,9 +1126,12 @@ function QuestionView({
       </section>
 
       <AnswerArea
+        betaSampleRevealed={betaSampleRevealed}
+        markingDisabled={markingDisabled}
         markingError={markingError}
         markingLoading={markingLoading}
         markingResult={markingResult}
+        onBetaReveal={onBetaReveal}
         onSubmit={onSubmitAnswer}
         question={question}
         questionId={question.id}
@@ -1095,6 +1153,7 @@ export default function DailyPracticePage() {
   const [markingLoading, setMarkingLoading] = useState(false)
   const [markingResult, setMarkingResult] = useState(null)
   const [markingError, setMarkingError] = useState("")
+  const [betaSampleRevealed, setBetaSampleRevealed] = useState(false)
 
   const membership = auth.subjectMemberships?.find(
     (item) => item.subject.slug === params.slug
@@ -1102,12 +1161,16 @@ export default function DailyPracticePage() {
   const subject = membership?.subject
   const subjectId = subject?.id
 
+  const markingDisabled = auth.markingSystemEnabled === false
+
   const { data: tags = [] } = useSWR(
     subjectId ? `${TAGS_API_URL}?subject_id=${subjectId}` : null,
     fetcher
   )
   const { data: questions = [] } = useSWR(
-    subjectId ? `${QUESTIONS_API_URL}?subject_id=${subjectId}` : null,
+    subjectId
+      ? `${QUESTIONS_API_URL}?subject_id=${subjectId}&moderation_status=published`
+      : null,
     fetcher
   )
   const buckets = useMemo(() => splitTags(tags), [tags])
@@ -1153,6 +1216,7 @@ export default function DailyPracticePage() {
       setQuestion(detail)
       setMarkingResult(null)
       setMarkingError("")
+      setBetaSampleRevealed(false)
     } finally {
       setQuestionLoading(false)
     }
@@ -1170,8 +1234,17 @@ export default function DailyPracticePage() {
     if (arrivalSource === "modal") setModalOpen(true)
   }
 
+  function revealBetaSample() {
+    setBetaSampleRevealed(true)
+    setMarkingResult(null)
+    setMarkingError("")
+  }
+
   async function submitAnswer(payload) {
     if (!question?.id) return
+    if (markingDisabled) {
+      return
+    }
     setMarkingLoading(true)
     setMarkingError("")
     setMarkingResult(null)
@@ -1225,12 +1298,15 @@ export default function DailyPracticePage() {
 
       {mode === "question" && (
         <QuestionView
+          betaSampleRevealed={betaSampleRevealed}
           config={config}
           loading={questionLoading}
+          markingDisabled={markingDisabled}
           markingError={markingError}
           markingLoading={markingLoading}
           markingResult={markingResult}
           onBack={backFromQuestion}
+          onBetaReveal={revealBetaSample}
           onSubmitAnswer={submitAnswer}
           question={question}
           timer={timer}

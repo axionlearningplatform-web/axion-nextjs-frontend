@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 import useSWR from "swr"
 
+import { useAuth } from "@/components/authProvider"
 import fetcher from "@/lib/fetcher"
 import { QuestionEditor } from "@/components/question-editor"
 import { useRouter } from "next/navigation"
@@ -33,10 +34,25 @@ export default function Page() {
       : null,
     fetcher
   )
+  const auth = useAuth()
   const { data: subjects = [] } = useSWR("/api/subjects/", fetcher)
   const lockedSubject = subjects.find(
     (subject) => subject.slug === params?.slug
   )
+  const taggingMode = useMemo(() => {
+    if (!data?.subject_id) return "hidden"
+    const role = auth.subjectMemberships?.find(
+      (m) => m.subject.id === data.subject_id
+    )?.role
+    return role === "head_coordinator" ? "full" : "hidden"
+  }, [auth.subjectMemberships, data?.subject_id])
+
+  const canDeleteQuestion = useMemo(() => {
+    if (!data?.subject_id) return false
+    return auth.subjectMemberships?.some(
+      (m) => m.subject.id === data.subject_id && m.role === "head_coordinator"
+    )
+  }, [auth.subjectMemberships, data?.subject_id])
 
   async function handleSubmit(payload) {
 
@@ -103,12 +119,10 @@ export default function Page() {
 
   try {
 
-    const response = await fetch(
-      `${QUESTIONS_API_URL}${lookupId}/`,
-      {
-        method: "DELETE",
-      }
-    )
+    const response = await fetch(`${QUESTIONS_API_URL}${lookupId}/`, {
+      method: "DELETE",
+      credentials: "include",
+    })
 
     if (response.ok) {
 
@@ -163,10 +177,21 @@ return (
         Question Editor
       </h1>
 
+      {data?.moderation_status === "needs_revision" && taggingMode === "hidden" && (
+        <div className="rounded-xl border border-orange-500/35 bg-orange-950/40 px-5 py-4 text-center text-sm leading-relaxed text-orange-100/95">
+          <p className="font-semibold text-orange-200">Changes requested</p>
+          <p className="mt-2 text-orange-100/80">
+            A head coordinator asked for edits on this question. When you save changes, it is sent back to the
+            moderation queue as submitted.
+          </p>
+        </div>
+      )}
+
      <QuestionEditor
   initialData={data}
   subjects={subjects}
   lockedSubject={lockedSubject}
+  taggingMode={taggingMode}
 
   submitLabel="Save Changes"
 
@@ -178,7 +203,7 @@ return (
 
   onSubmit={handleSubmit}
 
-  onDelete={handleDelete}
+  onDelete={canDeleteQuestion ? handleDelete : null}
   deleting={deleting}
 
   errors={errors}

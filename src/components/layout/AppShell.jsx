@@ -7,6 +7,7 @@ import {
   BarChart3,
   CalendarDays,
   ChevronsUpDown,
+  ClipboardList,
   Database,
   Home,
   LibraryBig,
@@ -185,6 +186,7 @@ export default function AppShell({ children }) {
   )
   const canUseQuestionBank =
     currentSubject && QUESTION_BANK_ROLES.includes(currentSubject.role)
+  const canModerateQuestions = currentSubject?.role === "head_coordinator"
   const subjectBase = currentSubject
     ? `/subjects/${currentSubject.subject.slug}`
     : "/dashboard"
@@ -301,6 +303,15 @@ export default function AppShell({ children }) {
                 active={pathname.startsWith(`${subjectBase}/questions`)}
                 collapsed={collapsed}
               />
+              {canModerateQuestions && (
+                <NavItem
+                  href={`${subjectBase}/moderation`}
+                  icon={ClipboardList}
+                  label="Moderation"
+                  active={pathname.startsWith(`${subjectBase}/moderation`)}
+                  collapsed={collapsed}
+                />
+              )}
               <NavItem
                 href={`${subjectBase}/tags`}
                 icon={Tags}
