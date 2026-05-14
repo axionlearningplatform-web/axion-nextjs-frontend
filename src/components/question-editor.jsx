@@ -2,9 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Bold, ChevronDown, Italic, Plus, Trash2 } from "lucide-react"
-import ReactMarkdown from "react-markdown"
-import remarkMath from "remark-math"
-import rehypeKatex from "rehype-katex"
 import useSWR from "swr"
 
 import {
@@ -16,11 +13,11 @@ import {
 
 import { cn } from "@/lib/utils"
 import fetcher from "@/lib/fetcher"
-import { toRemarkMathSource } from "@/lib/questionFieldLatex"
 import { subjectIsMathematics } from "@/lib/subjectMath"
 
 import { Button } from "@/components/ui/button"
 import { PreviewPanel } from "@/components/questionEditor/previewPanel"
+import { LatexSegmentPreview } from "@/components/questionEditor/LatexSegmentPreview"
 import {
   Card,
   CardContent,
@@ -378,29 +375,12 @@ function DropdownSection({ title, summary, children, defaultOpen = false }) {
 }
 
 function MarkdownPreview({ value, placeholder = "Preview will appear here." }) {
-  if (!String(value || "").trim()) {
-    return (
-      <p className="font-serif text-sm italic text-[#6f6258]">{placeholder}</p>
-    )
-  }
-
-  const md = toRemarkMathSource(value)
-
   return (
-    <div className="axion-question-math prose prose-invert max-w-none break-words font-serif text-[15px] leading-7 text-[#eee9e4]">
-      <ReactMarkdown
-        remarkPlugins={[remarkMath]}
-        rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
-        components={{
-          p: ({ children }) => <p className="my-3 first:mt-0 last:mb-0">{children}</p>,
-          strong: ({ children }) => <strong className="font-semibold text-[#f3ede6]">{children}</strong>,
-          em: ({ children }) => <em className="italic text-[#efe4da]">{children}</em>,
-          code: ({ children }) => <code className="whitespace-pre-wrap break-words">{children}</code>,
-        }}
-      >
-        {md}
-      </ReactMarkdown>
-    </div>
+    <LatexSegmentPreview
+      value={value}
+      emptyMessage={placeholder}
+      className="text-[15px] leading-7"
+    />
   )
 }
 

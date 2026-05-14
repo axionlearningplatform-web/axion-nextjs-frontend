@@ -1,15 +1,14 @@
 //Preview Editor
+"use client"
+
 import { memo, useEffect, useMemo, useState } from "react"
-import ReactMarkdown from "react-markdown"
-import remarkMath from "remark-math"
-import rehypeKatex from "rehype-katex"
 
 import {
   Card,
   CardContent,
 } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
-import { toRemarkMathSource } from "@/lib/questionFieldLatex"
+import { LatexSegmentPreview } from "@/components/questionEditor/LatexSegmentPreview"
 
 const TIKZ_PREVIEW_URL = `/api/questions/tikz/preview/`
 
@@ -259,63 +258,10 @@ function TikzInlinePreview({ code }) {
   )
 }
 
-function prepareMarkdown(value) {
-  let md = toRemarkMathSource(String(value || ""))
-  md = md
-    .split("\n")
-    .map((line) => {
-      const trimmedRight = line.replace(/\s+$/g, "")
-      return trimmedRight.replace(
-        /^(\s*)\*\*(\d+)\.\s+(.+?)\*\*$/,
-        "$1$2. **$3**"
-      )
-    })
-    .join("\n")
-    .replace(/(?<!\n)\n(?!\n)/g, "  \n")
-  return md
-}
-
 function MarkdownBlock({ children }) {
-  const markdown = prepareMarkdown(children)
-
   return (
     <div className="axion-question-math prose prose-invert max-w-none overflow-hidden break-words font-serif text-[17px] leading-[1.7] text-[#eee9e4]">
-      <ReactMarkdown
-        components={{
-          p: ({ children }) => <p className="my-4 first:mt-0 last:mb-0">{children}</p>,
-          ol: ({ children }) => (
-            <ol className="my-5 list-outside list-decimal space-y-1.5 pl-6">
-              {children}
-            </ol>
-          ),
-          ul: ({ children }) => (
-            <ul className="my-5 list-outside list-disc space-y-1.5 pl-6">
-              {children}
-            </ul>
-          ),
-          li: ({ children }) => (
-            <li className="pl-1 marker:text-[#8f8982]">{children}</li>
-          ),
-          strong: ({ children }) => (
-            <strong className="font-semibold text-[#f3ede6]">{children}</strong>
-          ),
-          em: ({ children }) => (
-            <em className="italic text-[#efe4da]">{children}</em>
-          ),
-          code: ({ children }) => (
-            <code className="whitespace-pre-wrap break-words">{children}</code>
-          ),
-          pre: ({ children }) => (
-            <pre className="max-w-full overflow-x-auto whitespace-pre-wrap break-words">
-              {children}
-            </pre>
-          ),
-        }}
-        remarkPlugins={[remarkMath]}
-        rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
-      >
-        {markdown}
-      </ReactMarkdown>
+      <LatexSegmentPreview value={children} />
     </div>
   )
 }

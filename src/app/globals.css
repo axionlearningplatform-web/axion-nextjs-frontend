@@ -3,6 +3,11 @@
 @import "shadcn/tailwind.css";
 @import "katex/dist/katex.min.css";
 
+/* Soften KaTeX error styling inside Axion previews (default is harsh red). */
+.axion-question-math .katex-error {
+  color: #8a7b72 !important;
+}
+
 @font-face {
   font-family: "Satoshi";
   src: url("/fonts/Satoshi-Variable.woff2") format("woff2"),
