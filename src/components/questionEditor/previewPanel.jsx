@@ -9,6 +9,7 @@ import {
   CardContent,
 } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
+import { toRemarkMathSource } from "@/lib/questionFieldLatex"
 
 const TIKZ_PREVIEW_URL = `/api/questions/tikz/preview/`
 
@@ -259,10 +260,8 @@ function TikzInlinePreview({ code }) {
 }
 
 function prepareMarkdown(value) {
-  return String(value || "")
-    .replace(/\r\n?/g, "\n")
-    .replace(/\\\[((?:.|\n)*?)\\\]/g, (_, expression) => `$$\n${expression.trim()}\n$$`)
-    .replace(/\\\((.+?)\\\)/g, (_, expression) => `$${expression.trim()}$`)
+  let md = toRemarkMathSource(String(value || ""))
+  md = md
     .split("\n")
     .map((line) => {
       const trimmedRight = line.replace(/\s+$/g, "")
@@ -273,6 +272,7 @@ function prepareMarkdown(value) {
     })
     .join("\n")
     .replace(/(?<!\n)\n(?!\n)/g, "  \n")
+  return md
 }
 
 function MarkdownBlock({ children }) {
@@ -312,7 +312,7 @@ function MarkdownBlock({ children }) {
           ),
         }}
         remarkPlugins={[remarkMath]}
-        rehypePlugins={[rehypeKatex]}
+        rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
       >
         {markdown}
       </ReactMarkdown>

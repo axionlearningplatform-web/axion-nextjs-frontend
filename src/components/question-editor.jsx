@@ -16,6 +16,7 @@ import {
 
 import { cn } from "@/lib/utils"
 import fetcher from "@/lib/fetcher"
+import { toRemarkMathSource } from "@/lib/questionFieldLatex"
 import { subjectIsMathematics } from "@/lib/subjectMath"
 
 import { Button } from "@/components/ui/button"
@@ -125,9 +126,7 @@ function RichTextArea({ value, onValueChange, className, onAfterChange, toolbarH
       cursorStart = start
       cursorEnd = start + unwrapped.length
     } else {
-      const insert = selected.length
-  ? selected
-  : fallback
+      const insert = selected.length ? selected : fallback
       const opening = block && start > 0 && value[start - 1] !== "\n" ? `\n\n${before}` : before
       const closing = block && value[end] && value[end] !== "\n" ? `${after}\n\n` : after
       next = `${value.slice(0, start)}${opening}${insert}${closing}${value.slice(end)}`
@@ -144,242 +143,211 @@ function RichTextArea({ value, onValueChange, className, onAfterChange, toolbarH
     })
   }
 
-  function applyMarker(marker) {
-    applyWrap({
-      before: marker,
-      after: marker,
-      fallback: marker === "**" ? "bold text" : "italic text",
-    })
-  }
-
-  function applyInlineMath() {
-    applyWrap({
-      before: "$",
-      after: "$",
-      fallback: "x^2",
-    })
-  }
-
-  function applyBlockMath() {
-    applyWrap({
-      before: "$$\n",
-      after: "\n$$",
-      fallback: "x^2 + y^2 = r^2",
-      block: true,
+  function applyRawInsert(insert, cursorOffsetFromEnd = 0) {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    const start = textarea.selectionStart ?? value.length
+    const end = textarea.selectionEnd ?? value.length
+    const next = value.slice(0, start) + insert + value.slice(end)
+    onValueChange(next)
+    onAfterChange?.()
+    const pos = start + insert.length - cursorOffsetFromEnd
+    requestAnimationFrame(() => {
+      textarea.focus()
+      textarea.setSelectionRange(pos, pos)
     })
   }
 
   function handleKeyDown(event) {
-  const isMac = navigator.platform.toUpperCase().includes("MAC")
-  const modifier = isMac ? event.metaKey : event.ctrlKey
+    const isMac = navigator.platform.toUpperCase().includes("MAC")
+    const modifier = isMac ? event.metaKey : event.ctrlKey
 
-  // CMD/CTRL + B
-  if (modifier && event.key.toLowerCase() === "b") {
-    event.preventDefault()
-    applyMarker("**")
-    return
-  }
-
-  // CMD/CTRL + I
-  if (modifier && event.key.toLowerCase() === "i") {
-    event.preventDefault()
-    applyMarker("*")
-    return
-  }
-
-  // Shift + 4 ($)
-  if (event.shiftKey && event.key === "$") {
-    const textarea = textareaRef.current
-    if (!textarea) return
-
-    const start = textarea.selectionStart ?? 0
-    const end = textarea.selectionEnd ?? 0
-
-    // only hijack if text is selected
-    if (start !== end) {
+    if (modifier && event.key.toLowerCase() === "b") {
       event.preventDefault()
-
-      const selected = value.slice(start, end)
-
-      const next =
-        value.slice(0, start) +
-        `$${selected}$` +
-        value.slice(end)
-
-      onValueChange(next)
-      onAfterChange?.()
-
-      requestAnimationFrame(() => {
-        textarea.focus()
-        textarea.setSelectionRange(
-          start + 1,
-          start + 1 + selected.length
-        )
+      applyWrap({
+        before: "\\textbf{",
+        after: "}",
+        fallback: "text",
       })
+      return
     }
-  }
 
+    if (modifier && event.key.toLowerCase() === "i") {
+      event.preventDefault()
+      applyWrap({
+        before: "\\textit{",
+        after: "}",
+        fallback: "text",
+      })
+      return
+    }
 
-  // Shift + Alt + 4 => block math
-if (event.shiftKey && event.altKey && event.key === "$") {
-  const textarea = textareaRef.current
-  if (!textarea) return
+    if (event.key === "Tab") {
+      const textarea = textareaRef.current
+      if (!textarea) return
 
-  const start = textarea.selectionStart ?? 0
-  const end = textarea.selectionEnd ?? 0
+      const cursor = textarea.selectionStart
+      const before = value.slice(0, cursor)
 
-  event.preventDefault()
-
-  const selected = value.slice(start, end) || "x^2 + y^2 = r^2"
-
-  const wrapped =
-`$$
-${selected}
-$$`
-
-  const next =
-    value.slice(0, start) +
-    wrapped +
-    value.slice(end)
-
-  onValueChange(next)
-  onAfterChange?.()
-
-  requestAnimationFrame(() => {
-    textarea.focus()
-    textarea.setSelectionRange(
-      start + 4,
-      start + 4 + selected.length
-    )
-  })
-}
-
-// TAB snippets
-if (event.key === "Tab") {
-  const textarea = textareaRef.current
-  if (!textarea) return
-
-  const cursor = textarea.selectionStart
-  const before = value.slice(0, cursor)
-
-  const snippets = {
-    "align": `$$
-\\begin{align*}
+      const snippets = {
+        align: `\\begin{align*}
 x &= y \\\\
 x + 1 &= 2
-\\end{align*}
-$$`,
+\\end{align*}`,
 
-    "cases": `\\begin{cases}
+        cases: `\\begin{cases}
 
 \\end{cases}`,
 
-    "tikz": `\\begin{tikzpicture}
+        tikz: `\\begin{tikzpicture}
 
 \\end{tikzpicture}`,
 
-    "matrix": `\\begin{bmatrix}
+        matrix: `\\begin{bmatrix}
 
 \\end{bmatrix}`,
-  }
+      }
 
-  for (const key in snippets) {
-    if (before.endsWith(key)) {
-      event.preventDefault()
-
-      const replacement = snippets[key]
-
-      const next =
-        value.slice(0, cursor - key.length) +
-        replacement +
-        value.slice(cursor)
-
-      onValueChange(next)
-
-      requestAnimationFrame(() => {
-        textarea.focus()
-
-        const position =
-          cursor -
-          key.length +
-          replacement.indexOf("\n\n") +
-          1
-
-        textarea.setSelectionRange(position, position)
-      })
-
-      return
+      for (const key of Object.keys(snippets)) {
+        if (before.endsWith(key)) {
+          event.preventDefault()
+          const replacement = snippets[key]
+          const next = value.slice(0, cursor - key.length) + replacement + value.slice(cursor)
+          onValueChange(next)
+          onAfterChange?.()
+          requestAnimationFrame(() => {
+            textarea.focus()
+            const nl = replacement.indexOf("\n\n")
+            const position = cursor - key.length + (nl >= 0 ? nl + 1 : replacement.length)
+            textarea.setSelectionRange(position, position)
+          })
+          return
+        }
+      }
     }
   }
-}
-}
 
   return (
     <div className="overflow-hidden rounded-3xl border border-[#3b2a22]/55 bg-white/[0.035] focus-within:ring-3 focus-within:ring-[#ffb595]/40">
       <TooltipProvider delayDuration={180}>
-      <div className="flex items-center gap-1 border-b border-[#3a302b] px-3 py-2">
-        <EditorToolbarButton
-  label="Bold"
-  shortcut="⌘B"
-  onClick={() => applyMarker("**")}
->
-  <Bold className="size-4" />
-</EditorToolbarButton>
-       <EditorToolbarButton
-  label="Italic"
-  shortcut="⌘I"
-  onClick={() => applyMarker("*")}
->
-  <Italic className="size-4" />
-</EditorToolbarButton>
-        <EditorToolbarButton
-  label="Align Environment"
-  shortcut="align + Tab"
-  onClick={() =>
-  applyWrap({
-    before: "$$\n\\begin{align*}\n",
-    after: "\n\\end{align*}\n$$",
-    fallback: "x &= y",
-    block: true,
-  })
-}
->
-  <span className="font-serif text-[12px]">
-    align
-  </span>
-</EditorToolbarButton>
-        <EditorToolbarButton
-  label="Inline LaTeX"
-  shortcut="$"
-  onClick={applyInlineMath}
->
-  <span className="font-serif text-[13px]">$x$</span>
-</EditorToolbarButton>
-        <EditorToolbarButton
-  label="Block Math"
-  shortcut="⌥⇧$"
-  onClick={applyBlockMath}
->
-  <span className="font-serif text-[13px]">$$</span>
-</EditorToolbarButton>
-        <span className="ml-2 text-[11px] text-[#6f6258]">
-          {toolbarHint || "Markdown + LaTeX"}
-        </span>
-      </div>
-      <Textarea
-        ref={textareaRef}
-        onKeyDown={handleKeyDown}
-        className={cn(
-          "rounded-none border-0 bg-transparent focus-visible:ring-0",
-          className
-        )}
-        value={value}
-        onChange={(event) => {
-          onValueChange(event.target.value)
-          onAfterChange?.()
-        }}
-        {...props}
-      />
+        <div className="flex flex-wrap items-center gap-1 border-b border-[#3a302b] px-2 py-1.5 sm:px-3 sm:py-2">
+          <EditorToolbarButton
+            label="Bold"
+            shortcut="⌘B"
+            onClick={() =>
+              applyWrap({
+                before: "\\textbf{",
+                after: "}",
+                fallback: "text",
+              })
+            }
+          >
+            <Bold className="size-4" />
+          </EditorToolbarButton>
+          <EditorToolbarButton
+            label="Italic"
+            shortcut="⌘I"
+            onClick={() =>
+              applyWrap({
+                before: "\\textit{",
+                after: "}",
+                fallback: "text",
+              })
+            }
+          >
+            <Italic className="size-4" />
+          </EditorToolbarButton>
+          <EditorToolbarButton
+            label="Align"
+            shortcut="align+Tab"
+            onClick={() =>
+              applyWrap({
+                before: "\\begin{align*}\n",
+                after: "\n\\end{align*}",
+                fallback: "x &= y",
+                block: true,
+              })
+            }
+          >
+            <span className="font-serif text-[12px]">align</span>
+          </EditorToolbarButton>
+          <EditorToolbarButton
+            label="Fraction"
+            onClick={() => applyRawInsert("\\frac{}{}", 3)}
+          >
+            <span className="font-serif text-[12px]">a/b</span>
+          </EditorToolbarButton>
+          <EditorToolbarButton label="Sqrt" onClick={() => applyRawInsert("\\sqrt{}", 1)}>
+            <span className="font-serif text-[12px]">√</span>
+          </EditorToolbarButton>
+          <EditorToolbarButton label="Superscript" onClick={() => applyRawInsert("^{}")}>
+            <span className="font-serif text-[11px]">xⁿ</span>
+          </EditorToolbarButton>
+          <EditorToolbarButton label="Subscript" onClick={() => applyRawInsert("_{}")}>
+            <span className="font-serif text-[11px]">xₙ</span>
+          </EditorToolbarButton>
+          <EditorToolbarButton label="Sum" onClick={() => applyRawInsert("\\sum ")}>
+            <span className="font-serif text-[12px]">∑</span>
+          </EditorToolbarButton>
+          <EditorToolbarButton label="Integral" onClick={() => applyRawInsert("\\int ")}>
+            <span className="font-serif text-[12px]">∫</span>
+          </EditorToolbarButton>
+          <EditorToolbarButton
+            label="Cases"
+            onClick={() =>
+              applyWrap({
+                before: "\\begin{cases}\n",
+                after: "\n\\end{cases}",
+                fallback: "x & x<0\\\\\n0 & \\text{otherwise}",
+                block: true,
+              })
+            }
+          >
+            <span className="font-serif text-[11px]">{`{`}</span>
+          </EditorToolbarButton>
+          <EditorToolbarButton
+            label="Matrix"
+            onClick={() =>
+              applyWrap({
+                before: "\\begin{bmatrix}\n",
+                after: "\n\\end{bmatrix}",
+                fallback: "a & b\\\\\nc & d",
+                block: true,
+              })
+            }
+          >
+            <span className="font-serif text-[11px]">[]</span>
+          </EditorToolbarButton>
+          <EditorToolbarButton
+            label="Colour"
+            onClick={() => applyRawInsert("\\textcolor{red}{}", 1)}
+          >
+            <span className="font-serif text-[11px]">RGB</span>
+          </EditorToolbarButton>
+          <EditorToolbarButton label="Boxed" onClick={() => applyRawInsert("\\boxed{}", 1)}>
+            <span className="font-serif text-[11px]">▢</span>
+          </EditorToolbarButton>
+          <EditorToolbarButton label="Greek θ" onClick={() => applyRawInsert("\\theta")}>
+            <span className="font-serif text-[11px]">θ</span>
+          </EditorToolbarButton>
+          <span className="ml-auto min-w-0 text-[10px] text-[#6f6258] sm:text-[11px]">
+            {toolbarHint || "LaTeX-first · preview wraps math"}
+          </span>
+        </div>
+        <Textarea
+          ref={textareaRef}
+          onKeyDown={handleKeyDown}
+          className={cn(
+            "rounded-none border-0 bg-transparent focus-visible:ring-0",
+            className
+          )}
+          value={value}
+          onChange={(event) => {
+            onValueChange(event.target.value)
+            onAfterChange?.()
+          }}
+          {...props}
+        />
       </TooltipProvider>
     </div>
   )
@@ -409,11 +377,31 @@ function DropdownSection({ title, summary, children, defaultOpen = false }) {
   )
 }
 
-function renderableMarkdown(value = "") {
-  return String(value || "")
-    .replace(/\r\n?/g, "\n")
-    .replace(/\\\[((?:.|\n)*?)\\\]/g, (_, expression) => `$$\n${expression.trim()}\n$$`)
-    .replace(/\\\((.+?)\\\)/g, (_, expression) => `$${expression.trim()}$`)
+function MarkdownPreview({ value, placeholder = "Preview will appear here." }) {
+  if (!String(value || "").trim()) {
+    return (
+      <p className="font-serif text-sm italic text-[#6f6258]">{placeholder}</p>
+    )
+  }
+
+  const md = toRemarkMathSource(value)
+
+  return (
+    <div className="axion-question-math prose prose-invert max-w-none break-words font-serif text-[15px] leading-7 text-[#eee9e4]">
+      <ReactMarkdown
+        remarkPlugins={[remarkMath]}
+        rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
+        components={{
+          p: ({ children }) => <p className="my-3 first:mt-0 last:mb-0">{children}</p>,
+          strong: ({ children }) => <strong className="font-semibold text-[#f3ede6]">{children}</strong>,
+          em: ({ children }) => <em className="italic text-[#efe4da]">{children}</em>,
+          code: ({ children }) => <code className="whitespace-pre-wrap break-words">{children}</code>,
+        }}
+      >
+        {md}
+      </ReactMarkdown>
+    </div>
+  )
 }
 
 function moderationStatusBadgeLabel(status) {
@@ -451,41 +439,6 @@ function ModerationStatusBadge({ status }) {
     >
       {label}
     </span>
-  )
-}
-
-function latexFirstPrepare(value = "") {
-  const raw = String(value || "")
-  const trimmed = raw.trim()
-  if (!trimmed || trimmed.includes("$$")) return raw
-  if (trimmed.startsWith("\\begin") && !trimmed.startsWith("$")) {
-    return `\n$$\n${trimmed}\n$$\n`
-  }
-  return raw
-}
-
-function MarkdownPreview({ value, placeholder = "Preview will appear here." }) {
-  if (!String(value || "").trim()) {
-    return (
-      <p className="font-serif text-sm italic text-[#6f6258]">{placeholder}</p>
-    )
-  }
-
-  return (
-    <div className="axion-question-math prose prose-invert max-w-none break-words font-serif text-[15px] leading-7 text-[#eee9e4]">
-      <ReactMarkdown
-        remarkPlugins={[remarkMath]}
-        rehypePlugins={[rehypeKatex]}
-        components={{
-          p: ({ children }) => <p className="my-3 first:mt-0 last:mb-0">{children}</p>,
-          strong: ({ children }) => <strong className="font-semibold text-[#f3ede6]">{children}</strong>,
-          em: ({ children }) => <em className="italic text-[#efe4da]">{children}</em>,
-          code: ({ children }) => <code className="whitespace-pre-wrap break-words">{children}</code>,
-        }}
-      >
-        {renderableMarkdown(latexFirstPrepare(value))}
-      </ReactMarkdown>
-    </div>
   )
 }
 
@@ -896,18 +849,19 @@ function MarkingCriteriaFields({ rows, onChange, compact }) {
       {rows.map((row, index) => (
         <Field key={`mc-row-${index}`}>
           <FieldLabel className="text-[#dac1b7]">Mark {row.mark}</FieldLabel>
-          <Textarea
+          <RichTextArea
             className={cn(
-              "min-h-[72px] rounded-2xl border-[#3b2a22]/55 bg-white/[0.035] p-3 text-sm text-[#e5e2e1] focus-visible:ring-[#ffb595]/40",
+              "min-h-[72px] p-3 text-sm text-[#e5e2e1]",
               compact && "min-h-[60px]"
             )}
             placeholder={`What earns mark ${row.mark}?`}
             value={row.text || ""}
-            onChange={(event) => {
+            onValueChange={(v) => {
               const next = [...rows]
-              next[index] = { ...row, text: event.target.value }
+              next[index] = { ...row, text: v }
               onChange(next)
             }}
+            toolbarHint="Marking criterion"
           />
         </Field>
       ))}
@@ -1025,11 +979,6 @@ export function QuestionEditor({
       normalizeCriteriaRows(initialData.marks || 1, initialData.marking_criteria || [])
     )
   }, [initialData])
-
-  useEffect(() => {
-    if (parts.length) return
-    setRootMarkingCriteria((prev) => normalizeCriteriaRows(criteriaRowCount(marks, prev), prev))
-  }, [marks, parts.length])
 
   useEffect(() => {
     if (!lockedSubject) return
@@ -1238,7 +1187,13 @@ export function QuestionEditor({
                       type="number"
                       value={marks}
                       onChange={(e) => {
-                        setMarks(e.target.value)
+                        const v = e.target.value
+                        setMarks(v)
+                        if (!parts.length) {
+                          setRootMarkingCriteria((prev) =>
+                            normalizeCriteriaRows(criteriaRowCount(v, prev), prev)
+                          )
+                        }
                         if (validationMessage) setValidationMessage("")
                       }}
                     />
