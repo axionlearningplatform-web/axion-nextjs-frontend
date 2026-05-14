@@ -23,12 +23,11 @@ const SEARCH_DEBOUNCE_MS = 260
 
 /** Extra right padding so the native select chevron clears the curved border. */
 const FILTER_SELECT_CLASS =
-  "h-10 w-full min-w-[140px] cursor-pointer rounded-full border border-[#3b2a22]/55 bg-[#181410] py-2 pl-4 pr-10 text-sm text-[#e5e2e1] outline-none focus:border-[#ffb595]/40"
+  "h-10 w-full min-w-[140px] cursor-pointer rounded-full border border-[#3b2a22]/55 bg-[#181410] py-2 pl-4 pr-12 text-sm text-[#e5e2e1] outline-none focus:border-[#ffb595]/40"
 
 const MODERATION_FILTER_OPTIONS = [
   { value: "", label: "Any status" },
-  { value: "submitted", label: "Submitted" },
-  { value: "under_review", label: "In review" },
+  { value: "submitted,under_review", label: "Coordinator review" },
   { value: "needs_revision", label: "Needs changes" },
   { value: "published", label: "Published" },
   { value: "rejected", label: "Rejected" },
@@ -49,14 +48,9 @@ const QuestionRow = memo(function QuestionRow({ item, onRowClick }) {
             Published
           </span>
         )}
-        {item.moderation_status === "submitted" && (
+        {(item.moderation_status === "submitted" || item.moderation_status === "under_review") && (
           <span className="rounded-full border border-sky-400/25 bg-sky-500/10 px-2 py-1 text-[10px] text-sky-100">
-            Submitted
-          </span>
-        )}
-        {item.moderation_status === "under_review" && (
-          <span className="rounded-full border border-sky-400/25 bg-sky-500/10 px-2 py-1 text-[10px] text-sky-100">
-            In review
+            Coordinator review
           </span>
         )}
         {item.moderation_status === "needs_revision" && (

@@ -52,6 +52,7 @@ export function AuthProvider({children}){
         try {
             const response = await fetch(ME_URL, {
                 cache: "no-store",
+                credentials: "include",
             })
             if (!response.ok) {
                 clearUserContext()

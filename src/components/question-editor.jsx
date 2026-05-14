@@ -863,6 +863,18 @@ function TagTaxonomyPicker({
   )
 }
 
+function criteriaRowCount(marksField, existingCriteria) {
+  const existingLen = (existingCriteria || []).length
+  if (marksField === "" || marksField == null) {
+    return Math.max(1, existingLen)
+  }
+  const n = Number(marksField)
+  if (!Number.isFinite(n) || n < 1) {
+    return Math.max(1, existingLen)
+  }
+  return n
+}
+
 function normalizeCriteriaRows(marks, existing = []) {
   const n = Math.max(1, Number(marks) || 1)
   const rows = Array.isArray(existing) ? [...existing] : []
@@ -962,7 +974,7 @@ export function QuestionEditor({
 
   const effectiveMarks = parts.length
     ? Number(marks) || parts.reduce((total, part) => total + (Number(part.marks) || 0), 0)
-    : Number(marks) || 1
+    : criteriaRowCount(marks, rootMarkingCriteria)
   const partMarksTotal = parts.reduce((total, part) => total + (Number(part.marks) || 0), 0)
 
   useEffect(() => {
@@ -1016,7 +1028,7 @@ export function QuestionEditor({
 
   useEffect(() => {
     if (parts.length) return
-    setRootMarkingCriteria((prev) => normalizeCriteriaRows(Number(marks) || 1, prev))
+    setRootMarkingCriteria((prev) => normalizeCriteriaRows(criteriaRowCount(marks, prev), prev))
   }, [marks, parts.length])
 
   useEffect(() => {
@@ -1042,17 +1054,22 @@ export function QuestionEditor({
       parts: parts.map((part) => ({
         label: part.label,
         text: part.text,
-        marks: Number(part.marks) || 1,
+        marks: criteriaRowCount(part.marks, part.marking_criteria),
         sample_solution: part.sample_solution || "",
         tag_ids: part.tag_ids || [],
         tag_requirements: syncTagRequirements(part.tag_ids || [], part.tag_requirements || [], tags),
         attachments: part.attachments || [],
         tikz_visuals: part.tikz_visuals || [],
-        marking_criteria: normalizeCriteriaRows(part.marks || 1, part.marking_criteria || []),
+        marking_criteria: normalizeCriteriaRows(
+          criteriaRowCount(part.marks, part.marking_criteria),
+          part.marking_criteria || []
+        ),
         hints: [],
       })),
       attachments,
-      marking_criteria: parts.length ? [] : normalizeCriteriaRows(Number(marks) || 1, rootMarkingCriteria),
+      marking_criteria: parts.length
+        ? []
+        : normalizeCriteriaRows(criteriaRowCount(marks, rootMarkingCriteria), rootMarkingCriteria),
       sample_solution: parts.length ? "" : sampleSolution,
       tag_ids: tagIds,
       tag_requirements: parts.length ? [] : syncTagRequirements(tagIds, tagRequirements, tags),
@@ -1078,14 +1095,14 @@ export function QuestionEditor({
     if (!isMathSubject) {
       if (parts.length) {
         for (const part of parts) {
-          const need = Number(part.marks) || 1
+          const need = criteriaRowCount(part.marks, part.marking_criteria)
           const crits = normalizeCriteriaRows(need, part.marking_criteria || [])
           if (crits.some((c) => !String(c.text || "").trim())) {
             return `Marking criteria required for every mark in part (${part.label || "?"}).`
           }
         }
       } else {
-        const crits = normalizeCriteriaRows(Number(marks) || 1, rootMarkingCriteria)
+        const crits = normalizeCriteriaRows(criteriaRowCount(marks, rootMarkingCriteria), rootMarkingCriteria)
         if (crits.some((c) => !String(c.text || "").trim())) {
           return "Marking criteria required for every mark."
         }
@@ -1426,12 +1443,15 @@ export function QuestionEditor({
                         {!isMathSubject && (
                           <DropdownSection
                             title="Marking Criteria"
-                            summary={`${(part.marking_criteria || []).filter((c) => String(c.text || "").trim()).length}/${Number(part.marks) || 1}`}
+                            summary={`${(part.marking_criteria || []).filter((c) => String(c.text || "").trim()).length}/${criteriaRowCount(part.marks, part.marking_criteria)}`}
                             defaultOpen
                           >
                             <MarkingCriteriaFields
                               compact
-                              rows={normalizeCriteriaRows(part.marks || 1, part.marking_criteria || [])}
+                              rows={normalizeCriteriaRows(
+                                criteriaRowCount(part.marks, part.marking_criteria),
+                                part.marking_criteria || []
+                              )}
                               onChange={(rows) => {
                                 setParts((prev) => {
                                   const next = [...prev]
@@ -1510,11 +1530,11 @@ export function QuestionEditor({
                     {!isMathSubject && (
                       <DropdownSection
                         title="Marking Criteria"
-                        summary={`${rootMarkingCriteria.filter((c) => String(c.text || "").trim()).length}/${Number(marks) || 1}`}
+                        summary={`${rootMarkingCriteria.filter((c) => String(c.text || "").trim()).length}/${criteriaRowCount(marks, rootMarkingCriteria)}`}
                         defaultOpen
                       >
                         <MarkingCriteriaFields
-                          rows={normalizeCriteriaRows(Number(marks) || 1, rootMarkingCriteria)}
+                          rows={normalizeCriteriaRows(criteriaRowCount(marks, rootMarkingCriteria), rootMarkingCriteria)}
                           onChange={setRootMarkingCriteria}
                         />
                       </DropdownSection>

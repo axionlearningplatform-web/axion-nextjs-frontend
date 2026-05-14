@@ -32,6 +32,7 @@ export default function Questions() {
       QUESTIONS_API_URL,
       {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
