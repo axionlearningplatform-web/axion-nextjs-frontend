@@ -59,12 +59,37 @@ function flattenSaveErrors(data) {
   return "Could not save — check required fields and taxonomy tags."
 }
 
+const MODERATION_QUEUE_SEARCH_DEBOUNCE_MS = 260
+
 export default function SubjectModerationPage() {
   const params = useParams()
   const auth = useAuth()
   const { data: subjects = [], isLoading: subjectsLoading } = useSWR(SUBJECTS_API_URL, fetcher)
   const lockedSubject = subjects.find((s) => s.slug === params?.slug)
   const subjectId = lockedSubject?.id
+
+  const [searchInput, setSearchInput] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setDebouncedSearch(searchInput.trim())
+    }, MODERATION_QUEUE_SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(t)
+  }, [searchInput])
+
+  const moderationQuestionsUrl = useMemo(() => {
+    if (!subjectId) return null
+    const p = new URLSearchParams({
+      subject_id: String(subjectId),
+      moderation_status: "submitted,under_review,needs_revision",
+      include_status_totals: "true",
+      limit: "500",
+      offset: "0",
+    })
+    if (debouncedSearch) p.set("search", debouncedSearch)
+    return `${QUESTIONS_API_URL}?${p.toString()}`
+  }, [subjectId, debouncedSearch])
 
   const canModerate = useMemo(
     () =>
@@ -75,23 +100,24 @@ export default function SubjectModerationPage() {
   )
 
   const {
-    data: questions = [],
+    data: questionsPayload,
     mutate: mutateQuestions,
     isLoading: questionsLoading,
-  } = useSWR(subjectId ? `${QUESTIONS_API_URL}?subject_id=${subjectId}` : null, fetcher)
+  } = useSWR(moderationQuestionsUrl, fetcher, {
+    dedupingInterval: 60_000,
+    keepPreviousData: true,
+  })
 
   const { data: allTags = [] } = useSWR(
     subjectId ? `/api/questions/tags/?subject_id=${subjectId}` : null,
     fetcher
   )
 
-  const queue = useMemo(
-    () =>
-      (questions || []).filter((item) => ACTIONABLE_MODERATION.has(item.moderation_status)),
-    [questions]
-  )
+  const queue = useMemo(() => {
+    const raw = questionsPayload?.results ?? []
+    return raw.filter((item) => ACTIONABLE_MODERATION.has(item.moderation_status))
+  }, [questionsPayload])
 
-  const [search, setSearch] = useState("")
   const [activeId, setActiveId] = useState(null)
   const [editorData, setEditorData] = useState(null)
   const [draft, setDraft] = useState(null)
@@ -99,17 +125,11 @@ export default function SubjectModerationPage() {
   const [saveError, setSaveError] = useState("")
   const [previewExpanded, setPreviewExpanded] = useState(false)
 
-  const filteredQueue = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return queue
-    return queue.filter((item) => (item.question_text || "").toLowerCase().includes(q))
-  }, [queue, search])
-
   const activeIndex = useMemo(
-    () => filteredQueue.findIndex((item) => item.id === activeId),
-    [filteredQueue, activeId]
+    () => queue.findIndex((item) => item.id === activeId),
+    [queue, activeId]
   )
-  const activeSummary = activeIndex >= 0 ? filteredQueue[activeIndex] : null
+  const activeSummary = activeIndex >= 0 ? queue[activeIndex] : null
 
   const loadDetail = useCallback(async (id) => {
     if (!id) {
@@ -176,7 +196,7 @@ export default function SubjectModerationPage() {
       setSaveError(flattenSaveErrors(result.data))
       return
     }
-    const next = filteredQueue.find((item) => item.id !== activeId)
+    const next = queue.find((item) => item.id !== activeId)
     setActiveId(next?.id || null)
   }
 
@@ -198,7 +218,7 @@ export default function SubjectModerationPage() {
       setSaveError(flattenSaveErrors(result.data))
       return
     }
-    const next = filteredQueue.find((item) => item.id !== activeId)
+    const next = queue.find((item) => item.id !== activeId)
     setActiveId(next?.id || null)
   }
 
@@ -224,7 +244,7 @@ export default function SubjectModerationPage() {
       setSaveError(flattenSaveErrors(result.data))
       return
     }
-    const next = filteredQueue.find((item) => item.id !== activeId)
+    const next = queue.find((item) => item.id !== activeId)
     setActiveId(next?.id || null)
   }
 
@@ -264,15 +284,24 @@ export default function SubjectModerationPage() {
   }, [draft, editorData, allTags])
 
   const counts = useMemo(() => {
+    const totals = questionsPayload?.status_totals
+    if (totals && typeof totals === "object") {
+      return {
+        pending: (totals.submitted || 0) + (totals.under_review || 0),
+        needsChanges: totals.needs_revision || 0,
+        accepted: totals.published || 0,
+        rejected: totals.rejected || 0,
+      }
+    }
     const c = { pending: 0, needsChanges: 0, accepted: 0, rejected: 0 }
-    for (const item of questions || []) {
+    for (const item of queue || []) {
       if (item.moderation_status === "published") c.accepted += 1
       else if (item.moderation_status === "rejected") c.rejected += 1
       else if (item.moderation_status === "needs_revision") c.needsChanges += 1
       else c.pending += 1
     }
     return c
-  }, [questions])
+  }, [questionsPayload, queue])
 
   if (subjectsLoading) {
     return <div className="p-10 text-[#dac1b7]">Loading moderation…</div>
@@ -347,13 +376,13 @@ export default function SubjectModerationPage() {
                   <Input
                     className="h-10 rounded-full border-[#3b2a22]/55 bg-white/[0.035] pl-9 text-sm text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
                     placeholder="Search question text"
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
+                    value={searchInput}
+                    onChange={(event) => setSearchInput(event.target.value)}
                   />
                 </div>
               </CardHeader>
               <CardContent className="grid max-h-[720px] gap-2 overflow-y-auto pr-1">
-                {filteredQueue.map((item) => (
+                {queue.map((item) => (
                   <button
                     key={item.id}
                     type="button"
@@ -385,11 +414,11 @@ export default function SubjectModerationPage() {
                       </span>
                     </div>
                     <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-[#a28c83]">
-                      {(item.question_text || "").slice(0, 260)}
+                      {(item.question_preview || item.question_text || "").slice(0, 260)}
                     </p>
                   </button>
                 ))}
-                {filteredQueue.length === 0 && (
+                {queue.length === 0 && (
                   <div className="rounded-xl border border-[#3b2a22]/40 bg-[#181410] p-4 text-sm text-[#a28c83]">
                     No questions match that search.
                   </div>
@@ -416,7 +445,7 @@ export default function SubjectModerationPage() {
                     className="rounded-full border-[#3b2a22]/55 bg-[#181410] text-[#dac1b7] hover:bg-[#211913]"
                     disabled={activeIndex <= 0}
                     onClick={() => {
-                      const prev = filteredQueue[activeIndex - 1]
+                      const prev = queue[activeIndex - 1]
                       if (prev) setActiveId(prev.id)
                     }}
                   >
@@ -427,9 +456,9 @@ export default function SubjectModerationPage() {
                     type="button"
                     variant="outline"
                     className="rounded-full border-[#3b2a22]/55 bg-[#181410] text-[#dac1b7] hover:bg-[#211913]"
-                    disabled={activeIndex < 0 || activeIndex >= filteredQueue.length - 1}
+                    disabled={activeIndex < 0 || activeIndex >= queue.length - 1}
                     onClick={() => {
-                      const next = filteredQueue[activeIndex + 1]
+                      const next = queue[activeIndex + 1]
                       if (next) setActiveId(next.id)
                     }}
                   >

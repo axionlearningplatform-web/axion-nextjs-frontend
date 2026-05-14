@@ -386,16 +386,22 @@ $$`,
 }
 
 function DropdownSection({ title, summary, children, defaultOpen = false }) {
+  const summaryText = summary != null ? String(summary) : ""
   return (
     <details
       className="group overflow-hidden rounded-2xl border border-[#3b2a22]/55 bg-[#181410]"
       open={defaultOpen}
     >
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-[#dac1b7] transition-colors hover:bg-[#211913] [&::-webkit-details-marker]:hidden">
-        <span>{title}</span>
-        <span className="flex items-center gap-2 text-xs font-normal text-[#a28c83]">
-          {summary}
-          <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold text-[#dac1b7] transition-colors hover:bg-[#211913] [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0 flex-1 truncate">{title}</span>
+        <span className="flex shrink-0 items-center gap-2 pl-2 text-xs font-normal text-[#a28c83]">
+          <span
+            className="max-w-[9rem] truncate text-right sm:max-w-[11rem]"
+            title={summaryText}
+          >
+            {summary}
+          </span>
+          <ChevronDown className="size-4 shrink-0 text-[#a28c83] transition-transform group-open:rotate-180" />
         </span>
       </summary>
       <div className="border-t border-[#3b2a22]/55 p-4">{children}</div>
@@ -408,6 +414,44 @@ function renderableMarkdown(value = "") {
     .replace(/\r\n?/g, "\n")
     .replace(/\\\[((?:.|\n)*?)\\\]/g, (_, expression) => `$$\n${expression.trim()}\n$$`)
     .replace(/\\\((.+?)\\\)/g, (_, expression) => `$${expression.trim()}$`)
+}
+
+function moderationStatusBadgeLabel(status) {
+  switch (status) {
+    case "published":
+      return "Published"
+    case "submitted":
+      return "Submitted"
+    case "under_review":
+      return "In review"
+    case "needs_revision":
+      return "Needs changes"
+    case "rejected":
+      return "Rejected"
+    default:
+      return status ? String(status).replace(/_/g, " ") : ""
+  }
+}
+
+function ModerationStatusBadge({ status }) {
+  if (!status) return null
+  const label = moderationStatusBadgeLabel(status)
+  const known = ["published", "submitted", "under_review", "needs_revision", "rejected"].includes(status)
+  return (
+    <span
+      className={cn(
+        "shrink-0 rounded-full border px-3 py-1 text-[11px] font-semibold tracking-wide",
+        !known && "border-[#3b2a22]/55 bg-[#211913] text-[#dac1b7]",
+        status === "published" && "border-emerald-400/25 bg-emerald-400/10 text-emerald-100",
+        status === "submitted" && "border-sky-400/25 bg-sky-500/10 text-sky-100",
+        status === "under_review" && "border-sky-400/25 bg-sky-500/10 text-sky-100",
+        status === "needs_revision" && "border-orange-400/30 bg-orange-500/12 text-orange-100",
+        status === "rejected" && "border-red-400/25 bg-red-400/10 text-red-100"
+      )}
+    >
+      {label}
+    </span>
+  )
 }
 
 function latexFirstPrepare(value = "") {
@@ -838,7 +882,7 @@ function MarkingCriteriaFields({ rows, onChange, compact }) {
         Non-mathematics subjects require one criterion per mark (what earns each mark).
       </p>
       {rows.map((row, index) => (
-        <Field key={row.mark}>
+        <Field key={`mc-row-${index}`}>
           <FieldLabel className="text-[#dac1b7]">Mark {row.mark}</FieldLabel>
           <Textarea
             className={cn(
@@ -1077,11 +1121,16 @@ export function QuestionEditor({
         >
           <CardHeader>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <CardTitle className="font-serif text-2xl font-semibold">
+              <CardTitle className="min-w-0 flex-1 font-serif text-2xl font-semibold">
                 {submitLabel === "Save Changes" ? "Edit Question" : "Create Question"}
               </CardTitle>
 
-              {onDelete && (
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                {submitLabel === "Save Changes" && initialData?.moderation_status ? (
+                  <ModerationStatusBadge status={initialData.moderation_status} />
+                ) : null}
+
+                {onDelete && (
                 <div className="flex items-center gap-2">
                   {!confirmDelete ? (
                     <Button
@@ -1114,7 +1163,8 @@ export function QuestionEditor({
                     </>
                   )}
                 </div>
-              )}
+                )}
+              </div>
             </div>
           </CardHeader>
 
@@ -1132,7 +1182,7 @@ export function QuestionEditor({
                       />
                     ) : subjects.length > 0 ? (
                       <select
-                        className="h-10 rounded-full border border-[#3b2a22]/55 bg-white/[0.035] px-4 text-[#e5e2e1]"
+                        className="h-10 w-full rounded-full border border-[#3b2a22]/55 bg-white/[0.035] py-2 pl-4 pr-10 text-[#e5e2e1] outline-none focus:border-[#ffb595]/40"
                         value={subjectId}
                         onChange={(e) => {
                           const value = e.target.value
@@ -1240,10 +1290,10 @@ export function QuestionEditor({
                       key={part.id}
                       open
                     >
-                      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 [&::-webkit-details-marker]:hidden">
-                        <div className="flex min-w-0 items-center gap-3">
+                      <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 [&::-webkit-details-marker]:hidden">
+                        <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
                           <Input
-                            className="h-8 w-11 rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-center text-sm text-[#e5e2e1]"
+                            className="h-8 w-11 shrink-0 rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-center text-sm text-[#e5e2e1]"
                             value={part.label}
                             onClick={(event) => event.stopPropagation()}
                             onChange={(event) => {
@@ -1252,11 +1302,11 @@ export function QuestionEditor({
                               setParts(next)
                             }}
                           />
-                          <span className="truncate text-sm font-semibold text-[#e5e2e1]">
+                          <span className="min-w-0 truncate text-sm font-semibold text-[#e5e2e1]">
                             {part.text || `Part ${index + 1}`}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex shrink-0 items-center gap-1.5 pr-1 sm:gap-2">
                           <Input
                             className="h-8 w-11 rounded-full border-[#3b2a22]/55 bg-white/[0.035] px-1 text-center text-sm text-[#e5e2e1] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             min="1"
@@ -1265,28 +1315,36 @@ export function QuestionEditor({
                             onClick={(event) => event.stopPropagation()}
                             onBlur={() => {
                               if (part.marks === "" || Number(part.marks) < 1) {
-                                const next = [...parts]
-                                next[index] = {
-                                  ...part,
-                                  marks: 1,
-                                  marking_criteria: normalizeCriteriaRows(1, part.marking_criteria || []),
-                                }
-                                setParts(next)
+                                setParts((prev) => {
+                                  const next = [...prev]
+                                  const current = next[index]
+                                  if (!current) return prev
+                                  next[index] = {
+                                    ...current,
+                                    marks: 1,
+                                    marking_criteria: normalizeCriteriaRows(1, current.marking_criteria || []),
+                                  }
+                                  return next
+                                })
                               }
                             }}
                             onChange={(event) => {
                               const rawValue = event.target.value
-                              const next = [...parts]
-                              const nextMarks = rawValue === "" ? "" : Math.max(1, Number(rawValue) || 1)
-                              next[index] = {
-                                ...part,
-                                marks: nextMarks,
-                                marking_criteria:
-                                  nextMarks === ""
-                                    ? part.marking_criteria || []
-                                    : normalizeCriteriaRows(nextMarks, part.marking_criteria || []),
-                              }
-                              setParts(next)
+                              setParts((prev) => {
+                                const next = [...prev]
+                                const current = next[index]
+                                if (!current) return prev
+                                const nextMarks = rawValue === "" ? "" : Math.max(1, Number(rawValue) || 1)
+                                next[index] = {
+                                  ...current,
+                                  marks: nextMarks,
+                                  marking_criteria:
+                                    nextMarks === ""
+                                      ? current.marking_criteria || []
+                                      : normalizeCriteriaRows(nextMarks, current.marking_criteria || []),
+                                }
+                                return next
+                              })
                             }}
                           />
                           <span className="hidden text-xs text-[#a28c83] sm:inline">marks</span>
@@ -1302,7 +1360,7 @@ export function QuestionEditor({
                           >
                             <Trash2 className="size-4" />
                           </Button>
-                          <ChevronDown className="size-4 text-[#a28c83] transition-transform group-open:rotate-180" />
+                          <ChevronDown className="size-4 shrink-0 text-[#a28c83] transition-transform group-open:rotate-180" />
                         </div>
                       </summary>
 
@@ -1375,9 +1433,13 @@ export function QuestionEditor({
                               compact
                               rows={normalizeCriteriaRows(part.marks || 1, part.marking_criteria || [])}
                               onChange={(rows) => {
-                                const next = [...parts]
-                                next[index] = { ...part, marking_criteria: rows }
-                                setParts(next)
+                                setParts((prev) => {
+                                  const next = [...prev]
+                                  const current = next[index]
+                                  if (!current) return prev
+                                  next[index] = { ...current, marking_criteria: rows }
+                                  return next
+                                })
                               }}
                             />
                           </DropdownSection>

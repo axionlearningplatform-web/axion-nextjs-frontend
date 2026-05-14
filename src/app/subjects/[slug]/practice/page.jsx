@@ -124,14 +124,6 @@ function configTagIds(config, buckets) {
     .map((tag) => tag.id)
 }
 
-function questionMatchesConfig(question, config, buckets) {
-  const selectedTagIds = new Set(configTagIds(config, buckets))
-  if (!selectedTagIds.size) return true
-
-  const questionTagIds = new Set((question.tags || []).map((tag) => tag.id))
-  return [...selectedTagIds].every((id) => questionTagIds.has(id))
-}
-
 function randomItem(items) {
   if (!items.length) return null
   return items[Math.floor(Math.random() * items.length)]
@@ -1167,13 +1159,29 @@ export default function DailyPracticePage() {
     subjectId ? `${TAGS_API_URL}?subject_id=${subjectId}` : null,
     fetcher
   )
-  const { data: questions = [] } = useSWR(
-    subjectId
-      ? `${QUESTIONS_API_URL}?subject_id=${subjectId}&moderation_status=published`
-      : null,
-    fetcher
-  )
   const buckets = useMemo(() => splitTags(tags), [tags])
+
+  const publishedQuestionsUrl = useMemo(() => {
+    if (!subjectId) return null
+    const p = new URLSearchParams({
+      subject_id: String(subjectId),
+      moderation_status: "published",
+      limit: "800",
+      offset: "0",
+    })
+    if (config) {
+      const ids = configTagIds(config, buckets)
+      if (ids.length) p.set("all_tag_ids", ids.join(","))
+    }
+    return `${QUESTIONS_API_URL}?${p.toString()}`
+  }, [subjectId, config, buckets])
+
+  const { data: questionsPayload } = useSWR(publishedQuestionsUrl, fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 120_000,
+  })
+
+  const questions = questionsPayload?.results ?? questionsPayload ?? []
 
   useEffect(() => {
     if (!subject) return
@@ -1205,9 +1213,7 @@ export default function DailyPracticePage() {
     setQuestionLoading(true)
     setTimer(0)
     try {
-      const matchingQuestion = randomItem(
-        questions.filter((item) => questionMatchesConfig(item, config, buckets))
-      )
+      const matchingQuestion = randomItem(questions)
       if (!matchingQuestion) {
         setQuestion(null)
         return
@@ -1220,7 +1226,7 @@ export default function DailyPracticePage() {
     } finally {
       setQuestionLoading(false)
     }
-  }, [buckets, config, questions])
+  }, [config, questions])
 
   async function generate(source) {
     setArrivalSource(source)
