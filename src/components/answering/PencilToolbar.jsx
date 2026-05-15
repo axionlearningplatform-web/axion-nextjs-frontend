@@ -1,4 +1,4 @@
-import { Eraser, PenLine, RotateCcw, RotateCw, SlidersHorizontal, Trash2 } from "lucide-react"
+import { Eraser, Lock, LockOpen, PenLine, RotateCcw, RotateCw, SlidersHorizontal, Trash2 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
@@ -28,11 +28,16 @@ export default function PencilToolbar({
   canRedo,
   canUndo,
   eraserSize,
+  navbarHeight = 64,
   onClear,
   onRedo,
   onEraserSizeChange,
+  onToggleQuestionLock,
   onToolChange,
   onUndo,
+  questionLocked = false,
+  rightOffset = 16,
+  sticky = false,
 }) {
   const eraserActive = activeTool === "stroke-eraser" || activeTool === "pixel-eraser"
   const eraserPresets = [
@@ -42,7 +47,20 @@ export default function PencilToolbar({
   ]
 
   return (
-    <div className="absolute right-4 top-4 z-20 grid justify-items-end gap-2">
+    <div
+      className={cn(
+        "grid justify-items-end gap-2 transition-[top,right,opacity] duration-[120ms] ease-out",
+        sticky ? "fixed z-50" : "absolute right-4 top-4 z-20"
+      )}
+      style={
+        sticky
+          ? {
+              top: `${navbarHeight + 16}px`,
+              right: `${rightOffset}px`,
+            }
+          : undefined
+      }
+    >
       <div className="flex items-center gap-1.5 rounded-[12px] border border-white/[0.08] bg-[#15110e]/80 p-1.5 shadow-[0_14px_50px_rgba(0,0,0,0.34)] backdrop-blur-md">
         <ToolButton active={activeTool === "pen"} label="Pen (P)" onClick={() => onToolChange("pen")}>
           <PenLine className="size-4" />
@@ -55,6 +73,13 @@ export default function PencilToolbar({
             <Eraser className="size-4" />
             <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-current" />
           </span>
+        </ToolButton>
+        <ToolButton
+          active={questionLocked}
+          label={questionLocked ? "Unlock question (Q)" : "Lock question (Q)"}
+          onClick={onToggleQuestionLock}
+        >
+          {questionLocked ? <Lock className="size-4" /> : <LockOpen className="size-4" />}
         </ToolButton>
         <span className="mx-1 h-5 w-px bg-white/[0.08]" />
         <ToolButton disabled={!canUndo} label="Undo" onClick={onUndo}>

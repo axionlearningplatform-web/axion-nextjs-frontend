@@ -357,7 +357,7 @@ function liveStrokeWidth(baseWidth, pressure, velocity) {
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
 const HandwritingCanvas = forwardRef(function HandwritingCanvas(
-  { onSubmit, questionId },
+  { onSubmit, onToggleQuestionLock, questionId, questionLocked = false },
   ref
 ) {
   // ── 5 canvas layers ─────────────────────────────────────────────────────
@@ -366,6 +366,8 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   const inkCanvasRef = useRef(null)       // live ink, APPEND ONLY
   const predCanvasRef = useRef(null)      // RAF predicted ink
   const activeCanvasRef = useRef(null)    // pointer events (transparent)
+  const canvasWrapperRef = useRef(null)
+  const toolbarSentinelRef = useRef(null)
 
   // ── Cached 2D contexts — avoid repeated getContext on pointermove ─────────
   const paperCtxRef = useRef(null)
@@ -404,6 +406,9 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   const [eraserSize, setEraserSize] = useState(DEFAULT_ERASER_SIZE)
   const [eraserPoint, setEraserPoint] = useState(null)
   const [writingSurfaceActive, setWritingSurfaceActive] = useState(false)
+  const [navbarHeight, setNavbarHeight] = useState(64)
+  const [toolbarRightOffset, setToolbarRightOffset] = useState(16)
+  const [toolbarSticky, setToolbarSticky] = useState(false)
 
   const currentPage = pages[currentPageIndex] || pages[0]
   const canUndo = Boolean(currentPage?.history?.length)
@@ -610,8 +615,10 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
         e.preventDefault()
       }
     }
-    const lockBody = () => {
-      document.body.style.touchAction = "none"
+    const lockBody = (e) => {
+      if (e.pointerType === "pen") {
+        document.body.style.touchAction = "none"
+      }
     }
     const unlockBody = () => {
       document.body.style.touchAction = ""
@@ -631,6 +638,67 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
       window.removeEventListener("pointercancel", unlockBody)
     }
   }, [])
+
+  useEffect(() => {
+    const frameId = requestAnimationFrame(() => {
+      const navbar =
+        document.querySelector("header") ||
+        document.querySelector('nav[role="navigation"]') ||
+        document.querySelector("[data-navbar]")
+      if (navbar) {
+        setNavbarHeight(navbar.getBoundingClientRect().height)
+      }
+    })
+    return () => cancelAnimationFrame(frameId)
+  }, [])
+
+  useEffect(() => {
+    const wrapper = canvasWrapperRef.current
+    if (!wrapper) return
+
+    const updateRightOffset = () => {
+      const rect = wrapper.getBoundingClientRect()
+      setToolbarRightOffset(window.innerWidth - rect.right + 16)
+      if (window.innerWidth < 768) {
+        setToolbarSticky(false)
+      }
+    }
+
+    updateRightOffset()
+
+    const ro = new ResizeObserver(updateRightOffset)
+    ro.observe(wrapper)
+    window.addEventListener("resize", updateRightOffset, { passive: true })
+
+    return () => {
+      ro.disconnect()
+      window.removeEventListener("resize", updateRightOffset)
+    }
+  }, [])
+
+  useEffect(() => {
+    const sentinel = toolbarSentinelRef.current
+    if (!sentinel) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (window.innerWidth < 768) {
+          setToolbarSticky(false)
+          return
+        }
+        setToolbarSticky(
+          !entry.isIntersecting && entry.boundingClientRect.top < 0
+        )
+      },
+      {
+        rootMargin: `-${navbarHeight + 16}px 0px 0px 0px`,
+        threshold: 0,
+      }
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [navbarHeight])
 
   useEffect(() => () => {
     cancelPredAnimation()
@@ -672,10 +740,14 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
         e.preventDefault()
         setTool("pen")
       }
+      if (e.key === "q" || e.key === "Q") {
+        e.preventDefault()
+        onToggleQuestionLock?.()
+      }
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [writingSurfaceActive])
+  }, [onToggleQuestionLock, writingSurfaceActive])
 
   // ─────────────────────────────────────────────────────────────────────────
   // Page state helpers
@@ -755,6 +827,8 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
 
   function startStroke(event) {
     if (!activeCanvasRef.current) return
+    // Reject finger/touch input — only pen and mouse create ink.
+    if (event.pointerType === "touch") return
     // Palm rejection — wide touch contacts are palms
     if (event.pointerType === "touch" && event.width > 45) return
     event.preventDefault()
@@ -812,6 +886,9 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   }
 
   function extendStroke(event) {
+    // Belt-and-suspenders: ignore touch events that leaked through.
+    if (event.pointerType === "touch" && activePointerRef.current !== event.pointerId) return
+
     // Always update cursor (even without active stroke)
     updateEraserCursor(event)
 
@@ -1175,6 +1252,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
           pages={pages}
         />
         <div
+          ref={canvasWrapperRef}
           className="relative flex min-w-0 flex-1 justify-center overflow-auto overscroll-contain bg-[#100d0b] p-4 outline-none select-none [-webkit-touch-callout:none] [-webkit-user-drag:none] [-webkit-user-select:none] md:p-6"
           onContextMenu={stopDefault}
           onDragStart={stopDefault}
@@ -1188,16 +1266,24 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
           onSelect={stopDefault}
           onSelectCapture={stopDefault}
         >
+          {/* Sentinel for toolbar sticky detection */}
+          <div ref={toolbarSentinelRef} className="pointer-events-none absolute right-4 top-4 h-0 w-0" />
+
           <PencilToolbar
             activeTool={tool}
             canRedo={canRedo}
             canUndo={canUndo}
             eraserSize={eraserSize}
+            navbarHeight={navbarHeight}
             onClear={clearPage}
             onEraserSizeChange={setEraserSize}
             onRedo={redo}
+            onToggleQuestionLock={onToggleQuestionLock}
             onToolChange={setTool}
             onUndo={undo}
+            questionLocked={questionLocked}
+            rightOffset={toolbarRightOffset}
+            sticky={toolbarSticky}
           />
 
           <div

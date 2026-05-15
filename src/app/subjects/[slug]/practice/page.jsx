@@ -690,8 +690,10 @@ function AnswerArea({
   markingResult,
   onBetaReveal,
   onSubmit,
+  onToggleQuestionLock,
   question,
   questionId,
+  questionLocked,
 }) {
   const [activeTab, setActiveTab] = useState("type")
   const [typedAnswer, setTypedAnswer] = useState("")
@@ -822,7 +824,9 @@ function AnswerArea({
       ) : activeTab === "draw" ? (
         <HandwritingCanvas
           ref={handwritingRef}
+          onToggleQuestionLock={onToggleQuestionLock}
           questionId={questionId}
+          questionLocked={questionLocked}
         />
       ) : activeTab === "photo" ? (
         <div className="rounded-[3px] border border-white/[0.06] bg-[#1a1714] p-5">
@@ -1056,6 +1060,15 @@ function QuestionView({
   selectedMcqOption,
   timer,
 }) {
+  const [questionLocked, setQuestionLocked] = useState(false)
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setQuestionLocked(false)
+    }, 0)
+    return () => window.clearTimeout(timeout)
+  }, [question?.id])
+
   if (loading) {
     return (
       <main className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-[#171412] text-[#8f8982]">
@@ -1134,7 +1147,15 @@ function QuestionView({
         </div>
       </div>
 
-      <section className="px-6 py-16 md:px-12">
+      <section
+        className={cn(
+          "px-6 py-16 md:px-12",
+          questionLocked && [
+            "sticky top-[64px] z-30 max-h-[45vh] overflow-y-auto",
+            "border-y border-[#d49a71]/20 bg-[#171412] shadow-[0_8px_32px_rgba(0,0,0,0.4)] backdrop-blur-sm",
+          ]
+        )}
+      >
         <article className="grid gap-8 font-serif lg:grid-cols-[minmax(0,1fr)_220px]">
           <div className="min-w-0">
             <div className="flex items-start gap-4">
@@ -1249,9 +1270,11 @@ function QuestionView({
         markingLoading={markingLoading}
         markingResult={markingResult}
         onBetaReveal={onBetaReveal}
+        onToggleQuestionLock={() => setQuestionLocked((value) => !value)}
         onSubmit={onSubmitAnswer}
         question={question}
         questionId={question.id}
+        questionLocked={questionLocked}
       />
     </main>
   )
