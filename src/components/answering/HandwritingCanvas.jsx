@@ -691,7 +691,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
         )
       },
       {
-        rootMargin: `-${navbarHeight + 16}px 0px 0px 0px`,
+        rootMargin: `-${navbarHeight}px 0px 0px 0px`,
         threshold: 0,
       }
     )
@@ -1253,7 +1253,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
         />
         <div
           ref={canvasWrapperRef}
-          className="relative flex min-w-0 flex-1 justify-center overflow-auto overscroll-contain bg-[#100d0b] p-4 outline-none select-none [-webkit-touch-callout:none] [-webkit-user-drag:none] [-webkit-user-select:none] md:p-6"
+          className="relative flex min-w-0 flex-1 justify-center bg-[#100d0b] p-4 outline-none select-none [-webkit-touch-callout:none] [-webkit-user-drag:none] [-webkit-user-select:none] md:p-6"
           onContextMenu={stopDefault}
           onDragStart={stopDefault}
           onPointerEnter={() => {
