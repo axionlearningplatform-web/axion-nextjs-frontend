@@ -139,7 +139,7 @@ function createPoint(event, bounds) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Point thinning — adaptive min distance by velocity
+// Point thinning — accept coalesced samples, reject only true duplicates/jitter
 // ─────────────────────────────────────────────────────────────────────────────
 function shouldAddPoint(newPoint, lastPoint, velocityRef) {
   if (!lastPoint) return true
@@ -150,9 +150,8 @@ function shouldAddPoint(newPoint, lastPoint, velocityRef) {
     const dt = Math.max(newPoint.timestamp - lastPoint.timestamp, 1)
     velocityRef.current = dist / dt
   }
-  const vel = velocityRef?.current ?? 0
-  // Fast strokes: accept every 2.5px. Slow strokes: every 1px.
-  return dist >= (vel > 1.5 ? 2.5 : 1.0)
+  // Coalesced hardware samples can be closely spaced at high stylus speed.
+  return dist >= 0.5
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -374,11 +373,12 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   const inkCtxRef = useRef(null)
   const predCtxRef = useRef(null)
 
-  /** Logical/CSS-space bounds for createPoint — synced on resize + stroke start */
+  /** Logical/CSS-space bounds for createPoint — synced outside the hot path */
   const canvasBoundsRef = useRef({ left: 0, top: 0 })
 
   /** Prediction RAF — non-null while a frame is queued or chaining during pen stroke */
   const predRafIdRef = useRef(null)
+  const highlightRafIdRef = useRef(null)
 
   // ── Hot-path refs — never trigger re-renders ─────────────────────────────
   const activePointerRef = useRef(null)
@@ -412,13 +412,6 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   const canvasScale = useMemo(() => {
     if (typeof window === "undefined") return 2
     return Math.min(Math.max(window.devicePixelRatio || 2, 2), 3)
-  }, [])
-
-  const syncCanvasBounds = useCallback(() => {
-    const el = activeCanvasRef.current
-    if (!el) return
-    const r = el.getBoundingClientRect()
-    canvasBoundsRef.current = { left: r.left, top: r.top }
   }, [])
 
   const cancelPredAnimation = useCallback(() => {
@@ -478,7 +471,19 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   }, [])
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Prediction RAF — ONLY while pen stroke active + one-shot for eraser highlights
+  const scheduleHighlightRedraw = useCallback(() => {
+    if (highlightRafIdRef.current != null) return
+    highlightRafIdRef.current = requestAnimationFrame(() => {
+      highlightRafIdRef.current = null
+      if (highlightDirtyRef.current) {
+        redrawCommitted()
+        highlightDirtyRef.current = false
+      }
+    })
+  }, [redrawCommitted])
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Prediction RAF — ONLY while pen stroke active
   // Idle: zero RAF (avoids full pred clearRect every frame at 120Hz on iPad).
   // ─────────────────────────────────────────────────────────────────────────
   const runPredFrame = useCallback(function runPredFrame() {
@@ -519,15 +524,10 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
       }
     }
 
-    if (highlightDirtyRef.current) {
-      redrawCommitted()
-      highlightDirtyRef.current = false
-    }
-
     if (currentStrokeRef.current?.tool === "pen") {
       predRafIdRef.current = requestAnimationFrame(runPredFrame)
     }
-  }, [canvasScale, redrawCommitted])
+  }, [canvasScale])
 
   const schedulePredFrame = useCallback(() => {
     if (predRafIdRef.current != null) return
@@ -556,11 +556,11 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
 
     paperCtxRef.current = paperCanvasRef.current.getContext("2d", {
       alpha: true,
-      desynchronized: false,
+      desynchronized: true,
     })
     committedCtxRef.current = committedCanvasRef.current.getContext("2d", {
       alpha: true,
-      desynchronized: false,
+      desynchronized: true,
     })
     inkCtxRef.current = inkCanvasRef.current.getContext("2d", {
       alpha: true,
@@ -571,12 +571,74 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
       desynchronized: true,
     })
 
-    syncCanvasBounds()
     drawPaperLayer()
     redrawCommitted()
-  }, [canvasScale, currentPageIndex, drawPaperLayer, redrawCommitted, syncCanvasBounds])
+  }, [canvasScale, currentPageIndex, drawPaperLayer, redrawCommitted])
 
-  useEffect(() => () => cancelPredAnimation(), [cancelPredAnimation])
+  // Keep cached canvas bounds accurate without reading layout in pointer handlers.
+  useEffect(() => {
+    const el = activeCanvasRef.current
+    if (!el) return
+
+    const sync = () => {
+      const r = el.getBoundingClientRect()
+      canvasBoundsRef.current = { left: r.left, top: r.top }
+    }
+
+    sync()
+
+    const ro = new ResizeObserver(sync)
+    ro.observe(el)
+
+    window.addEventListener("scroll", sync, { passive: true })
+    window.addEventListener("resize", sync, { passive: true })
+
+    return () => {
+      ro.disconnect()
+      window.removeEventListener("scroll", sync)
+      window.removeEventListener("resize", sync)
+    }
+  }, [])
+
+  // Safari/iPadOS scroll recognizer guard during active ink strokes.
+  useEffect(() => {
+    const el = activeCanvasRef.current
+    if (!el) return
+
+    const prevent = (e) => {
+      if (activePointerRef.current !== null) {
+        e.preventDefault()
+      }
+    }
+    const lockBody = () => {
+      document.body.style.touchAction = "none"
+    }
+    const unlockBody = () => {
+      document.body.style.touchAction = ""
+    }
+
+    el.addEventListener("touchstart", prevent, { passive: false })
+    el.addEventListener("touchmove", prevent, { passive: false })
+    el.addEventListener("pointerdown", lockBody)
+    window.addEventListener("pointerup", unlockBody)
+    window.addEventListener("pointercancel", unlockBody)
+
+    return () => {
+      el.removeEventListener("touchstart", prevent)
+      el.removeEventListener("touchmove", prevent)
+      el.removeEventListener("pointerdown", lockBody)
+      window.removeEventListener("pointerup", unlockBody)
+      window.removeEventListener("pointercancel", unlockBody)
+    }
+  }, [])
+
+  useEffect(() => () => {
+    cancelPredAnimation()
+    if (highlightRafIdRef.current != null) {
+      cancelAnimationFrame(highlightRafIdRef.current)
+      highlightRafIdRef.current = null
+    }
+  }, [cancelPredAnimation])
 
   // Redraw committed when page data changes
   useEffect(() => {
@@ -591,10 +653,10 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
       queueMicrotask(() => setEraserPoint(null))
       if (hadHighlight) {
         highlightDirtyRef.current = true
-        schedulePredFrame()
+        scheduleHighlightRedraw()
       }
     }
-  }, [tool, schedulePredFrame])
+  }, [tool, scheduleHighlightRedraw])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -660,7 +722,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
       if (changed) {
         eraserHighlightIdsRef.current = hitIds
         highlightDirtyRef.current = true
-        schedulePredFrame()
+        scheduleHighlightRedraw()
       }
       setEraserPoint({ ...point, hitCount: hitIds.size })
     } else {
@@ -675,7 +737,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     setEraserPoint(null)
     if (prev.size > 0) {
       highlightDirtyRef.current = true
-      schedulePredFrame()
+      scheduleHighlightRedraw()
     }
   }
 
@@ -697,7 +759,6 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     if (event.pointerType === "touch" && event.width > 45) return
     event.preventDefault()
 
-    syncCanvasBounds()
     updateEraserCursor(event)
     activePointerRef.current = event.pointerId
     activeCanvasRef.current.setPointerCapture(event.pointerId)
@@ -781,6 +842,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
         if (prev) {
           const ink = inkCtxRef.current
           if (ink) {
+            ink.setTransform(canvasScale, 0, 0, canvasScale, 0, 0)
             ink.lineWidth = liveStrokeWidth(PEN_WIDTH, p.pressure, velocityRef.current)
             ink.beginPath()
             ink.moveTo(prev.x, prev.y)
@@ -815,7 +877,13 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
 
     // Predictions — stored for RAF to render on predCanvas this frame
     if (currentTool === "pen") {
-      predictedPointsRef.current = predicted.map((e) => createPoint(e, bounds))
+      predictedPointsRef.current = predicted
+        .map((e) => createPoint(e, bounds))
+        .filter((p, i, arr) => {
+          if (i === 0) return true
+          const prev = arr[i - 1]
+          return Math.hypot(p.x - prev.x, p.y - prev.y) > 0.5
+        })
     }
   }
 
@@ -828,6 +896,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     event.preventDefault()
 
     const completedStroke = { ...currentStrokeRef.current }
+    const isCancelled = event.type === "pointercancel"
 
     // Reset all hot-path refs
     activePointerRef.current = null
@@ -843,6 +912,12 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     const predCtx = predCtxRef.current
     if (predCtx && predCanvas)
       predCtx.clearRect(0, 0, predCanvas.width, predCanvas.height)
+
+    // Discard tiny cancelled strokes caused by palm rejection/pointercancel.
+    if (isCancelled && completedStroke.points.length < 4) {
+      clearInkCanvas()
+      return
+    }
 
     // ── STROKE ERASER ──────────────────────────────────────────────────────
     if (completedStroke.tool === "stroke-eraser") {
@@ -869,6 +944,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
       })
       eraserHighlightIdsRef.current = new Set()
       highlightDirtyRef.current = true
+      scheduleHighlightRedraw()
       return
     }
 
@@ -983,6 +1059,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
       }
     })
     highlightDirtyRef.current = true
+    scheduleHighlightRedraw()
   }
 
   function redo() {
@@ -1025,6 +1102,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
       }
     })
     highlightDirtyRef.current = true
+    scheduleHighlightRedraw()
   }
 
   function clearPage() {
@@ -1102,7 +1180,6 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
           onDragStart={stopDefault}
           onPointerEnter={() => {
             setWritingSurfaceActive(true)
-            syncCanvasBounds()
           }}
           onPointerLeave={() => {
             setWritingSurfaceActive(false)
@@ -1125,7 +1202,11 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
 
           <div
             className="relative h-auto w-full max-w-[820px]"
-            style={{ aspectRatio: `${PAGE_WIDTH} / ${PAGE_HEIGHT}` }}
+            style={{
+              aspectRatio: `${PAGE_WIDTH} / ${PAGE_HEIGHT}`,
+              WebkitUserSelect: "none",
+              userSelect: "none",
+            }}
           >
             {/* ── Layer 1: Paper background — drawn once ── */}
             <canvas
@@ -1158,6 +1239,12 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
             {/* ── Layer 5: Pointer capture — transparent, receives all events ── */}
             <canvas
               ref={activeCanvasRef}
+              inputMode="none"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              data-gramm="false"
               draggable={false}
               className={LAYER_CLASS}
               style={{
