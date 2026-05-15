@@ -21,6 +21,7 @@ import HandwritingCanvas from "@/components/answering/HandwritingCanvas"
 import { useAuth } from "@/components/authProvider"
 import fetcher from "@/lib/fetcher"
 import { cn } from "@/lib/utils"
+import { subjectIsMathematics } from "@/lib/subjectMath"
 
 const QUESTIONS_API_URL = "/api/questions/"
 const TAGS_API_URL = "/api/questions/tags/"
@@ -657,6 +658,53 @@ function SampleAnswers({ question }) {
   )
 }
 
+function MarkingCriteriaSummary({ question }) {
+  if (subjectIsMathematics({ name: question?.subject })) return null
+
+  const partRows = (question?.parts || [])
+    .map((part, index) => ({
+      label: `Part ${part.label || String.fromCharCode(97 + index)}`,
+      rows: part.marking_criteria || [],
+    }))
+    .filter((item) => item.rows.some((row) => String(row.text || "").trim()))
+
+  const rows = partRows.length
+    ? partRows
+    : [{
+        label: "Question",
+        rows: question?.marking_criteria || [],
+      }].filter((item) => item.rows.some((row) => String(row.text || "").trim()))
+
+  if (!rows.length) return null
+
+  return (
+    <section className="mt-5 rounded-[3px] border border-white/[0.06] bg-[#171410] p-5">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8f8982]">
+        Marking criteria
+      </p>
+      <div className="mt-4 grid gap-4">
+        {rows.map((group) => (
+          <article key={group.label} className="rounded-[4px] border border-white/[0.06] bg-[#120f0d] p-4">
+            <p className="mb-3 text-[12px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
+              {group.label}
+            </p>
+            <ul className="grid gap-2">
+              {group.rows.map((row, index) => (
+                <li key={`${row.mark || index}-${row.text}`} className="text-[13px] leading-relaxed text-[#9b8f84]">
+                  <span className="text-[#dba476]">{row.mark || index + 1} mark:</span>{" "}
+                  <MarkdownMath className="inline-block max-w-full [&_p]:my-0 [&_p]:inline">
+                    {row.text || ""}
+                  </MarkdownMath>
+                </li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 function McqResultCard({ result }) {
   if (!result) return null
   const correct = Boolean(result.correct)
@@ -736,21 +784,25 @@ function AnswerArea({
           mime_type: "image/png",
           data_url: page.page_image,
         })),
-        handwriting_submission: exportPayload,
+        submission_type: "draw",
       })
       return
     }
 
-    const payloadFiles = [...files]
-    if (typedAnswer.trim()) {
-      payloadFiles.push({
-        name: "typed-answer.txt",
-        mime_type: "text/plain",
-        data_url: typedAnswer.trim(),
-        text: typedAnswer.trim(),
+    if (activeTab === "type") {
+      onSubmit({
+        submission_type: "text",
+        files: [{
+          name: "typed-answer.txt",
+          mime_type: "text/plain",
+          data_url: typedAnswer.trim(),
+          text: typedAnswer.trim(),
+        }],
       })
+      return
     }
-    onSubmit({ files: payloadFiles })
+
+    onSubmit({ submission_type: "file", files })
   }
 
   return (
@@ -907,12 +959,10 @@ function AnswerArea({
                   {markingResult.marks_awarded}/{markingResult.marks_possible}
                 </span>
                 <span className="text-[#4f4a45]">question marks</span>
-                <span className="text-[#5b5048]">·</span>
-                <span>{markingResult.tag_score}/{markingResult.tag_score_possible} tag score</span>
-                {markingResult.confidence !== undefined && (
+                {Number(markingResult.tag_score_possible || 0) > 0 && (
                   <>
                     <span className="text-[#5b5048]">·</span>
-                    <span>{Math.round(Number(markingResult.confidence || 0) * 100)}% confidence</span>
+                    <span>{markingResult.tag_score}/{markingResult.tag_score_possible} tag score</span>
                   </>
                 )}
               </div>
@@ -935,7 +985,7 @@ function AnswerArea({
                   <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
                     {part.label}: {part.marks_awarded}/{part.marks_possible} marks
                   </p>
-                  {part.lost_tags?.length > 0 ? (
+                  {part.marks_awarded < part.marks_possible && part.lost_tags?.length > 0 && (
                     <ul className="mt-3 grid gap-2">
                       {part.lost_tags.map((item) => (
                         <li key={item.tag} className="text-[13px] leading-relaxed text-[#9b8f84]">
@@ -950,85 +1000,9 @@ function AnswerArea({
                         </li>
                       ))}
                     </ul>
-                  ) : (
-                    <p className="mt-3 text-[13px] text-[#9b8f84]">No lost tags detected.</p>
                   )}
                 </div>
               ))}
-              {markingResult.detected_reasoning_steps?.length > 0 && (
-                <details className="rounded-[4px] border border-white/[0.06] bg-[#120f0d]">
-                  <summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
-                    Step breakdown
-                  </summary>
-                  <ul className="grid gap-2 border-t border-white/[0.06] p-3">
-                    {markingResult.detected_reasoning_steps.map((step, index) => (
-                      <li key={index} className="text-[13px] leading-relaxed text-[#9b8f84]">
-                        <MarkdownMath className="text-[13px] leading-relaxed [&_.katex]:text-[#cfc3b8] [&_p]:my-1">
-                          {String(
-                            step.step ||
-                              step.explanation ||
-                              JSON.stringify(step)
-                          )}
-                        </MarkdownMath>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-              {markingResult.mistakes?.length > 0 && (
-                <details className="rounded-[4px] border border-white/[0.06] bg-[#120f0d]">
-                  <summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
-                    Mistakes noted
-                  </summary>
-                  <ul className="grid gap-2 border-t border-white/[0.06] p-3">
-                    {markingResult.mistakes.map((item, index) => (
-                      <li key={index} className="text-[13px] leading-relaxed text-[#9b8f84]">
-                        <MarkdownMath className="text-[13px] leading-relaxed [&_.katex]:text-[#cfc3b8] [&_p]:my-1">
-                          {typeof item === "string"
-                            ? item
-                            : String(
-                                item?.description ||
-                                  item?.detail ||
-                                  JSON.stringify(item)
-                              )}
-                        </MarkdownMath>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-              {markingResult.rubric_breakdown?.length > 0 && (
-                <details className="rounded-[4px] border border-white/[0.06] bg-[#120f0d]">
-                  <summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
-                    Rubric breakdown
-                  </summary>
-                  <ul className="grid gap-2 border-t border-white/[0.06] p-3">
-                    {markingResult.rubric_breakdown.map((row, index) => (
-                      <li key={index} className="text-[13px] leading-relaxed text-[#9b8f84]">
-                        <MarkdownMath className="text-[13px] leading-relaxed [&_.katex]:text-[#cfc3b8] [&_p]:my-1">
-                          {typeof row === "string"
-                            ? row
-                            : String(
-                                row?.criterion ||
-                                  row?.label ||
-                                  JSON.stringify(row)
-                              )}
-                        </MarkdownMath>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-                {markingResult.ocr_crop_requests?.length > 0 && (
-                  <details className="rounded-[4px] border border-white/[0.06] bg-[#120f0d]">
-                    <summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
-                      OCR crop requests
-                    </summary>
-                    <pre className="max-h-52 overflow-auto border-t border-white/[0.06] p-3 text-[11px] leading-relaxed text-[#9b8f84]">
-                      {JSON.stringify(markingResult.ocr_crop_requests, null, 2)}
-                    </pre>
-                  </details>
-                )}
               </div>
             )}
           </div>
@@ -1037,6 +1011,7 @@ function AnswerArea({
       {(markingResult || betaSampleRevealed) && (
         <>
           <SampleAnswers question={question} />
+          <MarkingCriteriaSummary question={question} />
           {betaSampleRevealed && sampleAnswersForQuestion(question).length === 0 && (
             <div className="mt-5 rounded-[3px] border border-white/[0.06] bg-[#1a1714] p-5 text-[13px] leading-relaxed text-[#9b8f84]">
               <p className="font-semibold text-[#dba476]">Sample solution</p>

@@ -38,6 +38,8 @@ const emptyPart = (index = 0) => ({
   text: "",
   marks: 1,
   sample_solution: "",
+  answer_type: "proof",
+  answer_value: "",
   tag_ids: [],
   tag_requirements: [],
   attachments: [],
@@ -469,7 +471,57 @@ function QuestionTypeSwitch({ value, onChange }) {
   )
 }
 
-function SampleSolutionEditor({ value, onChange, compact = false }) {
+function AnswerMetadataFields({ answerType, answerValue, onAnswerTypeChange, onAnswerValueChange }) {
+  const options = [
+    { value: "proof", label: "Proof" },
+    { value: "explanation", label: "Explanation" },
+    { value: "value", label: "Value" },
+  ]
+
+  return (
+    <div className="grid gap-3 rounded-2xl border border-[#3b2a22]/55 bg-[#120f0d] p-3">
+      <div className="grid grid-cols-3 overflow-hidden rounded-full border border-[#3b2a22]/55 bg-[#181410] p-1">
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            className={cn(
+              "h-9 rounded-full text-xs font-semibold transition-colors",
+              answerType === option.value
+                ? "bg-[#ccb2a3d3] text-[#1a1817]"
+                : "text-[#a28c83] hover:bg-white/[0.035] hover:text-[#dac1b7]"
+            )}
+            onClick={() => onAnswerTypeChange?.(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      {answerType === "value" && (
+        <Field>
+          <FieldLabel className="text-[#dac1b7]">Final Answer</FieldLabel>
+          <Input
+            value={answerValue || ""}
+            onChange={(event) => onAnswerValueChange?.(event.target.value)}
+            placeholder="e.g. 3.6 × 10⁻¹⁹ J or e.g. Ethyl 3-chloro-2-hydroxy-3-methylbutanoate"
+            className="rounded-2xl border-[#3b2a22]/55 bg-white/[0.035] text-[#e5e2e1] placeholder:text-[#6f5b52]"
+          />
+        </Field>
+      )}
+    </div>
+  )
+}
+
+function SampleSolutionEditor({
+  value,
+  onChange,
+  answerType = "proof",
+  answerValue = "",
+  onAnswerTypeChange,
+  onAnswerValueChange,
+  showAnswerMetadata = true,
+  compact = false,
+}) {
   const [previewOpen, setPreviewOpen] = useState(false)
 
   return (
@@ -495,6 +547,14 @@ function SampleSolutionEditor({ value, onChange, compact = false }) {
         toolbarHint="LaTeX"
         placeholder="Write the sample solution (LaTeX environments do not need $$ wrappers)..."
       />
+      {showAnswerMetadata && (
+        <AnswerMetadataFields
+          answerType={answerType || "proof"}
+          answerValue={answerValue || ""}
+          onAnswerTypeChange={onAnswerTypeChange}
+          onAnswerValueChange={onAnswerValueChange}
+        />
+      )}
       {previewOpen && (
         <div className="rounded-2xl border border-[#3b2a22]/55 bg-[#11100e] p-4 shadow-inner shadow-black/20">
           <MarkdownPreview value={value} placeholder="Your sample solution preview will appear here." />
@@ -1040,6 +1100,8 @@ export function QuestionEditor({
   const [questionType, setQuestionType] = useState("saq")
   const [questionText, setQuestionText] = useState("")
   const [sampleSolution, setSampleSolution] = useState("")
+  const [answerType, setAnswerType] = useState("proof")
+  const [answerValue, setAnswerValue] = useState("")
   const [tikzCode, setTikzCode] = useState("")
   const [diagramSvg, setDiagramSvg] = useState("")
   const [tikzVisuals, setTikzVisuals] = useState([])
@@ -1048,6 +1110,7 @@ export function QuestionEditor({
   const [attachments, setAttachments] = useState([])
   const [tagRequirements, setTagRequirements] = useState([])
   const [tagIds, setTagIds] = useState([])
+  const [useTagMarking, setUseTagMarking] = useState(true)
   const [rootMarkingCriteria, setRootMarkingCriteria] = useState([])
   const [mcqOptions, setMcqOptions] = useState(defaultMcqOptions)
   const [correctOption, setCorrectOption] = useState("")
@@ -1092,6 +1155,8 @@ export function QuestionEditor({
     setQuestionType(initialData.question_type === "mcq" ? "mcq" : "saq")
     setQuestionText(initialData.question_text || "")
     setSampleSolution(initialData.sample_solution || "")
+    setAnswerType(initialData.answer_type || "proof")
+    setAnswerValue(initialData.answer_value || "")
     const incomingTikzVisuals = initialData.stem_tikz_visuals?.length
       ? initialData.stem_tikz_visuals
       : initialData.tikz_visuals?.length
@@ -1115,6 +1180,8 @@ export function QuestionEditor({
         text: part.text || "",
         marks: Number(part.marks || 1),
         sample_solution: part.sample_solution || "",
+        answer_type: part.answer_type || "proof",
+        answer_value: part.answer_value || "",
         tag_ids: part.tag_ids || [],
         tag_requirements: part.tag_requirements || [],
         attachments: part.attachments || [],
@@ -1129,6 +1196,7 @@ export function QuestionEditor({
     setAttachments(initialData.attachments || [])
     setTagRequirements(initialData.tag_requirements || [])
     setTagIds(initialData.tag_ids || [])
+    setUseTagMarking(initialData.use_tag_marking !== false)
     setRootMarkingCriteria(
       normalizeCriteriaRows(initialData.marks || 1, initialData.marking_criteria || [])
     )
@@ -1169,6 +1237,8 @@ export function QuestionEditor({
         text: part.text,
         marks: criteriaRowCount(part.marks, part.marking_criteria),
         sample_solution: part.sample_solution || "",
+        answer_type: part.answer_type || "proof",
+        answer_value: part.answer_type === "value" ? part.answer_value || "" : "",
         tag_ids: part.tag_ids || [],
         tag_requirements: syncTagRequirements(part.tag_ids || [], part.tag_requirements || [], tags),
         attachments: part.attachments || [],
@@ -1184,7 +1254,10 @@ export function QuestionEditor({
         ? []
         : normalizeCriteriaRows(criteriaRowCount(marks, rootMarkingCriteria), rootMarkingCriteria),
       sample_solution: isMcq || parts.length ? "" : sampleSolution,
+      answer_type: isMcq || parts.length ? "proof" : answerType,
+      answer_value: !isMcq && !parts.length && answerType === "value" ? answerValue : "",
       marking_enabled: !isMcq,
+      use_tag_marking: isMathSubject ? true : useTagMarking,
       mcq_options: isMcq ? normalizeOptionLetters(mcqOptions) : [],
       correct_option: isMcq ? correctOption : "",
       shuffle_options: isMcq ? shuffleOptions : false,
@@ -1255,7 +1328,7 @@ export function QuestionEditor({
     if (!onDraftChange) return
     onDraftChange(payload())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject, subjectId, marks, questionType, questionText, sampleSolution, tikzCode, diagramSvg, tikzVisuals, importSource, parts, attachments, tagIds, tagRequirements, tags, rootMarkingCriteria, mcqOptions, correctOption, shuffleOptions, explanation])
+  }, [subject, subjectId, marks, questionType, questionText, sampleSolution, answerType, answerValue, tikzCode, diagramSvg, tikzVisuals, importSource, parts, attachments, tagIds, tagRequirements, tags, rootMarkingCriteria, useTagMarking, mcqOptions, correctOption, shuffleOptions, explanation])
 
   return (
     <div className={cn("grid gap-8", !hidePreview && "lg:grid-cols-2")}>
@@ -1474,6 +1547,7 @@ export function QuestionEditor({
                       <SampleSolutionEditor
                         value={explanation}
                         onChange={setExplanation}
+                        showAnswerMetadata={false}
                       />
                     </DropdownSection>
                   </div>
@@ -1629,6 +1703,22 @@ export function QuestionEditor({
                               setParts(next)
                               if (validationMessage) setValidationMessage("")
                             }}
+                            answerType={part.answer_type || "proof"}
+                            answerValue={part.answer_value || ""}
+                            onAnswerTypeChange={(value) => {
+                              const next = [...parts]
+                              next[index] = {
+                                ...part,
+                                answer_type: value,
+                                answer_value: value === "value" ? part.answer_value || "" : "",
+                              }
+                              setParts(next)
+                            }}
+                            onAnswerValueChange={(value) => {
+                              const next = [...parts]
+                              next[index] = { ...part, answer_value: value }
+                              setParts(next)
+                            }}
                           />
                         </DropdownSection>
 
@@ -1709,6 +1799,13 @@ export function QuestionEditor({
                           setSampleSolution(value)
                           if (validationMessage) setValidationMessage("")
                         }}
+                        answerType={answerType}
+                        answerValue={answerValue}
+                        onAnswerTypeChange={(value) => {
+                          setAnswerType(value)
+                          if (value !== "value") setAnswerValue("")
+                        }}
+                        onAnswerValueChange={setAnswerValue}
                       />
                     </DropdownSection>
                     {!isMathSubject && (
@@ -1758,6 +1855,20 @@ export function QuestionEditor({
                     )}
                   </div>
                 </Field>
+                )}
+
+                {showTagging && taggingMode === "full" && !isMathSubject && !isMcq && (
+                  <label className="flex items-start gap-3 rounded-2xl border border-[#3b2a22]/55 bg-[#181410] p-4 text-sm text-[#dac1b7]">
+                    <input
+                      type="checkbox"
+                      checked={useTagMarking}
+                      onChange={(event) => setUseTagMarking(event.target.checked)}
+                      className="mt-0.5 size-4 accent-[#c8864a]"
+                    />
+                    <span>
+                      Use tag-based marking (uncheck for criteria-based marking on long-form or explain questions)
+                    </span>
+                  </label>
                 )}
 
                 {validationMessage && (
