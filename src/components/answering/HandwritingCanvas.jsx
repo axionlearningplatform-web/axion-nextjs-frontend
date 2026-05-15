@@ -359,7 +359,13 @@ function liveStrokeWidth(baseWidth, pressure, velocity) {
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
 const HandwritingCanvas = forwardRef(function HandwritingCanvas(
-  { onSubmit, onToggleQuestionLock, questionId, questionLocked = false },
+  {
+    lockedQuestionHeight = 0,
+    onSubmit,
+    onToggleQuestionLock,
+    questionId,
+    questionLocked = false,
+  },
   ref
 ) {
   // ── 5 canvas layers ─────────────────────────────────────────────────────
@@ -1266,6 +1272,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
             canRedo={canRedo}
             canUndo={canUndo}
             eraserSize={eraserSize}
+            lockedQuestionHeight={lockedQuestionHeight}
             navbarHeight={navbarHeight}
             onClear={clearPage}
             onEraserSizeChange={setEraserSize}

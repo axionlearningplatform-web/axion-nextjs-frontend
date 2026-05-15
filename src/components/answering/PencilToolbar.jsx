@@ -28,6 +28,7 @@ export default function PencilToolbar({
   canRedo,
   canUndo,
   eraserSize,
+  lockedQuestionHeight = 0,
   navbarHeight = 64,
   onClear,
   onRedo,
@@ -55,7 +56,7 @@ export default function PencilToolbar({
       style={
         sticky
           ? {
-              top: `${navbarHeight + 16}px`,
+              top: `${navbarHeight + lockedQuestionHeight + 8}px`,
               right: `${rightOffset}px`,
             }
           : undefined

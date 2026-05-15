@@ -691,6 +691,7 @@ function AnswerArea({
   onBetaReveal,
   onSubmit,
   onToggleQuestionLock,
+  lockedQuestionHeight = 0,
   question,
   questionId,
   questionLocked,
@@ -700,6 +701,14 @@ function AnswerArea({
   const [files, setFiles] = useState([])
   const handwritingRef = useRef(null)
   const isMcq = question?.question_type === "mcq"
+
+  useEffect(() => {
+    if (activeTab !== "draw" && questionLocked) {
+      onToggleQuestionLock?.()
+    }
+    // Intentionally only runs when activeTab changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
 
   async function addFiles(fileList) {
     const nextFiles = await Promise.all(Array.from(fileList || []).map(readFileAsDataUrl))
@@ -824,6 +833,7 @@ function AnswerArea({
       ) : activeTab === "draw" ? (
         <HandwritingCanvas
           ref={handwritingRef}
+          lockedQuestionHeight={lockedQuestionHeight}
           onToggleQuestionLock={onToggleQuestionLock}
           questionId={questionId}
           questionLocked={questionLocked}
@@ -1060,7 +1070,9 @@ function QuestionView({
   selectedMcqOption,
   timer,
 }) {
+  const questionSectionRef = useRef(null)
   const [questionLocked, setQuestionLocked] = useState(false)
+  const [lockedQuestionHeight, setLockedQuestionHeight] = useState(0)
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -1068,6 +1080,39 @@ function QuestionView({
     }, 0)
     return () => window.clearTimeout(timeout)
   }, [question?.id])
+
+  useEffect(() => {
+    let frameId = requestAnimationFrame(() => {
+      const el = questionSectionRef.current
+      setLockedQuestionHeight(
+        questionLocked && el ? el.getBoundingClientRect().height : 0
+      )
+    })
+
+    if (!questionLocked) {
+      return () => cancelAnimationFrame(frameId)
+    }
+
+    const el = questionSectionRef.current
+    if (!el) {
+      return () => cancelAnimationFrame(frameId)
+    }
+
+    const measure = () => {
+      cancelAnimationFrame(frameId)
+      frameId = requestAnimationFrame(() => {
+        setLockedQuestionHeight(el.getBoundingClientRect().height)
+      })
+    }
+
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+
+    return () => {
+      cancelAnimationFrame(frameId)
+      ro.disconnect()
+    }
+  }, [questionLocked])
 
   if (loading) {
     return (
@@ -1148,6 +1193,7 @@ function QuestionView({
       </div>
 
       <section
+        ref={questionSectionRef}
         className={cn(
           "px-6 py-16 md:px-12",
           questionLocked && [
@@ -1269,6 +1315,7 @@ function QuestionView({
         markingError={markingError}
         markingLoading={markingLoading}
         markingResult={markingResult}
+        lockedQuestionHeight={lockedQuestionHeight}
         onBetaReveal={onBetaReveal}
         onToggleQuestionLock={() => setQuestionLocked((value) => !value)}
         onSubmit={onSubmitAnswer}
