@@ -9,6 +9,7 @@ import useSWR from "swr"
 import {
   ArrowLeft,
   ArrowRight,
+  Check,
   Keyboard,
   Lightbulb,
   Loader2,
@@ -43,6 +44,29 @@ function titleCase(value = "") {
     .replaceAll("-", " ")
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
+
+function shuffledOptions(options = []) {
+  const next = [...options]
+  for (let i = next.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1))
+    const temp = next[i]
+    next[i] = next[j]
+    next[j] = temp
+  }
+  return next
+}
+
+function optionsForPracticeDisplay(options = [], shouldShuffle = false) {
+  const ordered = shouldShuffle ? shuffledOptions(options) : [...options]
+  return ordered.map((option, index) => {
+    const originalLetter = option.answer_letter || option.letter || String.fromCharCode(65 + index)
+    return {
+      ...option,
+      answer_letter: originalLetter,
+      display_letter: String.fromCharCode(65 + index),
+    }
+  })
 }
 
 function storageKey(slug) {
@@ -633,6 +657,31 @@ function SampleAnswers({ question }) {
   )
 }
 
+function McqResultCard({ result }) {
+  if (!result) return null
+  const correct = Boolean(result.correct)
+  return (
+    <div
+      className={cn(
+        "mt-5 rounded-[4px] border px-5 py-4 text-[13px] leading-relaxed",
+        correct
+          ? "border-emerald-400/30 bg-emerald-500/12 text-emerald-100"
+          : "border-red-400/30 bg-red-500/10 text-red-100"
+      )}
+    >
+      <p className={cn("flex items-center gap-2 font-serif text-xl", correct ? "text-emerald-200" : "text-red-200")}>
+        {correct ? <Check className="size-5" /> : <X className="size-5" />}
+        {correct ? "Correct!" : "Incorrect"}
+      </p>
+      {result.explanation && (
+        <MarkdownMath className="mt-3 text-[14px] leading-relaxed text-[#c4b5a8]">
+          {result.explanation}
+        </MarkdownMath>
+      )}
+    </div>
+  )
+}
+
 function AnswerArea({
   betaSampleRevealed,
   markingDisabled,
@@ -648,6 +697,7 @@ function AnswerArea({
   const [typedAnswer, setTypedAnswer] = useState("")
   const [files, setFiles] = useState([])
   const handwritingRef = useRef(null)
+  const isMcq = question?.question_type === "mcq"
 
   async function addFiles(fileList) {
     const nextFiles = await Promise.all(Array.from(fileList || []).map(readFileAsDataUrl))
@@ -659,6 +709,10 @@ function AnswerArea({
   }
 
   async function submitAnswer() {
+    if (isMcq) {
+      onSubmit({})
+      return
+    }
     if (markingDisabled) {
       onBetaReveal?.()
       return
@@ -690,6 +744,20 @@ function AnswerArea({
 
   return (
     <section className="border-t border-white/[0.06] px-6 py-6 md:px-12">
+      {isMcq ? (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            disabled={markingLoading}
+            onClick={submitAnswer}
+            className="inline-flex h-11 items-center justify-center gap-3 rounded-[2px] border border-[#9b673d]/42 bg-[#c8864a]/12 px-7 text-[12px] font-medium tracking-[0.06em] text-[#dba476] transition-colors hover:border-[#c8864a]/62 hover:bg-[#c8864a]/18 hover:text-[#efbd94] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {markingLoading ? "Submitting..." : "Submit Answer"}
+            {markingLoading ? <Loader2 className="size-[18px] animate-spin" /> : <ArrowRight className="size-[18px]" />}
+          </button>
+        </div>
+      ) : (
+      <>
       {markingDisabled && (
         <div className="mb-6 rounded-[4px] border border-[#7c573a]/35 bg-[#1a1511] px-5 py-4 text-[13px] leading-relaxed text-[#c4b5a8]">
           <p className="font-semibold tracking-[0.04em] text-[#dba476]">Marking unavailable</p>
@@ -966,6 +1034,8 @@ function AnswerArea({
           )}
         </>
       )}
+      </>
+      )}
     </section>
   )
 }
@@ -980,8 +1050,10 @@ function QuestionView({
   markingResult,
   onBack,
   onBetaReveal,
+  onSelectMcqOption,
   onSubmitAnswer,
   question,
+  selectedMcqOption,
   timer,
 }) {
   if (loading) {
@@ -1010,12 +1082,13 @@ function QuestionView({
     )
   }
 
+  const isMcq = question.question_type === "mcq"
   const metadata = [
     config.year,
     config.course,
     ...config.topicNames,
     config.difficulty,
-    config.type,
+    isMcq ? "MCQ" : config.type,
   ].filter(Boolean)
   const hasHint = (question.hints || []).some((hint) => hint.text) ||
     (question.parts || []).some((part) => (part.hints || []).some((hint) => hint.text))
@@ -1084,6 +1157,57 @@ function QuestionView({
               <DiagramSvg svg={visual.svg} key={visual.id || index} />
             ))}
 
+            {isMcq && (
+              <div className="mt-10 grid gap-3">
+                {(question.mcq_options || []).map((option, index) => {
+                  const answerLetter = option.answer_letter || option.letter || String.fromCharCode(65 + index)
+                  const displayLetter = option.display_letter || String.fromCharCode(65 + index)
+                  const selected = selectedMcqOption === answerLetter
+                  const submitted = Boolean(markingResult)
+                  const correct = submitted && markingResult.correct_option === answerLetter
+                  const incorrectSelection = submitted && markingResult.selected_option === answerLetter && !markingResult.correct
+                  return (
+                    <button
+                      className={cn(
+                        "flex min-w-0 items-center gap-4 rounded-[6px] border px-5 py-5 text-left transition-colors",
+                        selected && !submitted && "border-[#c8864a]/55 bg-[#c8864a]/10",
+                        !selected && !submitted && "border-white/[0.07] bg-[#211d19] hover:border-[#7c573a]/45",
+                        correct && "border-emerald-400/40 bg-emerald-500/12",
+                        incorrectSelection && "border-red-400/35 bg-red-500/10",
+                        submitted && !correct && !incorrectSelection && "border-white/[0.07] bg-[#211d19]"
+                      )}
+                      disabled={submitted}
+                      key={`${option.id || answerLetter}-${displayLetter}`}
+                      type="button"
+                      onClick={() => onSelectMcqOption(answerLetter)}
+                    >
+                      <span
+                        className={cn(
+                          "inline-flex size-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold",
+                          selected || correct
+                            ? "border-[#9cc878]/70 text-[#9cc878]"
+                            : "border-white/[0.08] text-[#6f6861]",
+                          incorrectSelection && "border-red-300/60 text-red-200"
+                        )}
+                      >
+                        {displayLetter}
+                      </span>
+                      <MarkdownMath className="font-serif text-[17px] leading-relaxed text-[#d8d0c8] md:text-[18px]">
+                        {option.text}
+                      </MarkdownMath>
+                    </button>
+                  )
+                })}
+                <McqResultCard result={markingResult} />
+                {markingError && (
+                  <p className="rounded-[4px] border border-[#d99658]/25 bg-[#d99658]/10 px-4 py-3 text-[13px] text-[#d99658]">
+                    {markingError}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {!isMcq && (
             <div className="mt-10 grid gap-7">
               {(question.parts || []).map((part, index) => (
                 <section
@@ -1108,6 +1232,7 @@ function QuestionView({
                 </section>
               ))}
             </div>
+            )}
           </div>
           {question.import_source && (
             <p className="pt-1 text-right text-[15px] tracking-[0.04em] text-[#6e6259]">
@@ -1146,6 +1271,7 @@ export default function DailyPracticePage() {
   const [markingResult, setMarkingResult] = useState(null)
   const [markingError, setMarkingError] = useState("")
   const [betaSampleRevealed, setBetaSampleRevealed] = useState(false)
+  const [selectedMcqOption, setSelectedMcqOption] = useState("")
 
   const membership = auth.subjectMemberships?.find(
     (item) => item.subject.slug === params.slug
@@ -1181,7 +1307,10 @@ export default function DailyPracticePage() {
     dedupingInterval: 120_000,
   })
 
-  const questions = questionsPayload?.results ?? questionsPayload ?? []
+  const questions = useMemo(
+    () => questionsPayload?.results ?? questionsPayload ?? [],
+    [questionsPayload]
+  )
 
   useEffect(() => {
     if (!subject) return
@@ -1219,10 +1348,17 @@ export default function DailyPracticePage() {
         return
       }
       const detail = await fetcher(`${QUESTIONS_API_URL}${matchingQuestion.id}/`)
+      if (detail.question_type === "mcq") {
+        detail.mcq_options = optionsForPracticeDisplay(
+          detail.mcq_options || [],
+          Boolean(detail.shuffle_options)
+        )
+      }
       setQuestion(detail)
       setMarkingResult(null)
       setMarkingError("")
       setBetaSampleRevealed(false)
+      setSelectedMcqOption("")
     } finally {
       setQuestionLoading(false)
     }
@@ -1248,6 +1384,36 @@ export default function DailyPracticePage() {
 
   async function submitAnswer(payload) {
     if (!question?.id) return
+    if (question.question_type === "mcq") {
+      if (!selectedMcqOption) {
+        setMarkingError("Choose one answer option before submitting.")
+        return
+      }
+      setMarkingLoading(true)
+      setMarkingError("")
+      setMarkingResult(null)
+      try {
+        const response = await fetch(`${QUESTIONS_API_URL}${question.id}/mcq/submit/`, {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({ selected_option: selectedMcqOption }),
+        })
+        const data = await parseJsonResponse(response)
+        if (!response.ok) {
+          throw new Error(data.detail || `Could not submit this answer (HTTP ${response.status}).`)
+        }
+        setMarkingResult(data)
+      } catch (error) {
+        setMarkingError(error.message || "Could not submit this answer.")
+      } finally {
+        setMarkingLoading(false)
+      }
+      return
+    }
     if (markingDisabled) {
       return
     }
@@ -1313,8 +1479,13 @@ export default function DailyPracticePage() {
           markingResult={markingResult}
           onBack={backFromQuestion}
           onBetaReveal={revealBetaSample}
+          onSelectMcqOption={(letter) => {
+            setSelectedMcqOption(letter)
+            setMarkingError("")
+          }}
           onSubmitAnswer={submitAnswer}
           question={question}
+          selectedMcqOption={selectedMcqOption}
           timer={timer}
         />
       )}

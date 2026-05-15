@@ -266,6 +266,10 @@ function MarkdownBlock({ children }) {
   )
 }
 
+function questionTypeLabel(questionType) {
+  return String(questionType || "saq").toLowerCase() === "mcq" ? "MCQ" : "SAQ"
+}
+
 function omitDeleted(items) {
   return (items || []).filter((item) => !item?.deleted)
 }
@@ -283,6 +287,10 @@ function PreviewPanelBase({
   diagramSvg = "",
   tikzCode = "",
   tikzVisuals = [],
+  stemTikzVisuals = null,
+  questionType = "saq",
+  mcqOptions = [],
+  correctOption = "",
 }) {
   const rootAttachments = useMemo(() => omitDeleted(attachments), [attachments])
   const rootHints = useMemo(() => omitDeleted(hints), [hints])
@@ -296,6 +304,8 @@ function PreviewPanelBase({
     [parts]
   )
   const hasParts = visibleParts.length > 0
+  const isMcq = String(questionType || "saq").toLowerCase() === "mcq"
+  const stemVisuals = stemTikzVisuals || tikzVisuals || []
   const hasHint = rootHints.some((hint) => hint.text) ||
     visibleParts.some((part) => (part.hints || []).some((hint) => hint.text))
   const displayQuestionText = questionText?.trim()
@@ -318,6 +328,9 @@ function PreviewPanelBase({
             <div className="flex flex-wrap gap-2">
               <span className="rounded-[2px] border border-[#3c2c24] bg-[#120f0d] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7f746b]">
                 {subject || "Subject"}
+              </span>
+              <span className="rounded-[2px] border border-[#8b5e42]/55 bg-[#d49a71]/10 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#dba476]">
+                {questionTypeLabel(questionType)}
               </span>
               {tags.map((tag) => (
                 <span
@@ -370,7 +383,7 @@ function PreviewPanelBase({
 
             <DiagramSvg svg={diagramSvg} />
             {!diagramSvg && <TikzInlinePreview code={tikzCode} />}
-            {(tikzVisuals || []).map((visual, index) => (
+            {(stemVisuals || []).map((visual, index) => (
               visual.svg ? (
                 <DiagramSvg svg={visual.svg} key={visual.id || index} />
               ) : (
@@ -378,7 +391,39 @@ function PreviewPanelBase({
               )
             ))}
 
-            {hasParts && (
+            {isMcq && (
+              <div className="mt-7 grid gap-2">
+                {(mcqOptions || []).map((option, index) => {
+                  const letter = option.letter || String.fromCharCode(65 + index)
+                  const selected = correctOption && letter === correctOption
+                  return (
+                    <div
+                      className={cn(
+                        "flex min-w-0 items-start gap-3 rounded-[8px] border px-3 py-3 text-[#cfc4b9]",
+                        selected
+                          ? "border-emerald-400/35 bg-emerald-500/10 text-emerald-100"
+                          : "border-[#3c2c24] bg-[#171410]"
+                      )}
+                      key={option.id || letter}
+                    >
+                      <span
+                        className={cn(
+                          "mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold",
+                          selected
+                            ? "border-emerald-300/60 text-emerald-200"
+                            : "border-[#3c322b] text-[#6f6258]"
+                        )}
+                      >
+                        {letter}
+                      </span>
+                      <MarkdownBlock>{option.text || `Option ${letter}`}</MarkdownBlock>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {!isMcq && hasParts && (
               <div className="mt-8 grid gap-6">
                 {visibleParts.map((part, index) => (
                   <section

@@ -550,7 +550,11 @@ export default function SubjectModerationPage() {
                 tags={previewTags}
                 diagramSvg={draft?.diagram_svg || editorData?.diagram_svg || ""}
                 tikzCode={draft?.tikz_code || editorData?.tikz_code || ""}
-                tikzVisuals={draft?.tikz_visuals || editorData?.tikz_visuals || []}
+                tikzVisuals={draft?.stem_tikz_visuals || draft?.tikz_visuals || editorData?.stem_tikz_visuals || editorData?.tikz_visuals || []}
+                stemTikzVisuals={draft?.stem_tikz_visuals || draft?.tikz_visuals || editorData?.stem_tikz_visuals || editorData?.tikz_visuals || []}
+                questionType={draft?.question_type || editorData?.question_type || "saq"}
+                mcqOptions={draft?.mcq_options || editorData?.mcq_options || []}
+                correctOption={draft?.correct_option || editorData?.correct_option || ""}
                 headerAction={
                   <Button
                     type="button"

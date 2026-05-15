@@ -33,6 +33,16 @@ const MODERATION_FILTER_OPTIONS = [
   { value: "rejected", label: "Rejected" },
 ]
 
+const QUESTION_TYPE_FILTER_OPTIONS = [
+  { value: "", label: "Any type" },
+  { value: "saq", label: "SAQ" },
+  { value: "mcq", label: "MCQ" },
+]
+
+function questionTypeLabel(value) {
+  return String(value || "saq").toLowerCase() === "mcq" ? "MCQ" : "SAQ"
+}
+
 const QuestionRow = memo(function QuestionRow({ item, onRowClick }) {
   const preview = item.question_preview ?? item.question_text ?? ""
   const tags = item.tags || []
@@ -65,6 +75,11 @@ const QuestionRow = memo(function QuestionRow({ item, onRowClick }) {
         )}
       </TableCell>
       <TableCell className="px-4 font-semibold text-[#ffb595]">{item.id}</TableCell>
+      <TableCell className="px-4">
+        <span className="rounded-full border border-[#8b5e42]/45 bg-[#d49a71]/10 px-2 py-1 text-[10px] font-semibold text-[#dba476]">
+          {questionTypeLabel(item.question_type)}
+        </span>
+      </TableCell>
       <TableCell className="max-w-[520px] px-4">
         <div className="overflow-hidden text-ellipsis line-clamp-3 break-words">{preview}</div>
       </TableCell>
@@ -114,6 +129,7 @@ export default function QuestionTable() {
   const [layer1Id, setLayer1Id] = useState("")
   const [layer2Id, setLayer2Id] = useState("")
   const [moderationFilter, setModerationFilter] = useState("")
+  const [questionTypeFilter, setQuestionTypeFilter] = useState("")
   const [page, setPage] = useState(0)
 
   useEffect(() => {
@@ -125,7 +141,7 @@ export default function QuestionTable() {
 
   useEffect(() => {
     setPage(0)
-  }, [debouncedSearch, layer1Id, layer2Id, moderationFilter, subjectSlug])
+  }, [debouncedSearch, layer1Id, layer2Id, moderationFilter, questionTypeFilter, subjectSlug])
 
   const {
     data: subjects = [],
@@ -155,10 +171,11 @@ export default function QuestionTable() {
     if (layer1Id) p.set("layer1_tag_id", String(layer1Id))
     if (layer2Id) p.set("layer2_tag_id", String(layer2Id))
     if (moderationFilter) p.set("moderation_status", moderationFilter)
+    if (questionTypeFilter) p.set("question_type", questionTypeFilter)
     p.set("limit", String(PAGE_SIZE))
     p.set("offset", String(page * PAGE_SIZE))
     return `${QUESTIONS_API_URL}?${p.toString()}`
-  }, [lockedSubject?.id, debouncedSearch, layer1Id, layer2Id, moderationFilter, page])
+  }, [lockedSubject?.id, debouncedSearch, layer1Id, layer2Id, moderationFilter, questionTypeFilter, page])
 
   const swrKey = subjectSlug ? (lockedSubject ? questionsListUrl : null) : questionsListUrl
 
@@ -190,7 +207,7 @@ export default function QuestionTable() {
 
   useEffect(() => {
     scrollParentRef.current?.scrollTo({ top: 0 })
-  }, [page, debouncedSearch, layer1Id, layer2Id, moderationFilter, lockedSubject?.id])
+  }, [page, debouncedSearch, layer1Id, layer2Id, moderationFilter, questionTypeFilter, lockedSubject?.id])
 
   const virtualRows = rowVirtualizer.getVirtualItems()
   const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0
@@ -234,10 +251,26 @@ export default function QuestionTable() {
           </label>
           <input
             className="h-10 w-full rounded-full border border-[#3b2a22]/55 bg-white/[0.035] px-4 text-sm text-[#e5e2e1] outline-none focus:border-[#ffb595]/40"
-            placeholder="Question text…"
+            placeholder="Question ID or text..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
           />
+        </div>
+        <div className="min-w-[140px]">
+          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#a28c83]">
+            Question Type
+          </label>
+          <select
+            className={FILTER_SELECT_CLASS}
+            value={questionTypeFilter}
+            onChange={(e) => setQuestionTypeFilter(e.target.value)}
+          >
+            {QUESTION_TYPE_FILTER_OPTIONS.map((opt) => (
+              <option key={opt.value || "any"} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="min-w-[160px]">
           <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#a28c83]">
@@ -310,6 +343,9 @@ export default function QuestionTable() {
                 <TableHead className="w-20 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                   ID
                 </TableHead>
+                <TableHead className="w-24 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
+                  Type
+                </TableHead>
                 <TableHead className="px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                   Question
                 </TableHead>
@@ -333,7 +369,7 @@ export default function QuestionTable() {
             <TableBody>
               {paddingTop > 0 && (
                 <TableRow className="border-0 hover:bg-transparent">
-                  <TableCell colSpan={8} className="p-0" style={{ height: `${paddingTop}px` }} />
+                  <TableCell colSpan={9} className="p-0" style={{ height: `${paddingTop}px` }} />
                 </TableRow>
               )}
               {virtualRows.map((virtualRow) => {
@@ -345,7 +381,7 @@ export default function QuestionTable() {
               })}
               {paddingBottom > 0 && (
                 <TableRow className="border-0 hover:bg-transparent">
-                  <TableCell colSpan={8} className="p-0" style={{ height: `${paddingBottom}px` }} />
+                  <TableCell colSpan={9} className="p-0" style={{ height: `${paddingBottom}px` }} />
                 </TableRow>
               )}
             </TableBody>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Bold, ChevronDown, Italic, Plus, Trash2 } from "lucide-react"
+import { Bold, Check, ChevronDown, Italic, Plus, Trash2 } from "lucide-react"
 import useSWR from "swr"
 
 import {
@@ -52,6 +52,14 @@ const emptyTikzVisual = (index = 0) => ({
   code: "",
   svg: "",
 })
+
+const emptyMcqOption = (index = 0) => ({
+  id: crypto.randomUUID(),
+  letter: String.fromCharCode(65 + index),
+  text: "",
+})
+
+const defaultMcqOptions = () => [0, 1, 2, 3].map(emptyMcqOption)
 
 function SectionTitle({ children }) {
   return (
@@ -422,6 +430,45 @@ function ModerationStatusBadge({ status }) {
   )
 }
 
+function QuestionTypeBadge({ questionType }) {
+  const label = String(questionType || "saq").toLowerCase() === "mcq" ? "MCQ" : "SAQ"
+  return (
+    <span className="shrink-0 rounded-full border border-[#8b5e42]/45 bg-[#d49a71]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#dba476]">
+      {label}
+    </span>
+  )
+}
+
+function QuestionTypeSwitch({ value, onChange }) {
+  const options = [
+    { value: "saq", label: "Short Answer" },
+    { value: "mcq", label: "Multiple Choice" },
+  ]
+
+  return (
+    <div className="grid grid-cols-2 overflow-hidden rounded-full border border-[#3b2a22]/55 bg-[#120f0d] p-1">
+      {options.map((option) => {
+        const active = value === option.value
+        return (
+          <button
+            className={cn(
+              "h-10 rounded-full text-sm font-semibold transition-colors",
+              active
+                ? "bg-[#ccb2a3d3] text-[#1a1817]"
+                : "text-[#a28c83] hover:bg-white/[0.035] hover:text-[#dac1b7]"
+            )}
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function SampleSolutionEditor({ value, onChange, compact = false }) {
   const [previewOpen, setPreviewOpen] = useState(false)
 
@@ -562,6 +609,11 @@ function selectedGranularTagCount(selectedIds = [], tags = []) {
   return tags.filter((tag) => selectedSet.has(tag.id) && isGranularMarkingTag(tag)).length
 }
 
+function selectedLayer3TagCount(selectedIds = [], tags = []) {
+  const selectedSet = new Set(selectedIds)
+  return tags.filter((tag) => selectedSet.has(tag.id) && tag.layer === 3 && isTaxonomyTag(tag)).length
+}
+
 function scoreScaleForTag(tag) {
   if (isMicroskill(tag)) return [0, 1]
   if (tag?.layer === 3) return [0, 1, 2]
@@ -626,6 +678,7 @@ function TagTaxonomyPicker({
   parentSelectedIds = [],
   deepOnly = false,
   showDeep = true,
+  includeMicroskills = true,
 }) {
   const [openRoot, setOpenRoot] = useState(null)
   const closeTimerRef = useRef(null)
@@ -673,11 +726,11 @@ function TagTaxonomyPicker({
   if (deepOnly) {
     const layer2Parents = tags.filter((tag) => tag.layer === 2 && parentSet.has(tag.id))
     const conceptTags = hasMainPath ? layer2Parents.flatMap((parent) => children(parent.id, 3)) : []
-    const microskillTags = microskills()
+    const microskillTags = includeMicroskills ? microskills() : []
     const groups = [
       { label: "Layer 3 concepts", tags: conceptTags },
-      { label: "Microskills", tags: microskillTags },
-    ]
+      includeMicroskills ? { label: "Microskills", tags: microskillTags } : null,
+    ].filter(Boolean)
 
     return (
       <div className="grid gap-3">
@@ -779,12 +832,19 @@ function TagTaxonomyPicker({
         })}
       </div>
 
-      {showDeep && (selectedIds.some((id) => tags.find((tag) => tag.id === id)?.layer === 2) || microskills().length > 0) && (
+      {showDeep && (selectedIds.some((id) => tags.find((tag) => tag.id === id)?.layer === 2) || (includeMicroskills && microskills().length > 0)) && (
         <div className="rounded-2xl border border-[#3b2a22]/55 bg-[#181410] p-3">
           <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8c8178]">
             Granular tags for this question
           </p>
-          <TagTaxonomyPicker tags={tags} selectedIds={selectedIds} onChange={onChange} parentSelectedIds={selectedIds} deepOnly />
+          <TagTaxonomyPicker
+            tags={tags}
+            selectedIds={selectedIds}
+            onChange={onChange}
+            parentSelectedIds={selectedIds}
+            deepOnly
+            includeMicroskills={includeMicroskills}
+          />
         </div>
       )}
       {!showDeep && selectedIds.some((id) => tags.find((tag) => tag.id === id)?.layer === 2) && (
@@ -849,6 +909,110 @@ function MarkingCriteriaFields({ rows, onChange, compact }) {
   )
 }
 
+function normalizeOptionLetters(options = []) {
+  return options.map((option, index) => ({
+    ...option,
+    letter: String.fromCharCode(65 + index),
+  }))
+}
+
+function McqOptionsEditor({
+  options,
+  correctOption,
+  onOptionsChange,
+  onCorrectOptionChange,
+  shuffleOptions,
+  onShuffleOptionsChange,
+}) {
+  const normalized = normalizeOptionLetters(options)
+
+  function updateOption(index, text) {
+    const next = [...normalized]
+    next[index] = { ...next[index], text }
+    onOptionsChange(next)
+  }
+
+  function deleteOption(index) {
+    const removed = normalized[index]
+    const next = normalizeOptionLetters(normalized.filter((_, itemIndex) => itemIndex !== index))
+    onOptionsChange(next)
+    if (removed?.letter === correctOption) {
+      onCorrectOptionChange("")
+    }
+  }
+
+  return (
+    <div className="grid gap-4">
+      <div className="grid gap-3">
+        {normalized.map((option, index) => {
+          const selected = option.letter === correctOption
+          return (
+            <div className="grid grid-cols-[38px_minmax(0,1fr)_34px] items-center gap-2" key={option.id || option.letter}>
+              <button
+                className={cn(
+                  "inline-flex size-9 items-center justify-center rounded-full border text-sm font-semibold transition-colors",
+                  selected
+                    ? "border-emerald-300/60 bg-emerald-500/15 text-emerald-200"
+                    : "border-[#3b2a22]/60 bg-white/[0.035] text-[#a28c83] hover:border-[#ffb595]/50 hover:text-[#ffb595]"
+                )}
+                type="button"
+                onClick={() => onCorrectOptionChange(option.letter)}
+                aria-label={`Mark option ${option.letter} as correct`}
+                title={`Mark option ${option.letter} as correct`}
+              >
+                {selected ? <Check className="size-4" /> : option.letter}
+              </button>
+              <RichTextArea
+                className="min-h-[58px] p-3 text-sm text-[#e5e2e1]"
+                toolbarHint={`Option ${option.letter}`}
+                value={option.text || ""}
+                onValueChange={(value) => updateOption(index, value)}
+                placeholder={`Option ${option.letter}`}
+              />
+              <Button
+                className="size-9 rounded-full p-0"
+                disabled={normalized.length <= 2}
+                type="button"
+                variant="ghost"
+                onClick={() => deleteOption(index)}
+                aria-label={`Delete option ${option.letter}`}
+                title={`Delete option ${option.letter}`}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#3b2a22]/55 pt-4">
+        <Button
+          className="w-fit rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-[#dac1b7] hover:bg-[#211913]"
+          type="button"
+          variant="outline"
+          onClick={() => onOptionsChange(normalizeOptionLetters([...normalized, emptyMcqOption(normalized.length)]))}
+        >
+          <Plus className="size-4" />
+          Add option
+        </Button>
+        <label className="inline-flex items-center gap-2 text-sm text-[#a28c83]">
+          <input
+            checked={shuffleOptions}
+            className="size-4 accent-[#c8864a]"
+            type="checkbox"
+            onChange={(event) => onShuffleOptionsChange(event.target.checked)}
+          />
+          Shuffle options when displaying to students
+        </label>
+      </div>
+
+      <p className="text-xs text-[#8f8378]">
+        Correct answer: {correctOption || "Select a letter"}
+      </p>
+    </div>
+  )
+}
+
 export function QuestionEditor({
   initialData = null,
   subjects = [],
@@ -873,6 +1037,7 @@ export function QuestionEditor({
   const [subject, setSubject] = useState("")
   const [subjectId, setSubjectId] = useState("")
   const [marks, setMarks] = useState("1")
+  const [questionType, setQuestionType] = useState("saq")
   const [questionText, setQuestionText] = useState("")
   const [sampleSolution, setSampleSolution] = useState("")
   const [tikzCode, setTikzCode] = useState("")
@@ -884,10 +1049,16 @@ export function QuestionEditor({
   const [tagRequirements, setTagRequirements] = useState([])
   const [tagIds, setTagIds] = useState([])
   const [rootMarkingCriteria, setRootMarkingCriteria] = useState([])
+  const [mcqOptions, setMcqOptions] = useState(defaultMcqOptions)
+  const [correctOption, setCorrectOption] = useState("")
+  const [shuffleOptions, setShuffleOptions] = useState(false)
+  const [explanation, setExplanation] = useState("")
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [validationMessage, setValidationMessage] = useState("")
 
   const showTagging = taggingMode !== "hidden"
+  const isMcq = questionType === "mcq"
+  const questionTypeLocked = Boolean(initialData?.id)
 
   const resolvedSubject = useMemo(() => {
     if (lockedSubject) return lockedSubject
@@ -906,7 +1077,7 @@ export function QuestionEditor({
   const selectedTags = tags.filter((tag) => tagIds.includes(tag.id))
   const sourcePlaceholder = `e.g. HSC ${subject || lockedSubject?.name || "Chemistry"} 2025`
 
-  const effectiveMarks = parts.length
+  const effectiveMarks = !isMcq && parts.length
     ? Number(marks) || parts.reduce((total, part) => total + (Number(part.marks) || 0), 0)
     : criteriaRowCount(marks, rootMarkingCriteria)
   const partMarksTotal = parts.reduce((total, part) => total + (Number(part.marks) || 0), 0)
@@ -918,24 +1089,27 @@ export function QuestionEditor({
     setSubject(initialData.subject || "")
     setSubjectId(initialData.subject_id ? String(initialData.subject_id) : "")
     setMarks(String(initialData.marks || "1"))
+    setQuestionType(initialData.question_type === "mcq" ? "mcq" : "saq")
     setQuestionText(initialData.question_text || "")
     setSampleSolution(initialData.sample_solution || "")
-    const incomingTikzVisuals = initialData.tikz_visuals?.length
-      ? initialData.tikz_visuals
-      : initialData.tikz_code
-        ? [{
-            id: "legacy-tikz",
-            name: "Visual 1",
-            code: initialData.tikz_code || "",
-            svg: initialData.diagram_svg || "",
-          }]
-        : []
+    const incomingTikzVisuals = initialData.stem_tikz_visuals?.length
+      ? initialData.stem_tikz_visuals
+      : initialData.tikz_visuals?.length
+        ? initialData.tikz_visuals
+        : initialData.tikz_code
+          ? [{
+              id: "legacy-tikz",
+              name: "Visual 1",
+              code: initialData.tikz_code || "",
+              svg: initialData.diagram_svg || "",
+            }]
+          : []
     setTikzCode("")
     setDiagramSvg("")
     setTikzVisuals(incomingTikzVisuals)
     setImportSource(initialData.import_source || "")
     setParts(
-      (initialData.parts || []).map((part, index) => ({
+      (initialData.question_type === "mcq" ? [] : initialData.parts || []).map((part, index) => ({
         id: part.id || crypto.randomUUID(),
         label: part.label || String.fromCharCode(97 + index),
         text: part.text || "",
@@ -958,6 +1132,14 @@ export function QuestionEditor({
     setRootMarkingCriteria(
       normalizeCriteriaRows(initialData.marks || 1, initialData.marking_criteria || [])
     )
+    setMcqOptions(
+      initialData.mcq_options?.length
+        ? normalizeOptionLetters(initialData.mcq_options)
+        : defaultMcqOptions()
+    )
+    setCorrectOption(initialData.correct_option || "")
+    setShuffleOptions(Boolean(initialData.shuffle_options))
+    setExplanation(initialData.explanation || "")
   }, [initialData])
 
   useEffect(() => {
@@ -973,14 +1155,16 @@ export function QuestionEditor({
       subject,
       subject_id: subjectId ? Number(subjectId) : null,
       marks: effectiveMarks,
+      question_type: questionType,
       question_text: questionText,
       latex: "",
       graph: "",
       tikz_code: tikzCode,
       diagram_svg: diagramSvg,
       tikz_visuals: tikzVisuals,
+      stem_tikz_visuals: tikzVisuals,
       hints: [],
-      parts: parts.map((part) => ({
+      parts: isMcq ? [] : parts.map((part) => ({
         label: part.label,
         text: part.text,
         marks: criteriaRowCount(part.marks, part.marking_criteria),
@@ -996,12 +1180,17 @@ export function QuestionEditor({
         hints: [],
       })),
       attachments,
-      marking_criteria: parts.length
+      marking_criteria: isMcq || parts.length
         ? []
         : normalizeCriteriaRows(criteriaRowCount(marks, rootMarkingCriteria), rootMarkingCriteria),
-      sample_solution: parts.length ? "" : sampleSolution,
+      sample_solution: isMcq || parts.length ? "" : sampleSolution,
+      marking_enabled: !isMcq,
+      mcq_options: isMcq ? normalizeOptionLetters(mcqOptions) : [],
+      correct_option: isMcq ? correctOption : "",
+      shuffle_options: isMcq ? shuffleOptions : false,
+      explanation: isMcq ? explanation : "",
       tag_ids: tagIds,
-      tag_requirements: parts.length ? [] : syncTagRequirements(tagIds, tagRequirements, tags),
+      tag_requirements: isMcq || parts.length ? [] : syncTagRequirements(tagIds, tagRequirements, tags),
       import_source: importSource,
     }
   }
@@ -1020,6 +1209,18 @@ export function QuestionEditor({
     if (!importSource.trim()) return "Source is required."
     if (!questionText.trim()) return "Question text is required."
     if (showTagging && !tagIds.length) return "At least one topic tag is required."
+    if (isMcq && showTagging && selectedLayer3TagCount(tagIds, tags) === 0) {
+      return "Multiple choice questions require a Layer 3 concept tag."
+    }
+
+    if (isMcq) {
+      const filledOptions = normalizeOptionLetters(mcqOptions).filter((option) => String(option.text || "").trim())
+      if (filledOptions.length < 2) return "Add at least two multiple choice options."
+      if (!correctOption || !filledOptions.some((option) => option.letter === correctOption)) {
+        return "Select the correct multiple choice answer."
+      }
+      return ""
+    }
 
     if (!isMathSubject) {
       if (parts.length) {
@@ -1054,7 +1255,7 @@ export function QuestionEditor({
     if (!onDraftChange) return
     onDraftChange(payload())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject, subjectId, marks, questionText, sampleSolution, tikzCode, diagramSvg, tikzVisuals, importSource, parts, attachments, tagIds, tagRequirements, tags, rootMarkingCriteria])
+  }, [subject, subjectId, marks, questionType, questionText, sampleSolution, tikzCode, diagramSvg, tikzVisuals, importSource, parts, attachments, tagIds, tagRequirements, tags, rootMarkingCriteria, mcqOptions, correctOption, shuffleOptions, explanation])
 
   return (
     <div className={cn("grid gap-8", !hidePreview && "lg:grid-cols-2")}>
@@ -1075,6 +1276,7 @@ export function QuestionEditor({
                 {submitLabel === "Save Changes" && initialData?.moderation_status ? (
                   <ModerationStatusBadge status={initialData.moderation_status} />
                 ) : null}
+                {questionTypeLocked ? <QuestionTypeBadge questionType={questionType} /> : null}
 
                 {onDelete && (
                 <div className="flex items-center gap-2">
@@ -1117,6 +1319,16 @@ export function QuestionEditor({
           <CardContent className="relative flex flex-col gap-6">
             <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
               <FieldGroup className="flex flex-col gap-6">
+                {!questionTypeLocked && (
+                  <QuestionTypeSwitch
+                    value={questionType}
+                    onChange={(value) => {
+                      setQuestionType(value)
+                      setValidationMessage("")
+                    }}
+                  />
+                )}
+
                 <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_112px]">
                   <Field>
                     <FieldLabel className="text-[#dac1b7]">Subject</FieldLabel>
@@ -1159,7 +1371,7 @@ export function QuestionEditor({
 
                   <Field>
                     <FieldLabel className="text-[#dac1b7]">
-                      {parts.length ? "Total Marks" : "Marks"}
+                      {!isMcq && parts.length ? "Total Marks" : "Marks"}
                     </FieldLabel>
                     <Input
                       className="h-10 rounded-full border-[#3b2a22]/55 bg-white/[0.035] px-2 text-center text-sm text-[#e5e2e1] [appearance:textfield] focus-visible:ring-[#ffb595]/40 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
@@ -1169,7 +1381,7 @@ export function QuestionEditor({
                       onChange={(e) => {
                         const v = e.target.value
                         setMarks(v)
-                        if (!parts.length) {
+                        if (!isMcq && !parts.length) {
                           setRootMarkingCriteria((prev) =>
                             normalizeCriteriaRows(criteriaRowCount(v, prev), prev)
                           )
@@ -1177,7 +1389,7 @@ export function QuestionEditor({
                         if (validationMessage) setValidationMessage("")
                       }}
                     />
-                    {parts.length > 0 && partMarksTotal !== Number(marks) && (
+                    {!isMcq && parts.length > 0 && partMarksTotal !== Number(marks) && (
                       <p className="mt-2 text-xs text-amber-200">
                         Parts currently add to {partMarksTotal} marks.
                       </p>
@@ -1200,7 +1412,7 @@ export function QuestionEditor({
 
                 <Field>
                   <FieldLabel className="text-[#dac1b7]">
-                    {parts.length ? "Question Stem / Background" : "Question"}
+                    {!isMcq && parts.length ? "Question Stem / Background" : "Question"}
                   </FieldLabel>
                   <RichTextArea
                     className={cn(
@@ -1223,6 +1435,51 @@ export function QuestionEditor({
                   )}
                 </Field>
 
+                <DropdownSection
+                  title="TikZ Visuals"
+                  summary={`${tikzVisuals.filter((item) => item.code).length} added`}
+                >
+                  <TikzVisualsEditor
+                    visuals={tikzVisuals}
+                    onChange={setTikzVisuals}
+                  />
+                </DropdownSection>
+
+                {isMcq && (
+                  <div className="grid gap-4">
+                    <DropdownSection
+                      title="Multiple Choice Options"
+                      summary={`${normalizeOptionLetters(mcqOptions).filter((item) => String(item.text || "").trim()).length} added`}
+                      defaultOpen
+                    >
+                      <McqOptionsEditor
+                        options={mcqOptions}
+                        correctOption={correctOption}
+                        onOptionsChange={(value) => {
+                          setMcqOptions(value)
+                          if (validationMessage) setValidationMessage("")
+                        }}
+                        onCorrectOptionChange={(value) => {
+                          setCorrectOption(value)
+                          if (validationMessage) setValidationMessage("")
+                        }}
+                        shuffleOptions={shuffleOptions}
+                        onShuffleOptionsChange={setShuffleOptions}
+                      />
+                    </DropdownSection>
+                    <DropdownSection
+                      title="Explanation"
+                      summary={explanation.trim() ? "ready" : "optional"}
+                    >
+                      <SampleSolutionEditor
+                        value={explanation}
+                        onChange={setExplanation}
+                      />
+                    </DropdownSection>
+                  </div>
+                )}
+
+                {!isMcq && (
                 <div className="grid gap-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <SectionTitle>Parts</SectionTitle>
@@ -1437,18 +1694,10 @@ export function QuestionEditor({
                     </details>
                   ))}
                 </div>
+                )}
 
-                {parts.length === 0 && (
+                {!isMcq && parts.length === 0 && (
                   <div className="grid gap-4">
-                    <DropdownSection
-                      title="TikZ Visuals"
-                      summary={`${tikzVisuals.filter((item) => item.code).length} added`}
-                    >
-                      <TikzVisualsEditor
-                        visuals={tikzVisuals}
-                        onChange={setTikzVisuals}
-                      />
-                    </DropdownSection>
                     <DropdownSection
                       title="Sample Solution"
                       summary={sampleSolution.trim() ? "ready" : "required"}
@@ -1495,10 +1744,11 @@ export function QuestionEditor({
                           setTagRequirements(syncTagRequirements(value, tagRequirements, tags))
                           if (validationMessage) setValidationMessage("")
                         }}
-                        showDeep={parts.length === 0}
+                        showDeep={isMcq || parts.length === 0}
+                        includeMicroskills={!isMcq}
                       />
                     )}
-                    {parts.length === 0 && (
+                    {!isMcq && parts.length === 0 && (
                       <TagRequirementAmounts
                         tags={tags}
                         selectedIds={tagIds}
@@ -1560,7 +1810,7 @@ export function QuestionEditor({
           hints={[]}
           markingCriteria={[]}
           marks={effectiveMarks}
-          parts={parts}
+          parts={isMcq ? [] : parts}
           questionText={questionText}
           importSource={importSource}
           subject={subject}
@@ -1568,6 +1818,10 @@ export function QuestionEditor({
           diagramSvg={diagramSvg}
           tikzCode={tikzCode}
           tikzVisuals={tikzVisuals}
+          stemTikzVisuals={tikzVisuals}
+          questionType={questionType}
+          mcqOptions={normalizeOptionLetters(mcqOptions)}
+          correctOption={correctOption}
         />
       )}
     </div>
