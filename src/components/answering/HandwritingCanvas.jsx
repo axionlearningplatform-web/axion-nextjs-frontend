@@ -341,6 +341,8 @@ function createPage(index) {
 // ─────────────────────────────────────────────────────────────────────────────
 const LAYER_CLASS =
   "absolute inset-0 block h-full w-full touch-none select-none [touch-action:none] [-webkit-touch-callout:none] [-webkit-user-drag:none] [-webkit-user-select:none]"
+const ACTIVE_CANVAS_CLASS =
+  "absolute inset-0 block h-full w-full select-none [-webkit-touch-callout:none] [-webkit-user-drag:none] [-webkit-user-select:none]"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Live ink width — cheap pressure + velocity bias (no perfect-freehand here)
@@ -367,7 +369,6 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   const predCanvasRef = useRef(null)      // RAF predicted ink
   const activeCanvasRef = useRef(null)    // pointer events (transparent)
   const canvasWrapperRef = useRef(null)
-  const toolbarSentinelRef = useRef(null)
 
   // ── Cached 2D contexts — avoid repeated getContext on pointermove ─────────
   const paperCtxRef = useRef(null)
@@ -677,27 +678,21 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   }, [])
 
   useEffect(() => {
-    const sentinel = toolbarSentinelRef.current
-    if (!sentinel) return
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (window.innerWidth < 768) {
-          setToolbarSticky(false)
-          return
-        }
-        setToolbarSticky(
-          !entry.isIntersecting && entry.boundingClientRect.top < 0
-        )
-      },
-      {
-        rootMargin: `-${navbarHeight}px 0px 0px 0px`,
-        threshold: 0,
+    const checkSticky = () => {
+      const wrapper = canvasWrapperRef.current
+      if (!wrapper) return
+      if (window.innerWidth < 768) {
+        setToolbarSticky(false)
+        return
       }
-    )
+      const rect = wrapper.getBoundingClientRect()
+      setToolbarSticky(rect.top < navbarHeight + 16)
+    }
 
-    observer.observe(sentinel)
-    return () => observer.disconnect()
+    checkSticky()
+
+    window.addEventListener("scroll", checkSticky, { passive: true })
+    return () => window.removeEventListener("scroll", checkSticky)
   }, [navbarHeight])
 
   useEffect(() => () => {
@@ -1266,9 +1261,6 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
           onSelect={stopDefault}
           onSelectCapture={stopDefault}
         >
-          {/* Sentinel for toolbar sticky detection */}
-          <div ref={toolbarSentinelRef} className="pointer-events-none absolute right-4 top-4 h-0 w-0" />
-
           <PencilToolbar
             activeTool={tool}
             canRedo={canRedo}
@@ -1332,7 +1324,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
               spellCheck={false}
               data-gramm="false"
               draggable={false}
-              className={LAYER_CLASS}
+              className={ACTIVE_CANVAS_CLASS}
               style={{
                 background: "transparent",
                 cursor:
