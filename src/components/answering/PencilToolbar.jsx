@@ -50,7 +50,7 @@ export default function PencilToolbar({
   return (
     <div
       className={cn(
-        "grid justify-items-end gap-2 transition-[top,right,opacity] duration-[120ms] ease-out",
+        "grid justify-items-end gap-2 transition-[right,opacity] duration-[120ms] ease-out",
         sticky ? "fixed z-50" : "absolute right-4 top-4 z-20"
       )}
       style={
