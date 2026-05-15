@@ -692,14 +692,19 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
         return
       }
       const rect = wrapper.getBoundingClientRect()
-      setToolbarSticky(rect.top < navbarHeight + 16)
+      // Barrier = navbar bottom + locked question panel height (0 when unlocked).
+      // Toolbar natural position = rect.top + 16 (top-4 offset inside wrapper).
+      // Go sticky when toolbar would be within 8px of the barrier — matching
+      // the 8px gap used in the sticky top position.
+      const barrier = navbarHeight + lockedQuestionHeight
+      setToolbarSticky(rect.top + 16 < barrier + 8)
     }
 
     checkSticky()
 
     window.addEventListener("scroll", checkSticky, { passive: true })
     return () => window.removeEventListener("scroll", checkSticky)
-  }, [navbarHeight])
+  }, [navbarHeight, lockedQuestionHeight])
 
   useEffect(() => () => {
     cancelPredAnimation()
