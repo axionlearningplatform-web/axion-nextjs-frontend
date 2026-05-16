@@ -1006,6 +1006,16 @@ function AnswerArea({
                   </p>
                 </div>
               )}
+              {markingResult?.ocr_failed && (
+                <div className="rounded-[3px] border border-[#d99658]/25 bg-[#d99658]/8 p-5">
+                  <p className="text-[13px] font-semibold text-[#d99658]">
+                    Handwriting not recognised
+                  </p>
+                  <p className="mt-1 text-[13px] text-[#9b8f84]">
+                    Your working was received but couldn&apos;t be read clearly. Try resubmitting, or switch to the Photo tab for a clearer image.
+                  </p>
+                </div>
+              )}
               {markingResult.marks_awarded < markingResult.marks_possible && (markingResult.parts || []).map((part) => (
                 <div key={part.label} className="border-t border-white/[0.06] pt-4">
                   <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
