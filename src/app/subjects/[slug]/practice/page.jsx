@@ -950,7 +950,16 @@ function AnswerArea({
         <>
           <div className="mt-5 rounded-[3px] border border-white/[0.06] bg-[#1a1714] p-5">
             {markingError && (
-              <p className="text-[13px] text-[#d99658]">{markingError}</p>
+              <div className="flex items-center gap-4">
+                <p className="flex-1 text-[13px] text-[#d99658]">{markingError}</p>
+                <button
+                  type="button"
+                  onClick={submitAnswer}
+                  className="shrink-0 text-[12px] font-medium text-[#dba476] underline underline-offset-2"
+                >
+                  Try again
+                </button>
+              </div>
             )}
             {markingResult && (
               <div className="grid gap-4">
@@ -968,6 +977,11 @@ function AnswerArea({
               </div>
               {(markingResult.feedback || markingResult.next_step_advice) && (
                 <div className="grid gap-3 rounded-[4px] border border-white/[0.06] bg-[#120f0d] p-3 text-[13px] leading-relaxed text-[#b7aca1]">
+                  {markingResult?.marking_parse_failed && (
+                    <p className="text-[13px] text-[#d99658]">
+                      Marking could not be scored for this response - see the sample answer below.
+                    </p>
+                  )}
                   {markingResult.feedback && (
                     <MarkdownMath className="text-[13px] leading-relaxed text-[#b7aca1] [&_.katex]:text-[#e8e4dc]">
                       {markingResult.feedback}
