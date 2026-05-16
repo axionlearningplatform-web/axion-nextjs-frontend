@@ -1492,9 +1492,11 @@ export default function DailyPracticePage() {
       const data = await parseJsonResponse(response)
       if (!response.ok) {
         const hint =
-          data.detail ||
-          data.message ||
-          (typeof data.error === "string" ? data.error : null)
+          response.status === 502 || response.status === 504
+            ? "Marking timed out - the question may be complex. Try submitting again."
+            : data.detail ||
+              data.message ||
+              (typeof data.error === "string" ? data.error : null)
         throw new Error(
           hint || `Could not mark this response (HTTP ${response.status}).`
         )
