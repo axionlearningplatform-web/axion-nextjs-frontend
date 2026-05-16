@@ -999,6 +999,13 @@ function AnswerArea({
                   )}
                 </div>
               )}
+              {markingResult?.ocr_empty && (
+                <div className="rounded-[3px] border border-[#d99658]/25 bg-[#d99658]/8 p-5">
+                  <p className="text-[13px] text-[#d99658]">
+                    No handwriting detected - your canvas may have been blank. Try resubmitting or switch to the Photo tab.
+                  </p>
+                </div>
+              )}
               {markingResult.marks_awarded < markingResult.marks_possible && (markingResult.parts || []).map((part) => (
                 <div key={part.label} className="border-t border-white/[0.06] pt-4">
                   <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">

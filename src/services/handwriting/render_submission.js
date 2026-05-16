@@ -124,7 +124,8 @@ export function drawPageStrokes(ctx, strokes, { clean = false } = {}) {
 // ─────────────────────────────────────────────────────────────────────────────
 const OCR_PADDING = 52
 const OCR_STROKE_WIDTH = 4
-const OCR_MAX_RENDERED_SIDE = 900
+const OCR_MIN_RENDERED_WIDTH = 1000
+const OCR_MAX_RENDERED_SIDE = 1400
 
 function validStrokePoints(stroke) {
   return (stroke?.points || []).filter(
@@ -213,15 +214,26 @@ export function renderPageToOCRCanvas({
   page,
   width,
   height,
-  scale = 0.6,
+  scale,
+  minRenderedWidth = OCR_MIN_RENDERED_WIDTH,
   padding = OCR_PADDING,
   maxRenderedSide = OCR_MAX_RENDERED_SIDE,
 } = {}) {
   const crop = getPageStrokeBounds(page, width, height, { padding })
+  let resolvedScale
+  if (scale !== undefined) {
+    resolvedScale = scale
+  } else {
+    resolvedScale = minRenderedWidth / Math.max(1, crop.width)
+  }
+
+  const maxWidthScale = maxRenderedSide / Math.max(1, crop.width)
+  const maxHeightScale = maxRenderedSide / Math.max(1, crop.height)
+  const floorScale = minRenderedWidth / Math.max(1, crop.width)
   const boundedScale = Math.min(
-    scale,
-    maxRenderedSide / Math.max(1, crop.width),
-    maxRenderedSide / Math.max(1, crop.height)
+    Math.max(resolvedScale, floorScale),
+    maxWidthScale,
+    maxHeightScale
   )
   const canvas = document.createElement("canvas")
   canvas.width = Math.max(1, Math.round(crop.width * boundedScale))

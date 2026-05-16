@@ -1,9 +1,10 @@
 import { renderPageToOCRCanvas } from "./render_submission"
 
-const OCR_EXPORT_SCALE = 0.6
+const OCR_MIN_RENDERED_WIDTH = 1000
+const OCR_MAX_RENDERED_SIDE = 1400
 const OCR_EXPORT_MIME_TYPE = "image/webp"
 const OCR_EXPORT_FALLBACK_MIME_TYPE = "image/png"
-const OCR_EXPORT_QUALITY = 0.72
+const OCR_EXPORT_QUALITY = 0.82
 
 function canvasToBlob(canvas, type, quality) {
   return new Promise((resolve, reject) => {
@@ -53,13 +54,17 @@ function serialiseStroke(stroke) {
 }
 
 export async function exportHandwrittenAnswer({ questionId, pages, width, height }) {
-  const scale = OCR_EXPORT_SCALE
-
   const exportedPages = []
   for (let index = 0; index < pages.length; index += 1) {
     const page = pages[index]
     const startedAt = performance.now()
-    const { canvas, crop, scale: actualScale } = renderPageToOCRCanvas({ page, width, height, scale })
+    const { canvas, crop, scale: actualScale } = renderPageToOCRCanvas({
+      page,
+      width,
+      height,
+      minRenderedWidth: OCR_MIN_RENDERED_WIDTH,
+      maxRenderedSide: OCR_MAX_RENDERED_SIDE,
+    })
     const { blob, mimeType, compression } = await canvasToPreferredOCRBlob(canvas)
     const renderMs = Math.round(performance.now() - startedAt)
     const strokeCount = (page.strokes || []).length
