@@ -43,6 +43,13 @@ function questionTypeLabel(value) {
   return String(value || "saq").toLowerCase() === "mcq" ? "MCQ" : "SAQ"
 }
 
+function titleCase(value = "") {
+  return value
+    .replaceAll("-", " ")
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
+
 const QuestionRow = memo(function QuestionRow({ item, onRowClick }) {
   const preview = item.question_preview ?? item.question_text ?? ""
   const tags = item.tags || []
@@ -113,6 +120,11 @@ const QuestionRow = memo(function QuestionRow({ item, onRowClick }) {
         </div>
       </TableCell>
       <TableCell className="px-4">{item.marks}</TableCell>
+      <TableCell className="px-4">
+        <span className="rounded-[2px] border border-[#7c573a]/70 bg-[#c8864a]/10 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#d99658]">
+          {titleCase(item.level || "exam_practice")}
+        </span>
+      </TableCell>
       <TableCell className="px-4 text-[#dac1b7]">
         {new Date(item.created_at).toLocaleDateString()}
       </TableCell>
@@ -167,6 +179,7 @@ export default function QuestionTable() {
   const questionsListUrl = useMemo(() => {
     const p = new URLSearchParams()
     if (lockedSubject?.id) p.set("subject_id", String(lockedSubject.id))
+    else if (subjectSlug) p.set("subject_slug", String(subjectSlug))
     if (debouncedSearch) p.set("search", debouncedSearch)
     if (layer1Id) p.set("layer1_tag_id", String(layer1Id))
     if (layer2Id) p.set("layer2_tag_id", String(layer2Id))
@@ -175,9 +188,9 @@ export default function QuestionTable() {
     p.set("limit", String(PAGE_SIZE))
     p.set("offset", String(page * PAGE_SIZE))
     return `${QUESTIONS_API_URL}?${p.toString()}`
-  }, [lockedSubject?.id, debouncedSearch, layer1Id, layer2Id, moderationFilter, questionTypeFilter, page])
+  }, [lockedSubject?.id, subjectSlug, debouncedSearch, layer1Id, layer2Id, moderationFilter, questionTypeFilter, page])
 
-  const swrKey = subjectSlug ? (lockedSubject ? questionsListUrl : null) : questionsListUrl
+  const swrKey = questionsListUrl
 
   const { data: listPayload, error, isLoading, isValidating } = useSWR(swrKey, fetcher, {
     revalidateOnFocus: false,
@@ -231,7 +244,7 @@ export default function QuestionTable() {
   if (subjectSlug && !subjectsLoading && !lockedSubject) {
     return <div className="p-10 text-[#ffb4ab]">Subject not available for this user</div>
   }
-  if (subjectsLoading || (isLoading && !listPayload)) {
+  if ((!subjectSlug && subjectsLoading) || (isLoading && !listPayload)) {
     return <div className="p-10 text-[#dac1b7]">Loading questions...</div>
   }
 
@@ -362,6 +375,9 @@ export default function QuestionTable() {
                   Marks
                 </TableHead>
                 <TableHead className="w-36 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
+                  Level
+                </TableHead>
+                <TableHead className="w-36 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                   Created
                 </TableHead>
               </TableRow>
@@ -369,7 +385,7 @@ export default function QuestionTable() {
             <TableBody>
               {paddingTop > 0 && (
                 <TableRow className="border-0 hover:bg-transparent">
-                  <TableCell colSpan={9} className="p-0" style={{ height: `${paddingTop}px` }} />
+                  <TableCell colSpan={10} className="p-0" style={{ height: `${paddingTop}px` }} />
                 </TableRow>
               )}
               {virtualRows.map((virtualRow) => {
@@ -381,7 +397,7 @@ export default function QuestionTable() {
               })}
               {paddingBottom > 0 && (
                 <TableRow className="border-0 hover:bg-transparent">
-                  <TableCell colSpan={9} className="p-0" style={{ height: `${paddingBottom}px` }} />
+                  <TableCell colSpan={10} className="p-0" style={{ height: `${paddingBottom}px` }} />
                 </TableRow>
               )}
             </TableBody>

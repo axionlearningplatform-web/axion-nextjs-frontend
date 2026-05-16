@@ -63,6 +63,13 @@ const emptyMcqOption = (index = 0) => ({
 
 const defaultMcqOptions = () => [0, 1, 2, 3].map(emptyMcqOption)
 
+const levelOptions = [
+  { value: "foundational", label: "Foundational" },
+  { value: "intermediate", label: "Intermediate" },
+  { value: "exam_practice", label: "Exam Practice" },
+  { value: "challenge", label: "Challenge" },
+]
+
 function SectionTitle({ children }) {
   return (
     <div className="font-serif text-xl font-semibold text-[#e5e2e1]">
@@ -462,6 +469,31 @@ function QuestionTypeSwitch({ value, onChange }) {
             key={option.value}
             type="button"
             onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function LevelSegmentedControl({ value, onChange }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {levelOptions.map((option) => {
+        const active = value === option.value
+        return (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            className={cn(
+              "h-8 rounded-[2px] border px-3 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors",
+              active
+                ? "border-[#d49a71]/70 bg-[#d49a71]/13 text-[#e0a77c]"
+                : "border-[#3c2c24] bg-[#120f0d] text-[#968a80] hover:border-[#8b5e42]/70 hover:text-[#e1d8d0]"
+            )}
           >
             {option.label}
           </button>
@@ -1090,6 +1122,7 @@ export function QuestionEditor({
   const [subjectId, setSubjectId] = useState("")
   const [marks, setMarks] = useState("1")
   const [questionType, setQuestionType] = useState("saq")
+  const [level, setLevel] = useState("exam_practice")
   const [questionText, setQuestionText] = useState("")
   const [sampleSolution, setSampleSolution] = useState("")
   const [answerType, setAnswerType] = useState("proof")
@@ -1110,6 +1143,7 @@ export function QuestionEditor({
   const [explanation, setExplanation] = useState("")
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [validationMessage, setValidationMessage] = useState("")
+  const preMcqMarksRef = useRef("1")
 
   const showTagging = taggingMode !== "hidden"
   const isMcq = questionType === "mcq"
@@ -1132,7 +1166,9 @@ export function QuestionEditor({
   const selectedTags = tags.filter((tag) => tagIds.includes(tag.id))
   const sourcePlaceholder = `e.g. HSC ${subject || lockedSubject?.name || "Chemistry"} 2025`
 
-  const effectiveMarks = !isMcq && parts.length
+  const effectiveMarks = isMcq
+    ? 1
+    : parts.length
     ? Number(marks) || parts.reduce((total, part) => total + (Number(part.marks) || 0), 0)
     : criteriaRowCount(marks, rootMarkingCriteria)
   const partMarksTotal = parts.reduce((total, part) => total + (Number(part.marks) || 0), 0)
@@ -1145,6 +1181,7 @@ export function QuestionEditor({
     setSubjectId(initialData.subject_id ? String(initialData.subject_id) : "")
     setMarks(String(initialData.marks || "1"))
     setQuestionType(initialData.question_type === "mcq" ? "mcq" : "saq")
+    setLevel(initialData.level || "exam_practice")
     setQuestionText(initialData.question_text || "")
     setSampleSolution(initialData.sample_solution || "")
     setAnswerType(initialData.answer_type || "proof")
@@ -1210,12 +1247,30 @@ export function QuestionEditor({
     setSubjectId(lockedSubject.id ? String(lockedSubject.id) : "")
   }, [lockedSubject])
 
+  function updateQuestionType(value) {
+    if (value === questionType) return
+    if (value === "mcq") {
+      preMcqMarksRef.current = marks || "1"
+      setMarks("1")
+      setRootMarkingCriteria(normalizeCriteriaRows(1, rootMarkingCriteria))
+    } else if (questionType === "mcq") {
+      const restored = preMcqMarksRef.current || "1"
+      setMarks(restored)
+      setRootMarkingCriteria((prev) =>
+        normalizeCriteriaRows(criteriaRowCount(restored, prev), prev)
+      )
+    }
+    setQuestionType(value)
+    if (validationMessage) setValidationMessage("")
+  }
+
   function payload() {
     return {
       subject,
       subject_id: subjectId ? Number(subjectId) : null,
       marks: effectiveMarks,
       question_type: questionType,
+      level,
       question_text: questionText,
       latex: "",
       graph: "",
@@ -1270,7 +1325,7 @@ export function QuestionEditor({
 
   function validateQuestionDraft() {
     if (!subjectId && !subject.trim()) return "Subject is required."
-    if (!Number(marks) || Number(marks) < 1) return "Marks are required."
+    if (!isMcq && (!Number(marks) || Number(marks) < 1)) return "Marks are required."
     if (!importSource.trim()) return "Source is required."
     if (!questionText.trim()) return "Question text is required."
     if (showTagging && !tagIds.length) return "At least one topic tag is required."
@@ -1320,7 +1375,7 @@ export function QuestionEditor({
     if (!onDraftChange) return
     onDraftChange(payload())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject, subjectId, marks, questionType, questionText, sampleSolution, answerType, answerValue, tikzCode, diagramSvg, tikzVisuals, importSource, parts, attachments, tagIds, tagRequirements, tags, rootMarkingCriteria, useTagMarking, mcqOptions, correctOption, shuffleOptions, explanation])
+  }, [subject, subjectId, marks, questionType, level, questionText, sampleSolution, answerType, answerValue, tikzCode, diagramSvg, tikzVisuals, importSource, parts, attachments, tagIds, tagRequirements, tags, rootMarkingCriteria, useTagMarking, mcqOptions, correctOption, shuffleOptions, explanation])
 
   return (
     <div className={cn("grid gap-8", !hidePreview && "lg:grid-cols-2")}>
@@ -1388,7 +1443,7 @@ export function QuestionEditor({
                   <QuestionTypeSwitch
                     value={questionType}
                     onChange={(value) => {
-                      setQuestionType(value)
+                      updateQuestionType(value)
                       setValidationMessage("")
                     }}
                   />
@@ -1439,10 +1494,14 @@ export function QuestionEditor({
                       {!isMcq && parts.length ? "Total Marks" : "Marks"}
                     </FieldLabel>
                     <Input
-                      className="h-10 rounded-full border-[#3b2a22]/55 bg-white/[0.035] px-2 text-center text-sm text-[#e5e2e1] [appearance:textfield] focus-visible:ring-[#ffb595]/40 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      className={cn(
+                        "h-10 rounded-full border-[#3b2a22]/55 bg-white/[0.035] px-2 text-center text-sm text-[#e5e2e1] [appearance:textfield] focus-visible:ring-[#ffb595]/40 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+                        isMcq && "pointer-events-none cursor-not-allowed opacity-50"
+                      )}
+                      disabled={isMcq}
                       min="1"
                       type="number"
-                      value={marks}
+                      value={isMcq ? "1" : marks}
                       onChange={(e) => {
                         const v = e.target.value
                         setMarks(v)
@@ -1470,6 +1529,19 @@ export function QuestionEditor({
                     value={importSource}
                     onChange={(event) => {
                       setImportSource(event.target.value)
+                      if (validationMessage) setValidationMessage("")
+                    }}
+                  />
+                </Field>
+
+                <Field>
+                  <FieldLabel className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#6d5d50]">
+                    Level
+                  </FieldLabel>
+                  <LevelSegmentedControl
+                    value={level}
+                    onChange={(value) => {
+                      setLevel(value)
                       if (validationMessage) setValidationMessage("")
                     }}
                   />

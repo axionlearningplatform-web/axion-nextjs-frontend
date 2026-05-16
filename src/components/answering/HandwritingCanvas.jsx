@@ -365,6 +365,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     onToggleQuestionLock,
     questionId,
     questionLocked = false,
+    readOnly = false,
   },
   ref
 ) {
@@ -832,6 +833,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   // ─────────────────────────────────────────────────────────────────────────
 
   function startStroke(event) {
+    if (readOnly) return
     if (!activeCanvasRef.current) return
     // Reject finger/touch input — only pen and mouse create ink.
     if (event.pointerType === "touch") return
@@ -892,6 +894,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   }
 
   function extendStroke(event) {
+    if (readOnly) return
     // Belt-and-suspenders: ignore touch events that leaked through.
     if (event.pointerType === "touch" && activePointerRef.current !== event.pointerId) return
 
@@ -971,6 +974,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   }
 
   function finishStroke(event) {
+    if (readOnly) return
     if (
       activePointerRef.current !== event.pointerId ||
       !currentStrokeRef.current
@@ -1118,6 +1122,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   // Undo / Redo / Clear
   // ─────────────────────────────────────────────────────────────────────────
   function undo() {
+    if (readOnly) return
     updateCurrentPage((page) => {
       const history = page.history || []
       if (!history.length) return page
@@ -1146,6 +1151,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   }
 
   function redo() {
+    if (readOnly) return
     updateCurrentPage((page) => {
       if (!page.redoStack?.length) return page
       const [action, ...redoStack] = page.redoStack
@@ -1189,6 +1195,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   }
 
   function clearPage() {
+    if (readOnly) return
     updateCurrentPage((page) => ({
       ...page,
       strokes: [],
@@ -1207,12 +1214,14 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   // Page management
   // ─────────────────────────────────────────────────────────────────────────
   function addPage() {
+    if (readOnly) return
     const next = [...pagesRef.current, createPage(pagesRef.current.length)]
     commitPages(next)
     setCurrentPageIndex(next.length - 1)
   }
 
   function deletePage(pageIndex) {
+    if (readOnly) return
     if (pagesRef.current.length <= 1) return
     const next = pagesRef.current
       .filter((_, i) => i !== pageIndex)
@@ -1254,7 +1263,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
           currentPageIndex={currentPageIndex}
           onAddPage={addPage}
           onDeletePage={deletePage}
-          onSelectPage={setCurrentPageIndex}
+          onSelectPage={readOnly ? () => {} : setCurrentPageIndex}
           pages={pages}
         />
         <div
@@ -1280,10 +1289,10 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
             lockedQuestionHeight={lockedQuestionHeight}
             navbarHeight={navbarHeight}
             onClear={clearPage}
-            onEraserSizeChange={setEraserSize}
+            onEraserSizeChange={readOnly ? () => {} : setEraserSize}
             onRedo={redo}
             onToggleQuestionLock={onToggleQuestionLock}
-            onToolChange={setTool}
+            onToolChange={readOnly ? () => {} : setTool}
             onUndo={undo}
             questionLocked={questionLocked}
             rightOffset={toolbarRightOffset}
@@ -1336,7 +1345,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
               spellCheck={false}
               data-gramm="false"
               draggable={false}
-              className={ACTIVE_CANVAS_CLASS}
+              className={`${ACTIVE_CANVAS_CLASS} ${readOnly ? "pointer-events-none" : ""}`}
               style={{
                 background: "transparent",
                 cursor:

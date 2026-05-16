@@ -5,11 +5,13 @@ import { useParams } from "next/navigation"
 import ReactMarkdown from "react-markdown"
 import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
-import useSWR from "swr"
+import useSWR, { preload } from "swr"
 import {
   ArrowLeft,
   ArrowRight,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Keyboard,
   Lightbulb,
   Loader2,
@@ -33,18 +35,26 @@ const sections = [
   { id: "course", label: "Course" },
   { id: "topics", label: "Topics" },
   { id: "dotPoints", label: "Dot Points", disabled: true },
-  { id: "difficulty", label: "Difficulty" },
+  { id: "level", label: "Level" },
   { id: "type", label: "Type" },
 ]
 
-const difficultyOptions = ["Foundation", "Intermediate", "Advanced"]
-const typeOptions = ["SAQ", "MCQ", "Extended Response"]
+const levelOptions = ["Foundational", "Intermediate", "Exam Practice", "Challenge"]
+const typeOptions = ["SAQ", "MCQ"]
 
 function titleCase(value = "") {
   return value
     .replaceAll("-", " ")
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
+
+function levelValue(label = "") {
+  return label.toLowerCase().replaceAll(" ", "_")
+}
+
+function levelLabel(value = "") {
+  return titleCase(value || "exam_practice")
 }
 
 function shuffledOptions(options = []) {
@@ -135,8 +145,8 @@ function defaultConfig(subject) {
     course: subject?.name || "Mathematical Methods",
     topicIds: [],
     topicNames: [],
-    difficulty: "Intermediate",
-    type: "SAQ",
+    level: "",
+    type: "",
   }
 }
 
@@ -149,9 +159,32 @@ function configTagIds(config, buckets) {
     .map((tag) => tag.id)
 }
 
+function questionMatchesConfig(question, config, buckets) {
+  if (config.type) {
+    const questionType = question.question_type?.toUpperCase()
+    if (questionType !== config.type.toUpperCase()) return false
+  }
+
+  if (config.level) {
+    const questionLevel = question.level || "exam_practice"
+    if (questionLevel !== levelValue(config.level)) return false
+  }
+
+  const selectedTagIds = new Set(configTagIds(config, buckets))
+  if (!selectedTagIds.size) return true
+
+  const questionTagIds = new Set((question.tags || []).map((tag) => tag.id))
+  return [...selectedTagIds].every((id) => questionTagIds.has(id))
+}
+
 function randomItem(items) {
   if (!items.length) return null
   return items[Math.floor(Math.random() * items.length)]
+}
+
+function unwrapQuestions(data) {
+  if (Array.isArray(data)) return data
+  return data?.results || []
 }
 
 function formatTimer(seconds) {
@@ -298,6 +331,7 @@ function OptionButton({ children, active, disabled, onClick }) {
 function PracticeModal({
   buckets,
   config,
+  dataLoading,
   onChange,
   onClose,
   onGenerate,
@@ -321,13 +355,14 @@ function PracticeModal({
       type: "topic",
       id: tag.id,
     })),
-    config.difficulty && { key: "difficulty", label: config.difficulty, type: "difficulty" },
+    config.level && { key: "level", label: config.level, type: "level" },
     config.type && { key: "type", label: config.type, type: "type" },
   ].filter(Boolean)
+  const canGenerate = Boolean(config.year && config.course && !dataLoading)
 
   function removeChip(chip) {
     if (chip.type === "year") onChange({ ...config, year: "" })
-    else if (chip.type === "difficulty") onChange({ ...config, difficulty: "" })
+    else if (chip.type === "level") onChange({ ...config, level: "" })
     else if (chip.type === "type") onChange({ ...config, type: "" })
     else if (chip.type === "topic") {
       const tag = topicById.get(chip.id)
@@ -390,7 +425,7 @@ function PracticeModal({
                   (section.id === "year" && config.year) ||
                   (section.id === "course" && config.course) ||
                   (section.id === "topics" && config.topicNames.length) ||
-                  (section.id === "difficulty" && config.difficulty) ||
+                  (section.id === "level" && config.level) ||
                   (section.id === "type" && config.type)
 
                 return (
@@ -468,13 +503,13 @@ function PracticeModal({
               <p className="font-serif text-xl text-[#4f4a45]">Dot Points are coming soon.</p>
             )}
 
-            {activeSection === "difficulty" && (
+            {activeSection === "level" && (
               <div className="flex flex-wrap gap-2">
-                {difficultyOptions.map((option) => (
+                {levelOptions.map((option) => (
                   <OptionButton
                     key={option}
-                    active={config.difficulty === option}
-                    onClick={() => onChange({ ...config, difficulty: option })}
+                    active={config.level === option}
+                    onClick={() => onChange({ ...config, level: config.level === option ? "" : option })}
                   >
                     {option}
                   </OptionButton>
@@ -488,7 +523,7 @@ function PracticeModal({
                   <OptionButton
                     key={option}
                     active={config.type === option}
-                    onClick={() => onChange({ ...config, type: option })}
+                    onClick={() => onChange({ ...config, type: config.type === option ? "" : option })}
                   >
                     {option}
                   </OptionButton>
@@ -510,9 +545,14 @@ function PracticeModal({
           <button
             type="button"
             onClick={() => onGenerate("modal")}
-            className="h-12 rounded-[8px] border border-[#d49a71]/45 bg-[#d49a71]/16 px-9 font-serif text-[20px] font-semibold tracking-normal text-[#e6b083] shadow-[0_12px_38px_rgba(0,0,0,0.22)] transition-colors hover:border-[#d49a71]/70 hover:bg-[#d49a71]/24 hover:text-[#f1c39e]"
+            disabled={!canGenerate}
+            title={canGenerate ? "Generate question" : dataLoading ? "Loading question data" : "Choose a year and course first"}
+            className={cn(
+              "h-12 rounded-[8px] border border-[#d49a71]/45 bg-[#d49a71]/16 px-9 font-serif text-[20px] font-semibold tracking-normal text-[#e6b083] shadow-[0_12px_38px_rgba(0,0,0,0.22)] transition-colors hover:border-[#d49a71]/70 hover:bg-[#d49a71]/24 hover:text-[#f1c39e]",
+              !canGenerate && "cursor-not-allowed border-[#2d2926] bg-[#11100f] text-[#4f4b47] opacity-70 hover:border-[#2d2926] hover:bg-[#11100f] hover:text-[#4f4b47]"
+            )}
           >
-            Generate
+            {dataLoading ? "Loading..." : "Generate"}
           </button>
         </footer>
       </section>
@@ -520,7 +560,7 @@ function PracticeModal({
   )
 }
 
-function PracticeHome({ config, onGenerate, onOpenModal, subject, userName }) {
+function PracticeHome({ config, dataLoading, onGenerate, onOpenModal, subject, userName }) {
   const greeting = greetingForNow()
   const displayName = String(userName || "there").trim() || "there"
   const topicLine = config.topicNames.length
@@ -547,7 +587,7 @@ function PracticeHome({ config, onGenerate, onOpenModal, subject, userName }) {
             className="min-w-0 px-6 py-5 text-left sm:px-7 sm:py-6"
           >
             <span className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#847165]">
-              {config.year || "Year 12"} · {subject?.name || config.course} · {config.difficulty || "Intermediate"}
+              {config.year || "Year 12"} · {subject?.name || config.course}{config.level ? ` · ${config.level}` : ""}
             </span>
             <span className="mt-2 block truncate font-serif text-[26px] font-medium leading-tight text-[#f1e7dd]">
               {topicLine}
@@ -571,9 +611,10 @@ function PracticeHome({ config, onGenerate, onOpenModal, subject, userName }) {
             type="button"
             aria-label="Start daily practice"
             onClick={() => onGenerate("home")}
-            className="m-5 flex size-12 items-center justify-center self-center rounded-[9px] border border-[#d49a71]/55 bg-[#d49a71]/78 text-[#120c08] transition-colors hover:bg-[#d49a71]/90"
+            disabled={dataLoading}
+            className="m-5 flex size-12 items-center justify-center self-center rounded-[9px] border border-[#d49a71]/55 bg-[#d49a71]/78 text-[#120c08] transition-colors hover:bg-[#d49a71]/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <ArrowRight className="size-6" />
+            {dataLoading ? <Loader2 className="size-5 animate-spin" /> : <ArrowRight className="size-6" />}
           </button>
         </article>
       </section>
@@ -730,6 +771,74 @@ function McqResultCard({ result }) {
   )
 }
 
+function SubmittedFilePreview({ files }) {
+  const imageFiles = files.filter((file) => file.mime_type?.startsWith("image/"))
+  const pdfFiles = files.filter((file) => file.mime_type === "application/pdf" || file.name?.toLowerCase().endsWith(".pdf"))
+  const [activeIndex, setActiveIndex] = useState(0)
+  const displayIndex = Math.min(activeIndex, Math.max(imageFiles.length - 1, 0))
+  const activeImage = imageFiles[displayIndex]
+
+  if (!imageFiles.length && !pdfFiles.length) return null
+
+  return (
+    <section className="mb-4 rounded-[3px] border border-white/[0.06] bg-[#17110e] p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8f8982]">
+        Your Submission
+      </p>
+      {activeImage && (
+        <div className="mt-3">
+          <div className="flex items-center justify-center rounded-[3px] border border-white/[0.06] bg-[#120f0d] p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={activeImage.data_url}
+              alt={activeImage.name || "Submitted work"}
+              className="max-h-[320px] max-w-full object-contain"
+            />
+          </div>
+          {imageFiles.length > 1 && (
+            <div className="mt-3 flex items-center justify-center gap-3 text-[11px] font-semibold tracking-[0.08em] text-[#8f8982]">
+              <button
+                type="button"
+                className="inline-flex size-8 items-center justify-center rounded-[2px] border border-white/[0.06] text-[#d99658] transition-colors hover:border-[#7c573a]/70 disabled:cursor-not-allowed disabled:opacity-45"
+                onClick={() => setActiveIndex((index) => Math.max(0, index - 1))}
+                disabled={displayIndex === 0}
+                aria-label="Previous submission image"
+              >
+                <ChevronLeft className="size-4" />
+              </button>
+              <span>{displayIndex + 1} / {imageFiles.length}</span>
+              <button
+                type="button"
+                className="inline-flex size-8 items-center justify-center rounded-[2px] border border-white/[0.06] text-[#d99658] transition-colors hover:border-[#7c573a]/70 disabled:cursor-not-allowed disabled:opacity-45"
+                onClick={() => setActiveIndex((index) => Math.min(imageFiles.length - 1, index + 1))}
+                disabled={displayIndex >= imageFiles.length - 1}
+                aria-label="Next submission image"
+              >
+                <ChevronRight className="size-4" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      {pdfFiles.length > 0 && (
+        <div className="mt-3 grid gap-2">
+          {pdfFiles.map((file, index) => (
+            <a
+              key={`${file.name}-${index}`}
+              href={file.data_url}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-[3px] border border-white/[0.06] bg-[#120f0d] px-3 py-2 text-[12px] text-[#b7aca1] transition-colors hover:border-[#7c573a]/70 hover:text-[#dba476]"
+            >
+              PDF submitted — {file.name || "submission.pdf"}
+            </a>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
 function AnswerArea({
   betaSampleRevealed,
   markingDisabled,
@@ -737,18 +846,25 @@ function AnswerArea({
   markingLoading,
   markingResult,
   onBetaReveal,
+  onNextQuestion,
   onSubmit,
   onToggleQuestionLock,
   lockedQuestionHeight = 0,
   question,
   questionId,
   questionLocked,
+  selectedMcqOption,
 }) {
   const [activeTab, setActiveTab] = useState("type")
   const [typedAnswer, setTypedAnswer] = useState("")
   const [files, setFiles] = useState([])
+  const [submitted, setSubmitted] = useState(false)
+  const [submittedTab, setSubmittedTab] = useState(null)
+  const [submittedFiles, setSubmittedFiles] = useState([])
   const handwritingRef = useRef(null)
   const isMcq = question?.question_type === "mcq"
+  const locked = submitted
+  const canMoveNext = Boolean((markingResult || betaSampleRevealed) && !markingLoading)
 
   useEffect(() => {
     if (activeTab !== "draw" && questionLocked) {
@@ -759,25 +875,43 @@ function AnswerArea({
   }, [activeTab])
 
   async function addFiles(fileList) {
+    if (locked) return
     const nextFiles = await Promise.all(Array.from(fileList || []).map(readFileAsDataUrl))
     setFiles((current) => [...current, ...nextFiles])
   }
 
   function removeFile(index) {
+    if (locked) return
     setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))
   }
 
   async function submitAnswer() {
+    if (canMoveNext) {
+      onNextQuestion?.()
+      return
+    }
+    if (locked) return
     if (isMcq) {
+      if (!selectedMcqOption) {
+        onSubmit({})
+        return
+      }
+      setSubmitted(true)
+      setSubmittedTab("mcq")
       onSubmit({})
       return
     }
     if (markingDisabled) {
+      setSubmitted(true)
+      setSubmittedTab(activeTab)
       onBetaReveal?.()
       return
     }
+    setSubmitted(true)
+    setSubmittedTab(activeTab)
     if (activeTab === "draw" && handwritingRef.current) {
       const exportPayload = await handwritingRef.current.exportAnswer()
+      setSubmittedFiles([])
       const formData = new FormData()
       formData.append("submission_type", "draw")
       formData.append("stroke_data", JSON.stringify(exportPayload.stroke_data || {}))
@@ -795,6 +929,7 @@ function AnswerArea({
     }
 
     if (activeTab === "type") {
+      setSubmittedFiles([])
       onSubmit({
         submission_type: "text",
         files: [{
@@ -807,6 +942,7 @@ function AnswerArea({
       return
     }
 
+    setSubmittedFiles(files)
     onSubmit({ submission_type: "file", files })
   }
 
@@ -816,11 +952,11 @@ function AnswerArea({
         <div className="flex justify-end">
           <button
             type="button"
-            disabled={markingLoading}
+            disabled={markingLoading || (submitted && !canMoveNext)}
             onClick={submitAnswer}
             className="inline-flex h-11 items-center justify-center gap-3 rounded-[2px] border border-[#9b673d]/42 bg-[#c8864a]/12 px-7 text-[12px] font-medium tracking-[0.06em] text-[#dba476] transition-colors hover:border-[#c8864a]/62 hover:bg-[#c8864a]/18 hover:text-[#efbd94] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {markingLoading ? "Submitting..." : "Submit Answer"}
+            {markingLoading ? "Submitting..." : canMoveNext ? "Next Question" : "Submit Answer"}
             {markingLoading ? <Loader2 className="size-[18px] animate-spin" /> : <ArrowRight className="size-[18px]" />}
           </button>
         </div>
@@ -842,11 +978,13 @@ function AnswerArea({
             key={tab}
             type="button"
             onClick={() => setActiveTab(tab)}
+            disabled={locked}
             className={cn(
               "h-9 border-b text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors",
               activeTab === tab
                 ? "border-[#e8e4dc] text-[#e8e4dc]"
-                : "border-transparent text-[#4f4a45] hover:text-[#8f8982]"
+                : "border-transparent text-[#4f4a45] hover:text-[#8f8982]",
+              locked && "pointer-events-none opacity-65"
             )}
           >
             {tab}
@@ -864,6 +1002,7 @@ function AnswerArea({
           <textarea
             value={typedAnswer}
             onChange={(event) => setTypedAnswer(event.target.value)}
+            readOnly={locked}
             className="min-h-36 w-full resize-y bg-transparent font-serif text-base leading-relaxed text-[#e8e4dc] outline-none placeholder:italic placeholder:text-[#4f4a45]"
             placeholder="Begin your working here..."
           />
@@ -894,10 +1033,14 @@ function AnswerArea({
           onToggleQuestionLock={onToggleQuestionLock}
           questionId={questionId}
           questionLocked={questionLocked}
+          readOnly={locked}
         />
       ) : activeTab === "photo" ? (
         <div className="rounded-[3px] border border-white/[0.06] bg-[#1a1714] p-5">
-          <label className="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-[3px] border border-dashed border-white/[0.09] px-4 py-8 text-center text-[13px] tracking-[0.04em] text-[#6f6861] transition-colors hover:border-[#9b673d]/45 hover:text-[#dba476]">
+          <label className={cn(
+            "flex min-h-36 flex-col items-center justify-center rounded-[3px] border border-dashed border-white/[0.09] px-4 py-8 text-center text-[13px] tracking-[0.04em] text-[#6f6861] transition-colors hover:border-[#9b673d]/45 hover:text-[#dba476]",
+            locked ? "pointer-events-none opacity-70" : "cursor-pointer"
+          )}>
             <input
               type="file"
               multiple
@@ -924,7 +1067,8 @@ function AnswerArea({
                     type="button"
                     aria-label={`Remove ${file.name}`}
                     onClick={() => removeFile(index)}
-                    className="shrink-0 text-[#6f6861] transition-colors hover:text-[#e8e4dc]"
+                    disabled={locked}
+                    className="shrink-0 text-[#6f6861] transition-colors hover:text-[#e8e4dc] disabled:pointer-events-none disabled:opacity-50"
                   >
                     <X className="size-4" />
                   </button>
@@ -942,11 +1086,11 @@ function AnswerArea({
       <div className="mt-5 flex justify-end">
         <button
           type="button"
-          disabled={markingLoading}
+          disabled={markingLoading || (submitted && !canMoveNext)}
           onClick={submitAnswer}
           className="inline-flex h-11 items-center justify-center gap-3 rounded-[2px] border border-[#9b673d]/42 bg-[#c8864a]/12 px-7 text-[12px] font-medium tracking-[0.06em] text-[#dba476] transition-colors hover:border-[#c8864a]/62 hover:bg-[#c8864a]/18 hover:text-[#efbd94] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {markingLoading ? "Marking..." : "Submit Answer"}
+          {markingLoading ? "Marking..." : canMoveNext ? "Next Question" : "Submit Answer"}
           {markingLoading ? <Loader2 className="size-[18px] animate-spin" /> : <ArrowRight className="size-[18px]" />}
         </button>
       </div>
@@ -954,16 +1098,21 @@ function AnswerArea({
       {(markingError || markingResult) && (
         <>
           <div className="mt-5 rounded-[3px] border border-white/[0.06] bg-[#1a1714] p-5">
+            {markingResult && submittedTab === "photo" && submittedFiles.length > 0 && (
+              <SubmittedFilePreview files={submittedFiles} />
+            )}
             {markingError && (
               <div className="flex items-center gap-4">
                 <p className="flex-1 text-[13px] text-[#d99658]">{markingError}</p>
-                <button
-                  type="button"
-                  onClick={submitAnswer}
-                  className="shrink-0 text-[12px] font-medium text-[#dba476] underline underline-offset-2"
-                >
-                  Try again
-                </button>
+                {!submitted && (
+                  <button
+                    type="button"
+                    onClick={submitAnswer}
+                    className="shrink-0 text-[12px] font-medium text-[#dba476] underline underline-offset-2"
+                  >
+                    Try again
+                  </button>
+                )}
               </div>
             )}
             {markingResult && (
@@ -1075,6 +1224,7 @@ function QuestionView({
   markingResult,
   onBack,
   onBetaReveal,
+  onNextQuestion,
   onSelectMcqOption,
   onSubmitAnswer,
   question,
@@ -1156,9 +1306,10 @@ function QuestionView({
     config.year,
     config.course,
     ...config.topicNames,
-    config.difficulty,
+    question.level ? levelLabel(question.level) : null,
     isMcq ? "MCQ" : config.type,
   ].filter(Boolean)
+  const levelBadge = question.level ? levelLabel(question.level) : null
   const hasHint = (question.hints || []).some((hint) => hint.text) ||
     (question.parts || []).some((part) => (part.hints || []).some((hint) => hint.text))
   const displayQuestionText = question.question_text?.trim()
@@ -1183,7 +1334,7 @@ function QuestionView({
                 key={item}
                 className={cn(
                   "rounded-[2px] border border-white/[0.06] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#4f4a45]",
-                  config.topicNames.includes(item) && "border-[#7c573a]/70 bg-[#c8864a]/10 text-[#d99658]"
+                  (config.topicNames.includes(item) || item === levelBadge) && "border-[#7c573a]/70 bg-[#c8864a]/10 text-[#d99658]"
                 )}
               >
                 {item}
@@ -1321,6 +1472,7 @@ function QuestionView({
       </section>
 
       <AnswerArea
+        key={question.id}
         betaSampleRevealed={betaSampleRevealed}
         markingDisabled={markingDisabled}
         markingError={markingError}
@@ -1328,11 +1480,13 @@ function QuestionView({
         markingResult={markingResult}
         lockedQuestionHeight={lockedQuestionHeight}
         onBetaReveal={onBetaReveal}
+        onNextQuestion={onNextQuestion}
         onToggleQuestionLock={() => setQuestionLocked((value) => !value)}
         onSubmit={onSubmitAnswer}
         question={question}
         questionId={question.id}
         questionLocked={questionLocked}
+        selectedMcqOption={selectedMcqOption}
       />
     </main>
   )
@@ -1362,8 +1516,9 @@ export default function DailyPracticePage() {
 
   const markingDisabled = auth.markingSystemEnabled === false
 
-  const { data: tags = [] } = useSWR(
-    subjectId ? `${TAGS_API_URL}?subject_id=${subjectId}` : null,
+  const tagsKey = subjectId ? `${TAGS_API_URL}?subject_id=${subjectId}` : null
+  const { data: tags = [], isLoading: tagsLoading } = useSWR(
+    tagsKey,
     fetcher
   )
   const buckets = useMemo(() => splitTags(tags), [tags])
@@ -1375,23 +1530,33 @@ export default function DailyPracticePage() {
       moderation_status: "published",
       limit: "800",
       offset: "0",
+      expand: "full",
     })
     if (config) {
       const ids = configTagIds(config, buckets)
       if (ids.length) p.set("all_tag_ids", ids.join(","))
+      if (config.type) p.set("question_type", config.type.toLowerCase())
+      if (config.level) p.set("level", levelValue(config.level))
     }
     return `${QUESTIONS_API_URL}?${p.toString()}`
   }, [subjectId, config, buckets])
 
-  const { data: questionsPayload } = useSWR(publishedQuestionsUrl, fetcher, {
+  const { data: questionsPayload, isLoading: questionsLoading } = useSWR(publishedQuestionsUrl, fetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 120_000,
   })
 
   const questions = useMemo(
-    () => questionsPayload?.results ?? questionsPayload ?? [],
+    () => unwrapQuestions(questionsPayload),
     [questionsPayload]
   )
+  const dataLoading = Boolean(tagsLoading || questionsLoading || (subjectId && (!tagsKey || !publishedQuestionsUrl)))
+
+  useEffect(() => {
+    if (!subjectId || !tagsKey || !publishedQuestionsUrl) return
+    preload(tagsKey, fetcher)
+    preload(publishedQuestionsUrl, fetcher)
+  }, [publishedQuestionsUrl, subjectId, tagsKey])
 
   useEffect(() => {
     if (!subject) return
@@ -1399,7 +1564,13 @@ export default function DailyPracticePage() {
     const timeout = window.setTimeout(() => {
       try {
         const saved = window.localStorage.getItem(storageKey(params.slug))
-        setConfig(saved ? { ...fallback, ...JSON.parse(saved), course: subject.name } : fallback)
+        const parsed = saved ? JSON.parse(saved) : {}
+        const migrated = {
+          ...parsed,
+          level: parsed.level || parsed.difficulty || "",
+        }
+        delete migrated.difficulty
+        setConfig(saved ? { ...fallback, ...migrated, course: subject.name } : fallback)
       } catch {
         setConfig(fallback)
       }
@@ -1420,22 +1591,25 @@ export default function DailyPracticePage() {
 
   const loadQuestion = useCallback(async () => {
     if (!config) return
+    if (questionsLoading || tagsLoading) return
     setQuestionLoading(true)
     setTimer(0)
     try {
-      const matchingQuestion = randomItem(questions)
+      const matchingQuestion = randomItem(
+        questions.filter((item) => questionMatchesConfig(item, config, buckets))
+      )
       if (!matchingQuestion) {
         setQuestion(null)
         return
       }
-      const detail = await fetcher(`${QUESTIONS_API_URL}${matchingQuestion.id}/`)
-      if (detail.question_type === "mcq") {
-        detail.mcq_options = optionsForPracticeDisplay(
-          detail.mcq_options || [],
-          Boolean(detail.shuffle_options)
+      const nextQuestion = { ...matchingQuestion }
+      if (nextQuestion.question_type === "mcq") {
+        nextQuestion.mcq_options = optionsForPracticeDisplay(
+          nextQuestion.mcq_options || [],
+          Boolean(nextQuestion.shuffle_options)
         )
       }
-      setQuestion(detail)
+      setQuestion(nextQuestion)
       setMarkingResult(null)
       setMarkingError("")
       setBetaSampleRevealed(false)
@@ -1443,14 +1617,27 @@ export default function DailyPracticePage() {
     } finally {
       setQuestionLoading(false)
     }
-  }, [config, questions])
+  }, [buckets, config, questions, questionsLoading, tagsLoading])
 
   async function generate(source) {
     setArrivalSource(source)
     setModalOpen(false)
     setMode("question")
+    if (questionsLoading || tagsLoading) {
+      setQuestionLoading(true)
+      return
+    }
     await loadQuestion()
   }
+
+  useEffect(() => {
+    if (mode !== "question" || !questionLoading) return
+    if (questionsLoading || tagsLoading) return
+    const timeout = window.setTimeout(() => {
+      loadQuestion()
+    }, 0)
+    return () => window.clearTimeout(timeout)
+  }, [loadQuestion, mode, questionLoading, questionsLoading, tagsLoading])
 
   function backFromQuestion() {
     setMode("home")
@@ -1547,6 +1734,7 @@ export default function DailyPracticePage() {
       {mode === "home" && (
         <PracticeHome
           config={config}
+          dataLoading={dataLoading}
           onGenerate={generate}
           onOpenModal={() => setModalOpen(true)}
           subject={subject}
@@ -1565,6 +1753,7 @@ export default function DailyPracticePage() {
           markingResult={markingResult}
           onBack={backFromQuestion}
           onBetaReveal={revealBetaSample}
+          onNextQuestion={loadQuestion}
           onSelectMcqOption={(letter) => {
             setSelectedMcqOption(letter)
             setMarkingError("")
@@ -1580,6 +1769,7 @@ export default function DailyPracticePage() {
         <PracticeModal
           buckets={buckets}
           config={config}
+          dataLoading={dataLoading}
           onChange={setConfig}
           onClose={() => setModalOpen(false)}
           onGenerate={generate}
