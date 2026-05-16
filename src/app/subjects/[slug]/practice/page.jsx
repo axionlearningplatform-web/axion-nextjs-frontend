@@ -778,12 +778,17 @@ function AnswerArea({
     }
     if (activeTab === "draw" && handwritingRef.current) {
       const exportPayload = await handwritingRef.current.exportAnswer()
+      const formData = new FormData()
+      formData.append("submission_type", "draw")
+      formData.append("stroke_data", JSON.stringify(exportPayload.stroke_data || {}))
+      formData.append("page_metadata", JSON.stringify(
+        exportPayload.pages.map(({ blob, ...metadata }) => metadata)
+      ))
+      exportPayload.pages.forEach((page) => {
+        formData.append("files", page.blob, page.filename)
+      })
       onSubmit({
-        files: exportPayload.pages.map((page) => ({
-          name: `handwriting-page-${page.page_number}.jpg`,
-          mime_type: "image/jpeg",
-          data_url: page.page_image,
-        })),
+        formData,
         submission_type: "draw",
       })
       return
@@ -1480,14 +1485,17 @@ export default function DailyPracticePage() {
     setMarkingError("")
     setMarkingResult(null)
     try {
-      const response = await fetch(`${QUESTIONS_API_URL}${question.id}/mark/`, {
+      const isMultipart = payload?.formData instanceof FormData
+      const response = await fetch(`${QUESTIONS_API_URL}${question.id}/${isMultipart ? "mark/upload/" : "mark/"}`, {
         method: "POST",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(payload),
+        headers: isMultipart
+          ? { Accept: "application/json" }
+          : {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+        body: isMultipart ? payload.formData : JSON.stringify(payload),
       })
       const data = await parseJsonResponse(response)
       if (!response.ok) {
