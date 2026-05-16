@@ -47,11 +47,40 @@ const emptyTikzVisual = (index = 0) => ({
   svg: "",
 })
 
+const levelOptions = [
+  { value: "foundational", label: "Foundational" },
+  { value: "intermediate", label: "Intermediate" },
+  { value: "exam_practice", label: "Exam Practice" },
+  { value: "challenge", label: "Challenge" },
+]
+
+const questionTypeOptions = [
+  { value: "saq", label: "SAQ" },
+  { value: "mcq", label: "MCQ" },
+]
+
 function SectionTitle({ children }) {
   return (
     <div className="font-serif text-xl font-semibold text-[#e5e2e1]">
       {children}
     </div>
+  )
+}
+
+function SegmentedChip({ children, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "h-8 rounded-[2px] border px-3 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors",
+        active
+          ? "border-[#d49a71]/70 bg-[#d49a71]/13 text-[#e0a77c]"
+          : "border-[#3c2c24] bg-[#120f0d] text-[#968a80] hover:border-[#8b5e42]/70 hover:text-[#e1d8d0]"
+      )}
+    >
+      {children}
+    </button>
   )
 }
 
@@ -626,6 +655,8 @@ export function QuestionEditor({
 }) {
   const [subject, setSubject] = useState("")
   const [subjectId, setSubjectId] = useState("")
+  const [questionType, setQuestionType] = useState("saq")
+  const [level, setLevel] = useState("exam_practice")
   const [marks, setMarks] = useState("1")
   const [questionText, setQuestionText] = useState("")
   const [sampleSolution, setSampleSolution] = useState("")
@@ -639,6 +670,7 @@ export function QuestionEditor({
   const [tagIds, setTagIds] = useState([])
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [validationMessage, setValidationMessage] = useState("")
+  const preMcqMarksRef = useRef("1")
 
   const tagsUrl = subjectId
     ? `/api/questions/tags/?subject_id=${subjectId}`
@@ -646,10 +678,11 @@ export function QuestionEditor({
   const { data: tags = [] } = useSWR(tagsUrl, fetcher)
   const selectedTags = tags.filter((tag) => tagIds.includes(tag.id))
   const sourcePlaceholder = `e.g. HSC ${subject || lockedSubject?.name || "Chemistry"} 2025`
+  const isMcq = questionType === "mcq"
 
   const effectiveMarks = parts.length
-    ? Number(marks) || parts.reduce((total, part) => total + (Number(part.marks) || 0), 0)
-    : Number(marks) || 1
+    ? isMcq ? 1 : Number(marks) || parts.reduce((total, part) => total + (Number(part.marks) || 0), 0)
+    : isMcq ? 1 : Number(marks) || 1
   const partMarksTotal = parts.reduce((total, part) => total + (Number(part.marks) || 0), 0)
 
   useEffect(() => {
@@ -658,6 +691,8 @@ export function QuestionEditor({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSubject(initialData.subject || "")
     setSubjectId(initialData.subject_id ? String(initialData.subject_id) : "")
+    setQuestionType(initialData.question_type || "saq")
+    setLevel(initialData.level || "exam_practice")
     setMarks(String(initialData.marks || "1"))
     setQuestionText(initialData.question_text || "")
     setSampleSolution(initialData.sample_solution || "")
@@ -703,11 +738,25 @@ export function QuestionEditor({
     setSubjectId(lockedSubject.id ? String(lockedSubject.id) : "")
   }, [lockedSubject])
 
+  function updateQuestionType(value) {
+    if (value === questionType) return
+    if (value === "mcq") {
+      preMcqMarksRef.current = marks || "1"
+      setMarks("1")
+    } else if (questionType === "mcq") {
+      setMarks(preMcqMarksRef.current || "1")
+    }
+    setQuestionType(value)
+    if (validationMessage) setValidationMessage("")
+  }
+
   function payload() {
     return {
       subject,
       subject_id: subjectId ? Number(subjectId) : null,
       marks: effectiveMarks,
+      question_type: questionType,
+      level,
       question_text: questionText,
       latex: "",
       graph: "",
@@ -746,7 +795,7 @@ export function QuestionEditor({
 
   function validateQuestionDraft() {
     if (!subjectId && !subject.trim()) return "Subject is required."
-    if (!Number(marks) || Number(marks) < 1) return "Marks are required."
+    if (!isMcq && (!Number(marks) || Number(marks) < 1)) return "Marks are required."
     if (!importSource.trim()) return "Source is required."
     if (!questionText.trim()) return "Question text is required."
     if (!tagIds.length) return "At least one topic tag is required."
@@ -767,7 +816,7 @@ export function QuestionEditor({
     if (!onDraftChange) return
     onDraftChange(payload())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject, subjectId, marks, questionText, sampleSolution, tikzCode, diagramSvg, tikzVisuals, importSource, parts, attachments, tagIds, tagRequirements, tags])
+  }, [subject, subjectId, questionType, level, marks, questionText, sampleSolution, tikzCode, diagramSvg, tikzVisuals, importSource, parts, attachments, tagIds, tagRequirements, tags])
 
   return (
     <div className={cn("grid gap-8", !hidePreview && "lg:grid-cols-2")}>
@@ -824,7 +873,7 @@ export function QuestionEditor({
           <CardContent className="relative flex flex-col gap-6">
             <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
               <FieldGroup className="flex flex-col gap-6">
-                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_112px]">
+                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_144px_112px]">
                   <Field>
                     <FieldLabel className="text-[#dac1b7]">Subject</FieldLabel>
                     {lockedSubject ? (
@@ -865,20 +914,39 @@ export function QuestionEditor({
                   </Field>
 
                   <Field>
+                    <FieldLabel className="text-[#dac1b7]">Type</FieldLabel>
+                    <div className="flex h-10 items-center gap-1">
+                      {questionTypeOptions.map((option) => (
+                        <SegmentedChip
+                          key={option.value}
+                          active={questionType === option.value}
+                          onClick={() => updateQuestionType(option.value)}
+                        >
+                          {option.label}
+                        </SegmentedChip>
+                      ))}
+                    </div>
+                  </Field>
+
+                  <Field>
                     <FieldLabel className="text-[#dac1b7]">
                       {parts.length ? "Total Marks" : "Marks"}
                     </FieldLabel>
                     <Input
-                      className="h-10 rounded-full border-[#3b2a22]/55 bg-white/[0.035] px-2 text-center text-sm text-[#e5e2e1] [appearance:textfield] focus-visible:ring-[#ffb595]/40 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      className={cn(
+                        "h-10 rounded-full border-[#3b2a22]/55 bg-white/[0.035] px-2 text-center text-sm text-[#e5e2e1] [appearance:textfield] focus-visible:ring-[#ffb595]/40 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+                        isMcq && "cursor-not-allowed opacity-50 pointer-events-none"
+                      )}
+                      disabled={isMcq}
                       min="1"
                       type="number"
-                      value={marks}
+                      value={isMcq ? "1" : marks}
                       onChange={(e) => {
                         setMarks(e.target.value)
                         if (validationMessage) setValidationMessage("")
                       }}
                     />
-                    {parts.length > 0 && partMarksTotal !== Number(marks) && (
+                    {!isMcq && parts.length > 0 && partMarksTotal !== Number(marks) && (
                       <p className="mt-2 text-xs text-amber-200">
                         Parts currently add to {partMarksTotal} marks.
                       </p>
@@ -897,6 +965,23 @@ export function QuestionEditor({
                       if (validationMessage) setValidationMessage("")
                     }}
                   />
+                </Field>
+
+                <Field>
+                  <FieldLabel className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#6d5d50]">
+                    Level
+                  </FieldLabel>
+                  <div className="flex flex-wrap gap-1">
+                    {levelOptions.map((option) => (
+                      <SegmentedChip
+                        key={option.value}
+                        active={level === option.value}
+                        onClick={() => setLevel(option.value)}
+                      >
+                        {option.label}
+                      </SegmentedChip>
+                    ))}
+                  </div>
                 </Field>
 
                 <Field>

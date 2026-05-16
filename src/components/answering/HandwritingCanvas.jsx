@@ -136,7 +136,7 @@ function drawPaper(ctx) {
 }
 
 const HandwritingCanvas = forwardRef(function HandwritingCanvas(
-  { onSubmit, questionId },
+  { onSubmit, questionId, readOnly = false },
   ref
 ) {
   const backgroundCanvasRef = useRef(null)
@@ -318,7 +318,7 @@ ctx.lineWidth =
 
     liveFrameRef.current =
       null
-  }, [canvasScale])
+  }, [canvasScale, eraserSize])
 
   const scheduleLiveRender = useCallback(() => {
     if (liveFrameRef.current) return
@@ -397,7 +397,7 @@ ctx.lineWidth =
   }, [clearOverlay, tool])
 
   useEffect(() => {
-    if (!writingSurfaceActive) return undefined
+    if (!writingSurfaceActive || readOnly) return undefined
     function handleKeyDown(event) {
       if (event.key === "e" || event.key === "E") {
         event.preventDefault()
@@ -411,7 +411,7 @@ ctx.lineWidth =
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [writingSurfaceActive])
+  }, [readOnly, writingSurfaceActive])
 
   function updateCurrentPage(updater) {
     const nextPages = pagesRef.current.map((page, index) =>
@@ -445,6 +445,7 @@ ctx.lineWidth =
   }
 
   function startStroke(event) {
+    if (readOnly) return
     const canvas = liveCanvasRef.current
     if (!canvas) return
     if (event.pointerType === "touch" && event.width > 45) return
@@ -465,6 +466,7 @@ ctx.lineWidth =
   }
 
   function extendStroke(event) {
+    if (readOnly) return
     const canvas = liveCanvasRef.current
     if (!canvas) return
     const rect = canvas.getBoundingClientRect()
@@ -528,6 +530,7 @@ renderLiveStroke()
   }
 
   function finishStroke(event) {
+    if (readOnly) return
     if (activePointerRef.current !== event.pointerId || !currentStrokeRef.current) return
     event.preventDefault()
     const rect = liveCanvasRef.current?.getBoundingClientRect()
@@ -575,6 +578,7 @@ renderLiveStroke()
   }
 
   function undo() {
+    if (readOnly) return
     updateCurrentPage((page) => {
       const history = page.history || []
       if (!history.length) return page
@@ -597,6 +601,7 @@ renderLiveStroke()
   }
 
   function redo() {
+    if (readOnly) return
     updateCurrentPage((page) => {
       if (!page.redoStack.length) return page
       const [action, ...redoStack] = page.redoStack
@@ -619,6 +624,7 @@ renderLiveStroke()
   }
 
   function clearPage() {
+    if (readOnly) return
     updateCurrentPage((page) => ({
       ...page,
       strokes: [],
@@ -628,12 +634,14 @@ renderLiveStroke()
   }
 
   function addPage() {
+    if (readOnly) return
     const nextPages = [...pagesRef.current, createPage(pagesRef.current.length)]
     commitPages(nextPages)
     setCurrentPageIndex(nextPages.length - 1)
   }
 
   function deletePage(pageIndex) {
+    if (readOnly) return
     if (pagesRef.current.length <= 1) return
     const nextPages = pagesRef.current
       .filter((_, index) => index !== pageIndex)
@@ -669,7 +677,7 @@ renderLiveStroke()
           currentPageIndex={currentPageIndex}
           onAddPage={addPage}
           onDeletePage={deletePage}
-          onSelectPage={setCurrentPageIndex}
+          onSelectPage={readOnly ? () => {} : setCurrentPageIndex}
           pages={pages}
         />
         <div
@@ -691,9 +699,9 @@ renderLiveStroke()
             canUndo={canUndo}
             eraserSize={eraserSize}
             onClear={clearPage}
-            onEraserSizeChange={setEraserSize}
+            onEraserSizeChange={readOnly ? () => {} : setEraserSize}
             onRedo={redo}
-            onToolChange={setTool}
+            onToolChange={readOnly ? () => {} : setTool}
             onUndo={undo}
           />
           <div
@@ -717,7 +725,7 @@ renderLiveStroke()
     transform: "translateZ(0)",
   }}
               draggable={false}
-              className="absolute inset-0 block h-full w-full touch-none rounded-[4px] select-none [-webkit-touch-callout:none] [-webkit-user-drag:none] [-webkit-user-select:none] [touch-action:none]"
+              className={`absolute inset-0 block h-full w-full touch-none rounded-[4px] select-none [-webkit-touch-callout:none] [-webkit-user-drag:none] [-webkit-user-select:none] [touch-action:none] ${readOnly ? "pointer-events-none" : ""}`}
               onContextMenu={preventWritingAreaBrowserGesture}
               onDragStart={preventWritingAreaBrowserGesture}
               onPointerCancel={finishStroke}

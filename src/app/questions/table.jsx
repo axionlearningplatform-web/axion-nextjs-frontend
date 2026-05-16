@@ -15,6 +15,18 @@ import useSWR from "swr"
 
 const QUESTIONS_API_URL = "/api/questions/"
 
+function titleCase(value = "") {
+  return value
+    .replaceAll("-", " ")
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
+
+function unwrapQuestions(data) {
+  if (Array.isArray(data)) return data
+  return data?.results || []
+}
+
 
 export default function QuestionTable() {
     const router = useRouter()
@@ -28,11 +40,10 @@ export default function QuestionTable() {
         (subject) => subject.slug === subjectSlug
     )
     const questionsUrl = subjectSlug
-        ? lockedSubject
-            ? `${QUESTIONS_API_URL}?subject_id=${lockedSubject.id}`
-            : null
+        ? `/api/questions/?subject_slug=${subjectSlug}`
         : QUESTIONS_API_URL
     const {data, error, isLoading} = useSWR(questionsUrl, fetcher)
+    const questions = unwrapQuestions(data)
     const auth = useAuth()
     useEffect(()=> {
         if(error?.status === 401){
@@ -43,7 +54,7 @@ export default function QuestionTable() {
     if(subjectSlug && !subjectsLoading && !lockedSubject) {
         return <div className="p-10 text-[#ffb4ab]">Subject not available for this user</div>
     }
-    if(subjectsLoading || isLoading) return <div className="p-10 text-[#dac1b7]">Loading questions...</div>
+    if(isLoading || (!subjectSlug && subjectsLoading)) return <div className="p-10 text-[#dac1b7]">Loading questions...</div>
   return (
   <div className="mx-auto w-full max-w-7xl px-8 py-10">
     <div className="mb-8">
@@ -65,11 +76,12 @@ export default function QuestionTable() {
           <TableHead className="w-52 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">Topics</TableHead>
           <TableHead className="w-36 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">Creator</TableHead>
           <TableHead className="w-24 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">Marks</TableHead>
+          <TableHead className="w-36 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">Level</TableHead>
           <TableHead className="w-36 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">Created</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {data?.map((item) => (
+        {questions.map((item) => (
         <TableRow
             key={item.id}
             className="cursor-pointer border-0 bg-[#181410] text-[#e5e2e1] shadow-sm transition-colors hover:bg-[#211913] [&>td:first-child]:rounded-l-xl [&>td:last-child]:rounded-r-xl"
@@ -78,7 +90,7 @@ export default function QuestionTable() {
             <TableCell className="px-4 font-semibold text-[#ffb595]">{item.id}</TableCell>
             <TableCell className="max-w-[520px] px-4">
                 <div className="overflow-hidden text-ellipsis line-clamp-3 break-words">
-                {item.question_text}
+                {item.question_text || item.question_preview}
             </div>
             </TableCell>
             <TableCell className="max-w-48 px-4 text-[#dac1b7]">
@@ -112,6 +124,11 @@ export default function QuestionTable() {
               </div>
             </TableCell>
             <TableCell className="px-4">{item.marks}</TableCell>
+            <TableCell className="px-4">
+              <span className="rounded-[2px] border border-[#7c573a]/70 bg-[#c8864a]/10 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#d99658]">
+                {titleCase(item.level || "exam_practice")}
+              </span>
+            </TableCell>
             <TableCell className="px-4 text-[#dac1b7]">
                 {new Date(item.created_at).toLocaleDateString()}
             </TableCell>
@@ -119,7 +136,7 @@ export default function QuestionTable() {
         ))}
      </TableBody>
     </Table>
-    {data?.length === 0 && (
+    {questions.length === 0 && (
       <div className="px-4 py-10 text-center text-sm text-[#a28c83]">
         No questions in this subject yet.
       </div>
