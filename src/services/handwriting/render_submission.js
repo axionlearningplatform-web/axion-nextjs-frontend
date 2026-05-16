@@ -123,7 +123,7 @@ export function drawPageStrokes(ctx, strokes, { clean = false } = {}) {
 // OCR export renderer — intentionally plain line art for vision token efficiency
 // ─────────────────────────────────────────────────────────────────────────────
 const OCR_PADDING = 52
-const OCR_STROKE_WIDTH = 4
+const OCR_STROKE_WIDTH = 6
 const OCR_MIN_RENDERED_WIDTH = 1000
 const OCR_MAX_RENDERED_SIDE = 1400
 
@@ -189,18 +189,23 @@ function drawOCRStroke(ctx, stroke) {
   ctx.save()
   ctx.lineCap = "round"
   ctx.lineJoin = "round"
-  ctx.lineWidth = stroke.tool === "pixel-eraser" ? OCR_STROKE_WIDTH * 2.4 : OCR_STROKE_WIDTH
+  ctx.lineWidth = stroke.tool === "pixel-eraser" ? 14 : OCR_STROKE_WIDTH
   ctx.strokeStyle = stroke.tool === "pixel-eraser" ? "#ffffff" : "#000000"
+  ctx.fillStyle = ctx.strokeStyle
   ctx.globalCompositeOperation = "source-over"
 
   ctx.beginPath()
   ctx.moveTo(points[0].x, points[0].y)
   if (points.length === 1) {
-    ctx.lineTo(points[0].x + 0.01, points[0].y + 0.01)
+    ctx.arc(points[0].x, points[0].y, 3, 0, Math.PI * 2)
+    ctx.fill()
   } else {
-    for (let i = 1; i < points.length; i += 1) {
-      ctx.lineTo(points[i].x, points[i].y)
+    for (let i = 1; i < points.length - 1; i += 1) {
+      const mx = (points[i].x + points[i + 1].x) / 2
+      const my = (points[i].y + points[i + 1].y) / 2
+      ctx.quadraticCurveTo(points[i].x, points[i].y, mx, my)
     }
+    ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y)
   }
   ctx.stroke()
   ctx.restore()
