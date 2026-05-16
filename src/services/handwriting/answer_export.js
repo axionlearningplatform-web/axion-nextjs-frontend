@@ -4,7 +4,7 @@ const OCR_MIN_RENDERED_WIDTH = 1000
 const OCR_MAX_RENDERED_SIDE = 1400
 const OCR_EXPORT_MIME_TYPE = "image/webp"
 const OCR_EXPORT_FALLBACK_MIME_TYPE = "image/png"
-const OCR_EXPORT_QUALITY = 0.82
+const OCR_EXPORT_QUALITY = 0.72
 
 function canvasToBlob(canvas, type, quality) {
   return new Promise((resolve, reject) => {
