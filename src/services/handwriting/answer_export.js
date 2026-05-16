@@ -38,6 +38,19 @@ async function canvasToPreferredOCRBlob(canvas) {
   return { blob: fallback, mimeType: OCR_EXPORT_FALLBACK_MIME_TYPE, compression: "png-fallback" }
 }
 
+function maybeDownloadOCRDebugImage(canvas, pageNumber) {
+  if (typeof window === "undefined" || typeof document === "undefined") return
+  if (window.localStorage?.getItem("axion:ocr-debug") !== "1") return
+
+  const link = document.createElement("a")
+  link.download = `ocr-debug-page-${pageNumber}-${Date.now()}.png`
+  link.href = canvas.toDataURL("image/png")
+  link.style.display = "none"
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+}
+
 function serialiseStroke(stroke) {
   return {
     id: stroke.id,
@@ -65,6 +78,7 @@ export async function exportHandwrittenAnswer({ questionId, pages, width, height
       minRenderedWidth: OCR_MIN_RENDERED_WIDTH,
       maxRenderedSide: OCR_MAX_RENDERED_SIDE,
     })
+    maybeDownloadOCRDebugImage(canvas, index + 1)
     const { blob, mimeType, compression } = await canvasToPreferredOCRBlob(canvas)
     const renderMs = Math.round(performance.now() - startedAt)
     const strokeCount = (page.strokes || []).length
