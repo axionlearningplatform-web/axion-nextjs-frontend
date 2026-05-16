@@ -780,8 +780,8 @@ function AnswerArea({
       const exportPayload = await handwritingRef.current.exportAnswer()
       onSubmit({
         files: exportPayload.pages.map((page) => ({
-          name: `handwriting-page-${page.page_number}.png`,
-          mime_type: "image/png",
+          name: `handwriting-page-${page.page_number}.jpg`,
+          mime_type: "image/jpeg",
           data_url: page.page_image,
         })),
         submission_type: "draw",
