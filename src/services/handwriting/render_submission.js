@@ -120,6 +120,117 @@ export function drawPageStrokes(ctx, strokes, { clean = false } = {}) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// OCR export renderer — intentionally plain line art for vision token efficiency
+// ─────────────────────────────────────────────────────────────────────────────
+const OCR_PADDING = 52
+const OCR_STROKE_WIDTH = 4
+
+function validStrokePoints(stroke) {
+  return (stroke?.points || []).filter(
+    (point) => Number.isFinite(point?.x) && Number.isFinite(point?.y)
+  )
+}
+
+export function getPageStrokeBounds(page, width, height, { padding = OCR_PADDING } = {}) {
+  const strokes = page?.strokes || []
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  let pointCount = 0
+
+  strokes.forEach((stroke) => {
+    validStrokePoints(stroke).forEach((point) => {
+      minX = Math.min(minX, point.x)
+      minY = Math.min(minY, point.y)
+      maxX = Math.max(maxX, point.x)
+      maxY = Math.max(maxY, point.y)
+      pointCount += 1
+    })
+  })
+
+  if (!pointCount || !Number.isFinite(minX) || !Number.isFinite(minY)) {
+    return {
+      x: 0,
+      y: 0,
+      width,
+      height,
+      empty: true,
+      point_count: pointCount,
+      coverage: 1,
+    }
+  }
+
+  const strokeMargin = padding + OCR_STROKE_WIDTH * 2
+  const x = Math.max(0, Math.floor(minX - strokeMargin))
+  const y = Math.max(0, Math.floor(minY - strokeMargin))
+  const right = Math.min(width, Math.ceil(maxX + strokeMargin))
+  const bottom = Math.min(height, Math.ceil(maxY + strokeMargin))
+  const cropWidth = Math.max(1, right - x)
+  const cropHeight = Math.max(1, bottom - y)
+
+  return {
+    x,
+    y,
+    width: cropWidth,
+    height: cropHeight,
+    empty: false,
+    point_count: pointCount,
+    coverage: (cropWidth * cropHeight) / Math.max(1, width * height),
+  }
+}
+
+function drawOCRStroke(ctx, stroke) {
+  const points = validStrokePoints(stroke)
+  if (!points.length) return
+
+  ctx.save()
+  ctx.lineCap = "round"
+  ctx.lineJoin = "round"
+  ctx.lineWidth = stroke.tool === "pixel-eraser" ? OCR_STROKE_WIDTH * 2.4 : OCR_STROKE_WIDTH
+  ctx.strokeStyle = stroke.tool === "pixel-eraser" ? "#ffffff" : "#000000"
+  ctx.globalCompositeOperation = "source-over"
+
+  ctx.beginPath()
+  ctx.moveTo(points[0].x, points[0].y)
+  if (points.length === 1) {
+    ctx.lineTo(points[0].x + 0.01, points[0].y + 0.01)
+  } else {
+    for (let i = 1; i < points.length; i += 1) {
+      ctx.lineTo(points[i].x, points[i].y)
+    }
+  }
+  ctx.stroke()
+  ctx.restore()
+}
+
+export function drawPageStrokesForOCR(ctx, strokes) {
+  ;(strokes || []).forEach((stroke) => drawOCRStroke(ctx, stroke))
+}
+
+export function renderPageToOCRCanvas({
+  page,
+  width,
+  height,
+  scale = 0.6,
+  padding = OCR_PADDING,
+} = {}) {
+  const crop = getPageStrokeBounds(page, width, height, { padding })
+  const canvas = document.createElement("canvas")
+  canvas.width = Math.max(1, Math.round(crop.width * scale))
+  canvas.height = Math.max(1, Math.round(crop.height * scale))
+  const ctx = canvas.getContext("2d", { alpha: false })
+
+  ctx.fillStyle = "#ffffff"
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.scale(scale, scale)
+  ctx.translate(-crop.x, -crop.y)
+  drawPageStrokesForOCR(ctx, page?.strokes || [])
+
+  return { canvas, crop }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Export: render page to offscreen canvas for AI marking
 // ─────────────────────────────────────────────────────────────────────────────
 export function renderPageToCanvas({
