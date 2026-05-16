@@ -124,6 +124,7 @@ export function drawPageStrokes(ctx, strokes, { clean = false } = {}) {
 // ─────────────────────────────────────────────────────────────────────────────
 const OCR_PADDING = 52
 const OCR_STROKE_WIDTH = 4
+const OCR_MAX_RENDERED_SIDE = 900
 
 function validStrokePoints(stroke) {
   return (stroke?.points || []).filter(
@@ -214,20 +215,26 @@ export function renderPageToOCRCanvas({
   height,
   scale = 0.6,
   padding = OCR_PADDING,
+  maxRenderedSide = OCR_MAX_RENDERED_SIDE,
 } = {}) {
   const crop = getPageStrokeBounds(page, width, height, { padding })
+  const boundedScale = Math.min(
+    scale,
+    maxRenderedSide / Math.max(1, crop.width),
+    maxRenderedSide / Math.max(1, crop.height)
+  )
   const canvas = document.createElement("canvas")
-  canvas.width = Math.max(1, Math.round(crop.width * scale))
-  canvas.height = Math.max(1, Math.round(crop.height * scale))
+  canvas.width = Math.max(1, Math.round(crop.width * boundedScale))
+  canvas.height = Math.max(1, Math.round(crop.height * boundedScale))
   const ctx = canvas.getContext("2d", { alpha: false })
 
   ctx.fillStyle = "#ffffff"
   ctx.fillRect(0, 0, canvas.width, canvas.height)
-  ctx.scale(scale, scale)
+  ctx.scale(boundedScale, boundedScale)
   ctx.translate(-crop.x, -crop.y)
   drawPageStrokesForOCR(ctx, page?.strokes || [])
 
-  return { canvas, crop }
+  return { canvas, crop, scale: boundedScale }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

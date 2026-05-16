@@ -1,9 +1,11 @@
 import { renderPageToOCRCanvas } from "./render_submission"
 
 const OCR_EXPORT_SCALE = 0.6
-const OCR_EXPORT_MIME_TYPE = "image/png"
+const OCR_EXPORT_MIME_TYPE = "image/webp"
+const OCR_EXPORT_FALLBACK_MIME_TYPE = "image/png"
+const OCR_EXPORT_QUALITY = 0.72
 
-function canvasToBlob(canvas, type) {
+function canvasToBlob(canvas, type, quality) {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (blob) {
@@ -11,7 +13,7 @@ function canvasToBlob(canvas, type) {
         return
       }
       try {
-        const dataUrl = canvas.toDataURL(type)
+        const dataUrl = canvas.toDataURL(type, quality)
         const [header, encoded] = dataUrl.split(",")
         const mimeMatch = header.match(/data:(.*?);base64/)
         const binary = atob(encoded || "")
@@ -21,8 +23,18 @@ function canvasToBlob(canvas, type) {
       } catch (error) {
         reject(error)
       }
-    }, type)
+    }, type, quality)
   })
+}
+
+async function canvasToPreferredOCRBlob(canvas) {
+  const blob = await canvasToBlob(canvas, OCR_EXPORT_MIME_TYPE, OCR_EXPORT_QUALITY)
+  if (blob.type === OCR_EXPORT_MIME_TYPE) {
+    return { blob, mimeType: OCR_EXPORT_MIME_TYPE, compression: "webp-lossy" }
+  }
+
+  const fallback = await canvasToBlob(canvas, OCR_EXPORT_FALLBACK_MIME_TYPE)
+  return { blob: fallback, mimeType: OCR_EXPORT_FALLBACK_MIME_TYPE, compression: "png-fallback" }
 }
 
 function serialiseStroke(stroke) {
@@ -42,14 +54,13 @@ function serialiseStroke(stroke) {
 
 export async function exportHandwrittenAnswer({ questionId, pages, width, height }) {
   const scale = OCR_EXPORT_SCALE
-  const mimeType = OCR_EXPORT_MIME_TYPE
 
   const exportedPages = []
   for (let index = 0; index < pages.length; index += 1) {
     const page = pages[index]
     const startedAt = performance.now()
-    const { canvas, crop } = renderPageToOCRCanvas({ page, width, height, scale })
-    const blob = await canvasToBlob(canvas, mimeType)
+    const { canvas, crop, scale: actualScale } = renderPageToOCRCanvas({ page, width, height, scale })
+    const { blob, mimeType, compression } = await canvasToPreferredOCRBlob(canvas)
     const renderMs = Math.round(performance.now() - startedAt)
     const strokeCount = (page.strokes || []).length
     const coverage = crop.coverage || 0
@@ -65,20 +76,25 @@ export async function exportHandwrittenAnswer({ questionId, pages, width, height
       point_count: crop.point_count || 0,
       empty: Boolean(crop.empty),
       mime_type: mimeType,
+      compression,
       byte_size: blob.size,
       render_ms: renderMs,
     }
 
     if (typeof console !== "undefined") {
       console.info(
-        "OCR export page=%d strokes=%d full=%dx%d cropped=%dx%d coverage=%s%% bytes=%dkb render=%dms",
+        "OCR export page=%d strokes=%d full=%dx%d cropped=%dx%d rendered=%dx%d scale=%s coverage=%s%% mime=%s bytes=%dkb render=%dms",
         index + 1,
         strokeCount,
         width,
         height,
         crop.width,
         crop.height,
+        canvas.width,
+        canvas.height,
+        actualScale.toFixed(2),
         (coverage * 100).toFixed(1),
+        mimeType,
         Math.round(blob.size / 1024),
         renderMs
       )
@@ -88,10 +104,10 @@ export async function exportHandwrittenAnswer({ questionId, pages, width, height
       page_number: index + 1,
       blob,
       mime_type: mimeType,
-      filename: `handwriting-page-${index + 1}.png`,
+      filename: `handwriting-page-${index + 1}.${mimeType === "image/webp" ? "webp" : "png"}`,
       width: canvas.width,
       height: canvas.height,
-      scale,
+      scale: actualScale,
       byte_size: blob.size,
       render_ms: renderMs,
       crop,
