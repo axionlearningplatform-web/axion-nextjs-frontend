@@ -471,42 +471,32 @@ function QuestionTypeSwitch({ value, onChange }) {
   )
 }
 
-function AnswerMetadataFields({ answerType, answerValue, onAnswerTypeChange, onAnswerValueChange }) {
-  const options = [
-    { value: "proof", label: "Proof" },
-    { value: "explanation", label: "Explanation" },
-    { value: "value", label: "Value" },
-  ]
-
+function AnswerMetadataFields({ answerType, answerValue, onAnswerTypeChange, onAnswerValueChange, name = "answer_type" }) {
   return (
-    <div className="grid gap-3 rounded-2xl border border-[#3b2a22]/55 bg-[#120f0d] p-3">
-      <div className="grid grid-cols-3 overflow-hidden rounded-full border border-[#3b2a22]/55 bg-[#181410] p-1">
-        {options.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            className={cn(
-              "h-9 rounded-full text-xs font-semibold transition-colors",
-              answerType === option.value
-                ? "bg-[#ccb2a3d3] text-[#1a1817]"
-                : "text-[#a28c83] hover:bg-white/[0.035] hover:text-[#dac1b7]"
-            )}
-            onClick={() => onAnswerTypeChange?.(option.value)}
-          >
-            {option.label}
-          </button>
+    <div className="grid gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-xs text-[#6f6861]">Answer type:</span>
+        {["proof", "explanation", "value"].map((type) => (
+          <label key={type} className="flex items-center gap-1 text-xs text-[#9b8f84]">
+            <input
+              type="radio"
+              name={name}
+              value={type}
+              checked={(answerType || "proof") === type}
+              onChange={() => onAnswerTypeChange?.(type)}
+              className="accent-[#c8864a]"
+            />
+            {type}
+          </label>
         ))}
       </div>
       {answerType === "value" && (
-        <Field>
-          <FieldLabel className="text-[#dac1b7]">Final Answer</FieldLabel>
-          <Input
-            value={answerValue || ""}
-            onChange={(event) => onAnswerValueChange?.(event.target.value)}
-            placeholder="e.g. 3.6 × 10⁻¹⁹ J or e.g. Ethyl 3-chloro-2-hydroxy-3-methylbutanoate"
-            className="rounded-2xl border-[#3b2a22]/55 bg-white/[0.035] text-[#e5e2e1] placeholder:text-[#6f5b52]"
-          />
-        </Field>
+        <Input
+          value={answerValue || ""}
+          onChange={(event) => onAnswerValueChange?.(event.target.value)}
+          placeholder="Final numerical answer (e.g. x = 3, 42.7)"
+          className="rounded border border-white/[0.08] bg-transparent px-3 py-2 text-sm text-[#e8e4dc] placeholder:text-[#6f5b52]"
+        />
       )}
     </div>
   )
@@ -519,6 +509,7 @@ function SampleSolutionEditor({
   answerValue = "",
   onAnswerTypeChange,
   onAnswerValueChange,
+  answerTypeName = "answer_type",
   showAnswerMetadata = true,
   compact = false,
 }) {
@@ -553,6 +544,7 @@ function SampleSolutionEditor({
           answerValue={answerValue || ""}
           onAnswerTypeChange={onAnswerTypeChange}
           onAnswerValueChange={onAnswerValueChange}
+          name={answerTypeName}
         />
       )}
       {previewOpen && (
@@ -1705,6 +1697,7 @@ export function QuestionEditor({
                             }}
                             answerType={part.answer_type || "proof"}
                             answerValue={part.answer_value || ""}
+                            answerTypeName={`answer_type_${index}`}
                             onAnswerTypeChange={(value) => {
                               const next = [...parts]
                               next[index] = {
@@ -1801,6 +1794,7 @@ export function QuestionEditor({
                         }}
                         answerType={answerType}
                         answerValue={answerValue}
+                        answerTypeName="answer_type_question"
                         onAnswerTypeChange={(value) => {
                           setAnswerType(value)
                           if (value !== "value") setAnswerValue("")
@@ -1858,15 +1852,19 @@ export function QuestionEditor({
                 )}
 
                 {showTagging && taggingMode === "full" && !isMathSubject && !isMcq && (
-                  <label className="flex items-start gap-3 rounded-2xl border border-[#3b2a22]/55 bg-[#181410] p-4 text-sm text-[#dac1b7]">
+                  <label className="mt-4 flex items-center gap-3 rounded-2xl border border-[#3b2a22]/55 bg-[#181410] p-4 text-sm text-[#9b8f84]">
                     <input
+                      id="use_tag_marking"
                       type="checkbox"
-                      checked={useTagMarking}
+                      checked={useTagMarking ?? true}
                       onChange={(event) => setUseTagMarking(event.target.checked)}
-                      className="mt-0.5 size-4 accent-[#c8864a]"
+                      className="size-4 accent-[#c8864a]"
                     />
                     <span>
-                      Use tag-based marking (uncheck for criteria-based marking on long-form or explain questions)
+                      Use tag-based marking
+                      <span className="ml-2 text-xs text-[#6f6861]">
+                        (uncheck for long-form criteria marking)
+                      </span>
                     </span>
                   </label>
                 )}

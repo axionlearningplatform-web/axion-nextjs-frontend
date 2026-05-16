@@ -994,12 +994,12 @@ function AnswerArea({
                   )}
                 </div>
               )}
-              {(markingResult.parts || []).map((part) => (
+              {markingResult.marks_awarded < markingResult.marks_possible && (markingResult.parts || []).map((part) => (
                 <div key={part.label} className="border-t border-white/[0.06] pt-4">
                   <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
                     {part.label}: {part.marks_awarded}/{part.marks_possible} marks
                   </p>
-                  {part.marks_awarded < part.marks_possible && part.lost_tags?.length > 0 && (
+                  {part.lost_tags?.length > 0 && (
                     <ul className="mt-3 grid gap-2">
                       {part.lost_tags.map((item) => (
                         <li key={item.tag} className="text-[13px] leading-relaxed text-[#9b8f84]">
