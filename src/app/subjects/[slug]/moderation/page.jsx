@@ -328,8 +328,8 @@ export default function SubjectModerationPage() {
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#ffb595]">
             {lockedSubject.name}
           </p>
-          <h1 className="mt-2 text-3xl font-bold text-[#e5e2e1]">Question Moderation</h1>
-          <p className="mt-2 max-w-10xl text-sm text-[#a28c83]">
+          <h1 className="mt-2 font-serif text-[32px] font-medium tracking-[-0.01em] text-[#f0ebe4]">Question Moderation</h1>
+          <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-[#6f6258]">
             Review the queue, edit in place, assign Layer 1–3 tags, then publish, request analyst changes, reject, or
             delete. Rejected questions stay in the database but no longer appear here. Same record as the question bank —
             no duplicate copies.
@@ -341,9 +341,9 @@ export default function SubjectModerationPage() {
         )}
 
         {!questionsLoading && queue.length === 0 && (
-          <Card className="rounded-2xl border-[#3b2a22]/55 bg-[#1b1713] p-8 text-[#dac1b7]">
-            <p className="font-serif text-lg text-[#e5e2e1]">Queue is clear</p>
-            <p className="mt-2 text-sm text-[#a28c83]">
+          <Card className="rounded-[10px] border-[#3b2a22]/55 bg-[#1b1713] p-8 text-[#dac1b7]">
+            <p className="font-serif text-[20px] font-medium text-[#d8cfc6]">Queue is clear</p>
+            <p className="mt-2 text-[13px] leading-relaxed text-[#6f6258]">
               There are no submitted, in-review, or needs-changes questions for this subject. New analyst submissions or
               re-submissions after revision will appear here. Rejected items remain in the question database.
             </p>
@@ -361,20 +361,20 @@ export default function SubjectModerationPage() {
           >
             <Card
               className={cn(
-                "min-w-0 self-start overflow-hidden rounded-2xl border-[#3b2a22]/55 bg-[#1b1713] text-[#e5e2e1] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                "min-w-0 self-start overflow-hidden rounded-[10px] border border-[#3b2a22]/55 bg-[#1b1713] text-[#e5e2e1] shadow-[0_0_0_1px_rgba(255,255,255,0.02)] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
                 previewExpanded && "xl:pointer-events-none xl:max-w-0 xl:-translate-x-4 xl:scale-[0.98] xl:opacity-0"
               )}
             >
               <CardHeader>
-                <CardTitle className="font-serif text-xl">Review Queue</CardTitle>
-                <p className="text-sm text-[#a28c83]">
+                <CardTitle className="font-serif text-[20px] font-medium text-[#d8cfc6]">Review Queue</CardTitle>
+                <p className="text-[12px] tracking-[0.02em] text-[#5a4f48]">
                   {counts.pending} submitted / in review · {counts.needsChanges} needs changes · {counts.accepted}{" "}
                   published · {counts.rejected} rejected
                 </p>
                 <div className="relative mt-3 min-w-0">
                   <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#a28c83]" />
                   <Input
-                    className="h-10 rounded-full border-[#3b2a22]/55 bg-white/[0.035] pl-9 text-sm text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
+                    className="h-9 rounded-[6px] border-[#3b2a22]/55 bg-white/[0.035] pl-9 text-[13px] text-[#e5e2e1] focus-visible:border-[#7c573a]/55 focus-visible:ring-0"
                     placeholder="Search question text"
                     value={searchInput}
                     onChange={(event) => setSearchInput(event.target.value)}
@@ -387,15 +387,15 @@ export default function SubjectModerationPage() {
                     key={item.id}
                     type="button"
                     className={cn(
-                      "w-full min-w-0 rounded-xl border p-3 text-left transition-colors",
+                      "w-full min-w-0 rounded-[6px] border p-3 text-left transition-colors duration-100",
                       item.id === activeId
-                        ? "border-[#ffb595]/60 bg-[#2a211e]"
-                        : "border-[#3b2a22]/40 bg-[#181410] hover:bg-[#211913]"
+                        ? "border-[#7c573a]/55 bg-[#1e1410]"
+                        : "border-[#252018]/70 bg-[#181410] hover:bg-[#1e1510]"
                     )}
                     onClick={() => setActiveId(item.id)}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-semibold text-[#e5e2e1]">
+                      <span className="text-[13px] font-semibold text-[#c4b5a8]">
                         <span
                           className={cn(
                             "mr-2 inline-block size-2.5 rounded-full align-middle",
@@ -406,14 +406,14 @@ export default function SubjectModerationPage() {
                       </span>
                       <span
                         className={cn(
-                          "rounded-full border px-2 py-1 text-[11px]",
+                          "rounded-[3px] border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.04em]",
                           STATUS_STYLES[item.moderation_status] || STATUS_STYLES.submitted
                         )}
                       >
                         {STATUS_LABEL[item.moderation_status] || item.moderation_status}
                       </span>
                     </div>
-                    <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-[#a28c83]">
+                    <p className="mt-2 line-clamp-3 text-[12px] leading-relaxed text-[#5a4f48]">
                       {(item.question_preview || item.question_text || "").slice(0, 260)}
                     </p>
                   </button>
@@ -427,13 +427,13 @@ export default function SubjectModerationPage() {
             </Card>
 
             <section className="flex min-w-0 flex-col gap-4">
-              <div className="flex min-h-[76px] flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#3b2a22]/55 bg-[#1b1713] px-4 py-3">
+              <div className="flex min-h-[64px] flex-wrap items-center justify-between gap-3 rounded-[8px] border border-[#3b2a22]/55 bg-[#1b1713] px-5 py-3">
                 <div>
-                  <p className="text-sm font-semibold text-[#e5e2e1]">
+                  <p className="text-[13px] font-semibold tracking-[0.02em] text-[#c4b5a8]">
                     {activeSummary ? `Question #${activeSummary.id}` : "Select a question"}
                   </p>
                   {saveError && (
-                    <p className="mt-2 max-w-2xl rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                    <p className="mt-2 max-w-2xl rounded-[4px] border border-red-500/20 bg-[#1a0b0b] px-3 py-2 text-[12px] text-red-300">
                       {saveError}
                     </p>
                   )}
@@ -442,7 +442,7 @@ export default function SubjectModerationPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-full border-[#3b2a22]/55 bg-[#181410] text-[#dac1b7] hover:bg-[#211913]"
+                    className="rounded-[4px] border-[#3b2a22]/55 bg-transparent text-[12px] tracking-[0.04em] text-[#6f6258] hover:border-[#5a3d2e]/60 hover:bg-transparent hover:text-[#9a8880]"
                     disabled={activeIndex <= 0}
                     onClick={() => {
                       const prev = queue[activeIndex - 1]
@@ -455,7 +455,7 @@ export default function SubjectModerationPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-full border-[#3b2a22]/55 bg-[#181410] text-[#dac1b7] hover:bg-[#211913]"
+                    className="rounded-[4px] border-[#3b2a22]/55 bg-transparent text-[12px] tracking-[0.04em] text-[#6f6258] hover:border-[#5a3d2e]/60 hover:bg-transparent hover:text-[#9a8880]"
                     disabled={activeIndex < 0 || activeIndex >= queue.length - 1}
                     onClick={() => {
                       const next = queue[activeIndex + 1]
@@ -468,7 +468,7 @@ export default function SubjectModerationPage() {
                   <Button
                     type="button"
                     variant="destructive"
-                    className="rounded-full"
+                    className="rounded-[4px] border border-red-400/25 bg-red-500/12 text-[12px] tracking-[0.04em] text-red-200 hover:border-red-400/35 hover:bg-red-500/18"
                     disabled={!draft || status === "saving"}
                     onClick={rejectQuestion}
                   >
@@ -478,7 +478,7 @@ export default function SubjectModerationPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-full border-orange-500/35 bg-orange-500/10 text-orange-100 hover:bg-orange-500/18"
+                    className="rounded-[4px] border-orange-500/30 bg-orange-500/8 text-[12px] tracking-[0.04em] text-orange-200/80 hover:border-orange-400/40 hover:bg-transparent hover:text-orange-100"
                     disabled={!draft || status === "saving"}
                     onClick={requestRevisionQuestion}
                   >
@@ -488,7 +488,7 @@ export default function SubjectModerationPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-full border-[#3b2a22]/55 bg-[#181410] text-[#dac1b7] hover:bg-[#211913]"
+                    className="rounded-[4px] border-[#3b2a22]/55 bg-transparent text-[12px] tracking-[0.04em] text-[#6f6258] hover:border-[#5a3d2e]/60 hover:bg-transparent hover:text-[#9a8880]"
                     disabled={!draft || status === "saving"}
                     onClick={() => persistQuestion(draft)}
                   >
@@ -496,7 +496,7 @@ export default function SubjectModerationPage() {
                   </Button>
                   <Button
                     type="button"
-                    className="rounded-full bg-[#ccb2a3d3] text-[#1a1817] hover:bg-[#ddbeaa]"
+                    className="rounded-[4px] border border-[#7c573a]/60 bg-[#1e1511] text-[12px] font-semibold uppercase tracking-[0.06em] text-[#dba476] hover:border-[#c8864a]/70 hover:bg-[#261a12] hover:text-[#f0c99e]"
                     disabled={!draft || status === "saving"}
                     onClick={publishQuestion}
                   >
@@ -506,7 +506,7 @@ export default function SubjectModerationPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-full border-red-500/40 bg-red-950/30 text-red-200 hover:bg-red-950/50"
+                    className="rounded-[4px] border-red-400/20 bg-transparent text-[12px] tracking-[0.04em] text-red-300/50 hover:border-red-400/30 hover:bg-transparent hover:text-red-300"
                     disabled={status === "saving"}
                     onClick={deleteQuestion}
                   >
@@ -559,7 +559,7 @@ export default function SubjectModerationPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="size-8 rounded-full border-[#3b2a22]/55 bg-[#181410]/90 p-0 text-[#dac1b7] shadow-lg shadow-black/20 transition-colors hover:bg-[#211913]"
+                    className="size-7 rounded-[4px] border-[#3b2a22]/55 bg-[#181410]/90 p-0 text-[#6f6258] transition-colors hover:border-[#5a3d2e]/60 hover:bg-transparent hover:text-[#9a8880]"
                     onClick={() => setPreviewExpanded((expanded) => !expanded)}
                     aria-label={previewExpanded ? "Compact preview" : "Expand preview"}
                     title={previewExpanded ? "Compact preview" : "Expand preview"}
