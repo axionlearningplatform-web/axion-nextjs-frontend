@@ -306,9 +306,9 @@ const QuestionRow = memo(function QuestionRow({ item, onRowClick }) {
           {questionTypeLabel(item.question_type)}
         </span>
       </TableCell>
-      <TableCell className="min-w-[260px] max-w-none px-4">
-        <div className="overflow-hidden text-ellipsis line-clamp-3 break-words">{preview}</div>
-      </TableCell>
+    <TableCell className="max-w-[375px] px-4">
+  <div className="overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,black_70%,transparent_100%)]">{preview}</div>
+</TableCell>
       <TableCell className="w-44 shrink-0 px-4 text-[#dac1b7]">
         <div className="line-clamp-2 whitespace-normal break-words">
           {item.import_source || "Manual"}
@@ -590,7 +590,7 @@ export default function QuestionTable() {
                 <TableHead className="w-20 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                   Type
                 </TableHead>
-                <TableHead className="min-w-[320px] px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
+                <TableHead className="max-w-[320px] px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                   Question
                 </TableHead>
                 <TableHead className="w-44 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
