@@ -72,7 +72,7 @@ const levelOptions = [
 
 function SectionTitle({ children }) {
   return (
-    <div className="font-serif text-xl font-semibold text-[#e5e2e1]">
+    <div className="font-serif text-[18px] font-medium tracking-[0.01em] text-[#c8bdb6]">
       {children}
     </div>
   )
@@ -88,7 +88,7 @@ function EditorToolbarButton({
     <Tooltip>
       <TooltipTrigger
         type="button"
-        className="inline-flex h-8 min-w-8 items-center justify-center rounded-md px-2 text-[#a28c83] transition-colors hover:bg-[#2d2d2d] hover:text-[#ffb595]"
+        className="inline-flex h-7 min-w-7 items-center justify-center rounded-[4px] px-1.5 text-[#6f6258] transition-colors hover:bg-[#1b1713] hover:text-[#dba476]"
         onClick={onClick}
       >
         {children}
@@ -242,9 +242,9 @@ x + 1 &= 2
   }
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-[#3b2a22]/55 bg-white/[0.035] focus-within:ring-3 focus-within:ring-[#ffb595]/40">
+    <div className="overflow-hidden rounded-[10px] border border-[#3b2a22]/55 bg-white/[0.035] transition-colors duration-150 focus-within:border-[#7c573a]/55 focus-within:ring-0">
       <TooltipProvider delayDuration={180}>
-        <div className="flex flex-wrap items-center gap-1 border-b border-[#3a302b] px-2 py-1.5 sm:px-3 sm:py-2">
+        <div className="flex flex-wrap items-center gap-0.5 border-b border-[#3b2a22]/55 bg-[#181410]/60 px-3 py-2">
           <EditorToolbarButton
             label="Bold"
             shortcut="⌘B"
@@ -271,6 +271,7 @@ x + 1 &= 2
           >
             <Italic className="size-4" />
           </EditorToolbarButton>
+          <span className="mx-1 h-4 w-px bg-[#3b2a22]/60" />
           <EditorToolbarButton
             label="Align"
             shortcut="align+Tab"
@@ -300,12 +301,14 @@ x + 1 &= 2
           <EditorToolbarButton label="Subscript" onClick={() => applyRawInsert("_{}")}>
             <span className="font-serif text-[11px]">xₙ</span>
           </EditorToolbarButton>
+          <span className="mx-1 h-4 w-px bg-[#3b2a22]/60" />
           <EditorToolbarButton label="Sum" onClick={() => applyRawInsert("\\sum ")}>
             <span className="font-serif text-[12px]">∑</span>
           </EditorToolbarButton>
           <EditorToolbarButton label="Integral" onClick={() => applyRawInsert("\\int ")}>
             <span className="font-serif text-[12px]">∫</span>
           </EditorToolbarButton>
+          <span className="mx-1 h-4 w-px bg-[#3b2a22]/60" />
           <EditorToolbarButton
             label="Cases"
             onClick={() =>
@@ -344,7 +347,7 @@ x + 1 &= 2
           <EditorToolbarButton label="Greek θ" onClick={() => applyRawInsert("\\theta")}>
             <span className="font-serif text-[11px]">θ</span>
           </EditorToolbarButton>
-          <span className="ml-auto min-w-0 text-[10px] text-[#6f6258] sm:text-[11px]">
+          <span className="ml-auto min-w-0 text-[10px] tracking-[0.04em] text-[#6f6258]">
             {toolbarHint || "LaTeX-first · preview wraps math"}
           </span>
         </div>
@@ -352,7 +355,7 @@ x + 1 &= 2
           ref={textareaRef}
           onKeyDown={handleKeyDown}
           className={cn(
-            "rounded-none border-0 bg-transparent focus-visible:ring-0",
+            "rounded-none border-0 bg-transparent px-4 py-3 text-[15px] leading-relaxed text-[#e0d8d0] placeholder:italic placeholder:text-[#4f4945] focus-visible:ring-0",
             className
           )}
           value={value}
@@ -371,19 +374,19 @@ function DropdownSection({ title, summary, children, defaultOpen = false }) {
   const summaryText = summary != null ? String(summary) : ""
   return (
     <details
-      className="group overflow-hidden rounded-2xl border border-[#3b2a22]/55 bg-[#181410]"
+      className="group overflow-hidden rounded-[8px] border border-[#3b2a22]/55 bg-[#181410]"
       open={defaultOpen}
     >
-      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold text-[#dac1b7] transition-colors hover:bg-[#211913] [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-[13px] font-semibold tracking-[0.01em] text-[#c4b5a8] transition-colors hover:bg-[#1b1713] [&::-webkit-details-marker]:hidden">
         <span className="min-w-0 flex-1 truncate">{title}</span>
-        <span className="flex shrink-0 items-center gap-2 pl-2 text-xs font-normal text-[#a28c83]">
+        <span className="flex shrink-0 items-center gap-2 pl-2 text-[11px] font-normal tracking-[0.04em] text-[#6f6258]">
           <span
             className="max-w-[9rem] truncate text-right sm:max-w-[11rem]"
             title={summaryText}
           >
             {summary}
           </span>
-          <ChevronDown className="size-4 shrink-0 text-[#a28c83] transition-transform group-open:rotate-180" />
+          <ChevronDown className="size-3.5 shrink-0 text-[#77716b] transition-transform group-open:rotate-180" />
         </span>
       </summary>
       <div className="border-t border-[#3b2a22]/55 p-4">{children}</div>
@@ -455,16 +458,16 @@ function QuestionTypeSwitch({ value, onChange }) {
   ]
 
   return (
-    <div className="grid grid-cols-2 overflow-hidden rounded-full border border-[#3b2a22]/55 bg-[#120f0d] p-1">
+    <div className="grid grid-cols-2 overflow-hidden rounded-[10px] border border-[#3b2a22]/55 bg-[#181410] p-[3px]">
       {options.map((option) => {
         const active = value === option.value
         return (
           <button
             className={cn(
-              "h-10 rounded-full text-sm font-semibold transition-colors",
+              "h-9 rounded-[7px] border border-transparent text-[13px] font-semibold tracking-[0.02em] transition-colors",
               active
-                ? "bg-[#ccb2a3d3] text-[#1a1817]"
-                : "text-[#a28c83] hover:bg-white/[0.035] hover:text-[#dac1b7]"
+                ? "border-[#7c573a]/60 bg-[#2a1f1a] text-[#e8d5c4] shadow-[0_1px_4px_rgba(0,0,0,0.4)]"
+                : "text-[#766860] hover:text-[#c4b0a3]"
             )}
             key={option.value}
             type="button"
@@ -553,10 +556,10 @@ function SampleSolutionEditor({
         <button
           type="button"
           className={cn(
-            "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+            "rounded-[4px] border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] transition-colors",
             previewOpen
-              ? "border-[#c8864a]/45 bg-[#c8864a]/14 text-[#e6b083]"
-              : "border-[#3b2a22]/55 bg-white/[0.035] text-[#a28c83] hover:text-[#dac1b7]"
+              ? "border-[#5a3d2e]/60 bg-[#1b1713] text-[#dba476]"
+              : "border-[#3b2a22]/55 bg-transparent text-[#6f6258] hover:border-[#3b2a22]/70 hover:text-[#7a6d63]"
           )}
           onClick={() => setPreviewOpen((open) => !open)}
         >
@@ -564,7 +567,7 @@ function SampleSolutionEditor({
         </button>
       </div>
       <RichTextArea
-        className={cn("p-4 text-[#e5e2e1]", compact ? "min-h-[100px]" : "min-h-[145px]")}
+        className={cn("p-4 text-[15px] leading-relaxed text-[#e0d8d0]", compact ? "min-h-[100px]" : "min-h-[145px]")}
         value={value}
         onValueChange={onChange}
         toolbarHint="LaTeX"
@@ -580,7 +583,7 @@ function SampleSolutionEditor({
         />
       )}
       {previewOpen && (
-        <div className="rounded-2xl border border-[#3b2a22]/55 bg-[#11100e] p-4 shadow-inner shadow-black/20">
+        <div className="rounded-[6px] border border-[#3b2a22]/55 bg-[#181410] p-4">
           <MarkdownPreview value={value} placeholder="Your sample solution preview will appear here." />
         </div>
       )}
@@ -734,7 +737,7 @@ function TagRequirementAmounts({ tags, selectedIds, requirements, onChange }) {
         >
           <span className="max-w-[190px] truncate">{tag.name}</span>
           <Input
-            className="h-7 w-11 rounded-full border-[#3b2a22]/55 bg-[#131110] px-1 text-center text-xs text-[#e5e2e1] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            className="h-7 w-11 rounded-full border-[#3b2a22]/55 bg-[#181410] px-1 text-center text-xs text-[#e5e2e1] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             min="1"
             aria-label={`${tag.name} count`}
             type="number"
@@ -831,10 +834,10 @@ function TagTaxonomyPicker({
               {group.tags.map((tag) => (
                 <button
                   className={cn(
-                    "rounded-full border px-3 py-1.5 text-sm transition-colors",
+                    "rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors",
                     selectedSet.has(tag.id)
                       ? "border-[#ffb595]/60 bg-[#4a2f26] text-[#ffb595]"
-                      : "border-[#3b2a22]/55 bg-white/[0.035] text-[#dac1b7] hover:bg-[#211913]"
+                      : "border-[#3b2a22]/55 bg-white/[0.035] text-[#9a8880] hover:border-[#7c573a]/55 hover:bg-[#211913] hover:text-[#dba476]"
                   )}
                   key={tag.id}
                   type="button"
@@ -868,10 +871,10 @@ function TagTaxonomyPicker({
             >
               <button
                 className={cn(
-                  "rounded-full border px-2.5 py-1 font-serif text-[14px] transition-colors",
+                  "rounded-full border px-2.5 py-1 text-[13px] font-medium transition-colors",
                   selected
                     ? "border-[#ffb595]/60 bg-[#4a2f26] text-[#ffb595]"
-                    : "border-[#3b2a22]/55 bg-white/[0.035] text-[#dac1b7] hover:bg-[#211913]"
+                    : "border-[#3b2a22]/55 bg-white/[0.035] text-[#9a8880] hover:border-[#7c573a]/55 hover:bg-[#211913] hover:text-[#dba476]"
                 )}
                 type="button"
                 onClick={() => toggle(tag)}
@@ -880,7 +883,7 @@ function TagTaxonomyPicker({
               </button>
               {openRoot === tag.id && subtopics.length > 0 && (
                 <span
-                  className="absolute left-0 top-9 z-30 grid min-w-[240px] gap-2 rounded-2xl border border-[#3b2a22]/70 bg-[#131110] p-3 shadow-2xl shadow-black/40"
+                  className="absolute left-0 top-9 z-30 grid min-w-[240px] gap-2 rounded-[8px] border border-[#3b2a22]/70 bg-[#181410] p-3 shadow-[0_12px_40px_rgba(0,0,0,0.5)]"
                   onMouseEnter={() => openFlyout(tag.id)}
                   onMouseLeave={scheduleCloseFlyout}
                 >
@@ -890,10 +893,10 @@ function TagTaxonomyPicker({
                   {subtopics.map((child) => (
                     <button
                       className={cn(
-                        "rounded-xl border px-3 py-2 text-left text-sm transition-colors",
+                        "rounded-[6px] border px-3 py-2 text-left text-[13px] font-medium transition-colors",
                         selectedSet.has(child.id)
                           ? "border-[#ffb595]/60 bg-[#4a2f26] text-[#ffb595]"
-                          : "border-[#3b2a22]/55 bg-white/[0.035] text-[#dac1b7] hover:bg-[#211913]"
+                          : "border-[#3b2a22]/55 bg-white/[0.035] text-[#9a8880] hover:border-[#7c573a]/55 hover:bg-[#211913] hover:text-[#dba476]"
                       )}
                       key={child.id}
                       type="button"
@@ -972,10 +975,10 @@ function MarkingCriteriaFields({ rows, onChange, compact }) {
       </p>
       {rows.map((row, index) => (
         <Field key={`mc-row-${index}`}>
-          <FieldLabel className="text-[#dac1b7]">Mark {row.mark}</FieldLabel>
+          <FieldLabel className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a6d63]">Mark {row.mark}</FieldLabel>
           <RichTextArea
             className={cn(
-              "min-h-[72px] p-3 text-sm text-[#e5e2e1]",
+              "min-h-[72px] p-3 text-sm text-[#e0d8d0]",
               compact && "min-h-[60px]"
             )}
             placeholder={`What earns mark ${row.mark}?`}
@@ -1034,10 +1037,10 @@ function McqOptionsEditor({
             <div className="grid grid-cols-[38px_minmax(0,1fr)_34px] items-center gap-2" key={option.id || option.letter}>
               <button
                 className={cn(
-                  "inline-flex size-9 items-center justify-center rounded-full border text-sm font-semibold transition-colors",
+                  "inline-flex size-9 items-center justify-center rounded-[4px] border text-sm font-semibold transition-colors",
                   selected
                     ? "border-emerald-300/60 bg-emerald-500/15 text-emerald-200"
-                    : "border-[#3b2a22]/60 bg-white/[0.035] text-[#a28c83] hover:border-[#ffb595]/50 hover:text-[#ffb595]"
+                    : "border-[#3b2a22]/55 bg-[#181410] text-[#6f6258] hover:border-[#7c573a]/60 hover:text-[#dba476]"
                 )}
                 type="button"
                 onClick={() => onCorrectOptionChange(option.letter)}
@@ -1047,7 +1050,7 @@ function McqOptionsEditor({
                 {selected ? <Check className="size-4" /> : option.letter}
               </button>
               <RichTextArea
-                className="min-h-[58px] p-3 text-sm text-[#e5e2e1]"
+                className="min-h-[58px] p-3 text-sm text-[#e0d8d0]"
                 toolbarHint={`Option ${option.letter}`}
                 value={option.text || ""}
                 onValueChange={(value) => updateOption(index, value)}
@@ -1071,7 +1074,7 @@ function McqOptionsEditor({
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#3b2a22]/55 pt-4">
         <Button
-          className="w-fit rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-[#dac1b7] hover:bg-[#211913]"
+          className="h-8 w-fit rounded-[6px] border border-[#3b2a22]/55 bg-transparent px-3 text-[13px] text-[#9a8880] hover:border-[#5a3d2e]/70 hover:text-[#dba476]"
           type="button"
           variant="outline"
           onClick={() => onOptionsChange(normalizeOptionLetters([...normalized, emptyMcqOption(normalized.length)]))}
@@ -1079,7 +1082,7 @@ function McqOptionsEditor({
           <Plus className="size-4" />
           Add option
         </Button>
-        <label className="inline-flex items-center gap-2 text-sm text-[#a28c83]">
+        <label className="inline-flex items-center gap-2 text-[13px] tracking-[0.02em] text-[#6f6258]">
           <input
             checked={shuffleOptions}
             className="size-4 accent-[#c8864a]"
@@ -1382,13 +1385,13 @@ export function QuestionEditor({
       <div className="flex min-w-0 flex-col gap-6">
         <Card
           className={cn(
-            "w-full rounded-3xl border-[#3b2a22]/55 bg-[#1b1713] text-[#e5e2e1] shadow-2xl shadow-black/20 transition-colors",
+            "w-full rounded-3xl border-[#3b2a22]/55 bg-[#1b1713] text-[#e5e2e1] shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_24px_64px_rgba(0,0,0,0.35)] transition-colors",
             errors?.question_text && "border-destructive shadow-destructive/20"
           )}
         >
-          <CardHeader>
+          <CardHeader className="border-b border-[#3b2a22]/55 pb-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <CardTitle className="min-w-0 flex-1 font-serif text-2xl font-semibold">
+              <CardTitle className="min-w-0 flex-1 font-serif text-[26px] font-medium tracking-[-0.01em] text-[#f0ebe4]">
                 {submitLabel === "Save Changes" ? "Edit Question" : "Create Question"}
               </CardTitle>
 
@@ -1451,7 +1454,7 @@ export function QuestionEditor({
 
                 <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_112px]">
                   <Field>
-                    <FieldLabel className="text-[#dac1b7]">Subject</FieldLabel>
+                    <FieldLabel className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a6d63]">Subject</FieldLabel>
                     {lockedSubject ? (
                       <Input
                         className="rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-[#a28c83]"
@@ -1490,7 +1493,7 @@ export function QuestionEditor({
                   </Field>
 
                   <Field>
-                    <FieldLabel className="text-[#dac1b7]">
+                    <FieldLabel className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a6d63]">
                       {!isMcq && parts.length ? "Total Marks" : "Marks"}
                     </FieldLabel>
                     <Input
@@ -1522,7 +1525,7 @@ export function QuestionEditor({
                 </div>
 
                 <Field>
-                  <FieldLabel className="text-[#dac1b7]">Source</FieldLabel>
+                  <FieldLabel className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a6d63]">Source</FieldLabel>
                   <Input
                     className="rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
                     placeholder={sourcePlaceholder}
@@ -1548,12 +1551,12 @@ export function QuestionEditor({
                 </Field>
 
                 <Field>
-                  <FieldLabel className="text-[#dac1b7]">
+                  <FieldLabel className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a6d63]">
                     {!isMcq && parts.length ? "Question Stem / Background" : "Question"}
                   </FieldLabel>
                   <RichTextArea
                     className={cn(
-                      "min-h-[180px] p-5 text-[#e5e2e1]",
+                      "min-h-[200px] px-4 py-3 text-[15px] leading-relaxed text-[#e0d8d0]",
                       errors?.question_text && "border-destructive focus-visible:ring-destructive"
                     )}
                     value={questionText}
@@ -1621,26 +1624,27 @@ export function QuestionEditor({
                 <div className="grid gap-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <SectionTitle>Parts</SectionTitle>
-                    <Button
-                      className="rounded-full border border-[#3b2a22]/55 bg-white/[0.035] text-[#dac1b7] hover:bg-[#211913]"
-                      type="button"
-                      onClick={() => setParts([...parts, emptyPart(parts.length)])}
-                    >
-                      <Plus className="size-4" />
-                      Add Part
-                    </Button>
+                   <Button
+  className="h-8 rounded-[6px] border border-[#3b2a22]/55 bg-transparent px-3 text-[13px] text-[#9a8880] hover:bg-transparent hover:border-[#5a3d2e]/70 hover:text-[#dba476]"
+  type="button"
+  variant="outline"
+  onClick={() => setParts([...parts, emptyPart(parts.length)])}
+>
+  <Plus className="size-4" />
+  Add Part
+</Button>
                   </div>
 
                   {parts.map((part, index) => (
                     <details
-                      className="group overflow-hidden rounded-2xl border border-[#3b2a22]/55 bg-[#181410]"
+                      className="group overflow-hidden rounded-[8px] border border-[#3b2a22]/55 bg-[#181410]"
                       key={part.id}
                       open
                     >
-                      <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 [&::-webkit-details-marker]:hidden">
+                      <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 transition-colors hover:bg-[#181410] [&::-webkit-details-marker]:hidden">
                         <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
                           <Input
-                            className="h-8 w-11 shrink-0 rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-center text-sm text-[#e5e2e1]"
+                            className="h-8 w-11 shrink-0 rounded-[4px] border-[#3b2a22]/55 bg-white/[0.035] text-center text-sm text-[#e5e2e1]"
                             value={part.label}
                             onClick={(event) => event.stopPropagation()}
                             onChange={(event) => {
@@ -1714,7 +1718,7 @@ export function QuestionEditor({
                       <div className="grid gap-4 border-t border-[#3b2a22]/55 p-4">
                         <Field>
                           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                            <FieldLabel className="text-[#dac1b7]">Question Text</FieldLabel>
+                            <FieldLabel className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a6d63]">Question Text</FieldLabel>
                             {onBranchPart && (
                               <Button
                                 className="rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-xs text-[#dac1b7] hover:bg-[#211913]"
@@ -1728,7 +1732,7 @@ export function QuestionEditor({
                             )}
                           </div>
                           <RichTextArea
-                            className="min-h-[110px] p-4 text-[#e5e2e1]"
+                            className="min-h-[110px] px-4 py-3 text-[15px] leading-relaxed text-[#e0d8d0]"
                             value={part.text}
                             onValueChange={(value) => {
                               const next = [...parts]
@@ -1891,7 +1895,7 @@ export function QuestionEditor({
 
                 {showTagging && (
                 <Field>
-                  <FieldLabel className="text-[#dac1b7]">Tags</FieldLabel>
+                  <FieldLabel className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a6d63]">Tags</FieldLabel>
                   <div className="flex flex-wrap gap-2 rounded-2xl border border-[#3b2a22]/55 bg-[#181410] p-3">
                     {tags.length === 0 && (
                       <span className="text-sm text-[#a28c83]">
@@ -1942,13 +1946,13 @@ export function QuestionEditor({
                 )}
 
                 {validationMessage && (
-                  <p className="rounded-2xl border border-[#c8864a]/30 bg-[#c8864a]/10 px-4 py-3 text-sm text-[#e6b083]">
+                  <p className="rounded-[4px] border border-[#7c573a]/50 bg-[#1b1713] px-4 py-3 text-[13px] tracking-[0.02em] text-[#dba476]">
                     {validationMessage}
                   </p>
                 )}
 
                 <Button
-                  className="rounded-full bg-[#ccb2a3d3] text-base font-semibold text-[#1a1817] shadow-[0_0_0_1px_rgba(255,255,255,0.03)] transition-all duration-300 hover:bg-[#ddbeaa] hover:text-black hover:shadow-[0_8px_30px_rgba(255,220,200,0.06)] active:scale-[0.995]"
+                  className="h-11 rounded-[6px] border border-[#7c573a]/55 bg-[#1e1511] text-[14px] font-semibold tracking-[0.04em] text-[#dba476] shadow-[0_2px_12px_rgba(0,0,0,0.25)] transition-all duration-300 hover:border-[#c8864a]/65 hover:bg-[#261a12] hover:text-[#f0c99e] active:scale-[0.997]"
                   type="submit"
                 >
                   {submitLabel}

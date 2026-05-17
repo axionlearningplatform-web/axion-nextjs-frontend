@@ -572,7 +572,7 @@ export default function QuestionImportPage() {
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#ffb595]">
               {lockedSubject.name}
             </p>
-            <h1 className="mt-2 text-3xl font-bold text-[#e5e2e1]">
+            <h1 className="mt-2 font-serif text-[32px] font-medium tracking-[-0.01em] text-[#f0ebe4]">
               Question Import Review
             </h1>
           </div>
@@ -580,7 +580,7 @@ export default function QuestionImportPage() {
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
-                className="rounded-full bg-[#ccb2a3d3] text-[#1a1817] hover:bg-[#ddbeaa]"
+                className="h-9 rounded-[6px] border border-[#7c573a]/55 bg-[#1e1511] px-4 text-[12px] font-semibold uppercase tracking-[0.04em] text-[#dba476] hover:border-[#c8864a]/65 hover:bg-[#261a12] hover:text-[#f0c99e]"
                 disabled={status === "saving"}
                 onClick={acceptAllPending}
               >
@@ -590,7 +590,7 @@ export default function QuestionImportPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-full border-[#3b2a22]/55 bg-[#181410] text-[#dac1b7] hover:bg-[#211913]"
+                className="h-9 rounded-[6px] border border-[#3b2a22]/55 bg-transparent px-4 text-[12px] font-semibold uppercase tracking-[0.04em] text-[#6f6258] hover:border-[#5a3d2e]/60 hover:text-[#9a8880]"
                 onClick={rejectAllPending}
               >
                 Reject Pending
@@ -599,17 +599,17 @@ export default function QuestionImportPage() {
           )}
         </div>
 
-        <Card className="rounded-2xl border-[#3b2a22]/55 bg-[#1b1713] text-[#e5e2e1]">
+        <Card className="rounded-2xl border-[#3b2a22]/55 bg-[#1b1713] text-[#e5e2e1] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_20px_50px_rgba(0,0,0,0.3)]">
           <CardHeader className="flex flex-row items-center justify-between gap-4">
             <div>
-              <CardTitle className="font-serif text-2xl">Import Source</CardTitle>
+              <CardTitle className="font-serif text-[22px] font-medium text-[#d8cfc6]">Import Source</CardTitle>
               {candidates.length > 0 && (
-                <p className="mt-1 text-sm text-[#a28c83]">
+                <p className="mt-1 text-[12px] tracking-[0.02em] text-[#6f6258]">
                   Parsed {candidates.length} candidate questions locally.
                 </p>
               )}
               {parseMetadata?.parser_mode && (
-                <p className="mt-1 text-sm text-[#a28c83]">
+                <p className="mt-1 text-[12px] tracking-[0.02em] text-[#6f6258]">
                   Parser: {parseMetadata.parser_mode}
                   {parseMetadata.llm_model ? ` · ${parseMetadata.llm_model}` : ""}
                 </p>
@@ -618,7 +618,7 @@ export default function QuestionImportPage() {
             {candidates.length > 0 && (
               <button
                 type="button"
-                className="flex h-10 items-center gap-2 rounded-full border border-[#3b2a22]/55 bg-[#181410] px-4 text-sm font-semibold text-[#dac1b7] transition-colors hover:bg-[#211913]"
+                className="flex h-8 items-center gap-2 rounded-[6px] border border-[#3b2a22]/55 bg-transparent px-4 text-[12px] font-semibold tracking-[0.04em] text-[#6f6258] transition-colors hover:border-[#5a3d2e]/60 hover:text-[#9a8880]"
                 onClick={() => setSourceCollapsed((value) => !value)}
               >
                 <ChevronDown
@@ -633,7 +633,7 @@ export default function QuestionImportPage() {
           </CardHeader>
           {!sourceCollapsed && (
             <CardContent className="grid gap-5">
-              <div className="flex flex-wrap gap-2">
+              <div className="flex w-fit flex-wrap gap-1 rounded-[8px] border border-[#3b2a22]/55 bg-[#181410] p-1">
                 {[
                   ["paste", FileText, "Pasted Text"],
                   ["file", FileUp, "File / PDF"],
@@ -643,27 +643,27 @@ export default function QuestionImportPage() {
                     key={mode}
                     type="button"
                     className={cn(
-                      "flex h-11 shrink-0 items-center gap-3 rounded-xl px-4 text-left text-sm font-semibold transition-colors",
+                      "flex h-9 shrink-0 items-center gap-2 rounded-[6px] border border-transparent px-4 text-left text-[12px] font-semibold tracking-[0.04em] transition-colors",
                       candidates.length > 0 && "cursor-not-allowed opacity-45",
                       sourceMode === mode
-                        ? "bg-[#4a2f26] text-[#ffb595]"
-                        : "bg-white/[0.035] text-[#dac1b7] hover:bg-[#211913]"
+                        ? "border-[#7c573a]/55 bg-[#2a1f1a] text-[#dba476]"
+                        : "bg-transparent text-[#77716b] hover:text-[#a28c83]"
                     )}
                     disabled={candidates.length > 0}
                     onClick={() => setSourceMode(mode)}
                   >
-                    <Icon className="size-4" />
+                    <Icon className="size-3.5" />
                     {label}
                   </button>
                 ))}
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
+              <div className="grid gap-4">
                 <div>
                   <Field>
-                    <FieldLabel className="text-[#dac1b7]">Source</FieldLabel>
+                    <FieldLabel className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a6d63]">Source</FieldLabel>
                     <Input
-                      className="rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
+                      className="h-10 rounded-[6px] border border-[#3b2a22]/55 bg-white/[0.035] px-4 text-[14px] text-[#e5e2e1] placeholder:text-[#4f4945] focus-visible:border-[#7c573a]/60 focus-visible:ring-0"
                       disabled={candidates.length > 0}
                       placeholder={sourcePlaceholder}
                       value={importSource}
@@ -673,9 +673,9 @@ export default function QuestionImportPage() {
 
                   {sourceMode === "paste" && (
                     <Field className="mt-4">
-                      <FieldLabel className="text-[#dac1b7]">Content</FieldLabel>
+                      <FieldLabel className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a6d63]">Content</FieldLabel>
                       <Textarea
-                        className="min-h-[150px] rounded-2xl border-[#3b2a22]/55 bg-white/[0.035] p-4 text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
+                        className="min-h-[150px] rounded-[8px] border border-[#3b2a22]/55 bg-white/[0.035] p-4 text-[14px] leading-relaxed text-[#e5e2e1] placeholder:italic placeholder:text-[#4f4945] focus-visible:border-[#7c573a]/60 focus-visible:ring-0"
                         disabled={candidates.length > 0}
                         placeholder="Paste numbered questions, LaTeX source, or exported document text."
                         value={pastedContent}
@@ -686,11 +686,11 @@ export default function QuestionImportPage() {
 
                   {sourceMode === "file" && (
                     <Field className="mt-4">
-                      <FieldLabel className="text-[#dac1b7]">File</FieldLabel>
+                      <FieldLabel className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a6d63]">File</FieldLabel>
                       <Input
                         type="file"
                         accept=".pdf,.tex,.txt,.md,.docx,application/pdf"
-                        className="rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-[#e5e2e1] file:text-[#dac1b7]"
+                        className="h-10 rounded-[6px] border border-[#3b2a22]/55 bg-white/[0.035] px-4 text-[14px] text-[#e5e2e1] file:text-[#dba476] focus-visible:border-[#7c573a]/60 focus-visible:ring-0"
                         disabled={candidates.length > 0}
                         onChange={(event) => setFile(event.target.files?.[0] || null)}
                       />
@@ -699,9 +699,9 @@ export default function QuestionImportPage() {
 
                   {sourceMode === "url" && (
                     <Field className="mt-4">
-                      <FieldLabel className="text-[#dac1b7]">URL</FieldLabel>
+                      <FieldLabel className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a6d63]">URL</FieldLabel>
                       <Input
-                        className="rounded-full border-[#3b2a22]/55 bg-white/[0.035] text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
+                        className="h-10 rounded-[6px] border border-[#3b2a22]/55 bg-white/[0.035] px-4 text-[14px] text-[#e5e2e1] placeholder:text-[#4f4945] focus-visible:border-[#7c573a]/60 focus-visible:ring-0"
                         disabled={candidates.length > 0}
                         placeholder="https://..."
                         value={sourceUrl}
@@ -717,21 +717,19 @@ export default function QuestionImportPage() {
                   )}
 
                   <Field className="mt-4">
-                    <FieldLabel className="text-[#dac1b7]">Parsing Notes</FieldLabel>
+                    <FieldLabel className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a6d63]">Parsing Notes</FieldLabel>
                     <Textarea
-                      className="min-h-[84px] rounded-2xl border-[#3b2a22]/55 bg-white/[0.035] p-4 text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
+                      className="min-h-[84px] rounded-[8px] border border-[#3b2a22]/55 bg-white/[0.035] p-4 text-[14px] leading-relaxed text-[#e5e2e1] placeholder:italic placeholder:text-[#4f4945] focus-visible:border-[#7c573a]/60 focus-visible:ring-0"
                       disabled={candidates.length > 0}
                       placeholder="Optional: e.g. questions start at page 3, ignore solutions, use marks in right margin, split by Exercise 2A."
                       value={importInstructions}
                       onChange={(event) => setImportInstructions(event.target.value)}
                     />
                   </Field>
-                </div>
 
-                <div className="flex items-end">
                   <Button
                     type="button"
-                    className="rounded-full bg-[#ccb2a3d3] text-[#1a1817] hover:bg-[#ddbeaa]"
+                    className="ml-auto mt-4 h-10 w-fit rounded-[6px] border border-[#7c573a]/55 bg-[#1e1511] px-6 text-[13px] font-semibold uppercase tracking-[0.04em] text-[#dba476] transition-colors hover:border-[#c8864a]/65 hover:bg-[#261a12] hover:text-[#f0c99e] disabled:opacity-40"
                     disabled={
                       status === "parsing" ||
                       candidates.length > 0 ||
@@ -770,22 +768,22 @@ export default function QuestionImportPage() {
               )}
             >
               <CardHeader>
-                <CardTitle className="font-serif text-xl">Review Queue</CardTitle>
-                <p className="text-sm text-[#a28c83]">
+                <CardTitle className="font-serif text-[20px] font-medium text-[#d8cfc6]">Review Queue</CardTitle>
+                <p className="text-[12px] tracking-[0.02em] text-[#77716b]">
                   {counts.pending || 0} pending · {counts.accepted || 0} accepted · {counts.rejected || 0} rejected
                 </p>
                 <div className="mt-3 flex items-center gap-2">
                   <div className="relative min-w-0 flex-1">
                     <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#a28c83]" />
                     <Input
-                      className="h-10 rounded-full border-[#3b2a22]/55 bg-white/[0.035] pl-9 text-sm text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
+                      className="h-10 rounded-[6px] border border-[#3b2a22]/55 bg-white/[0.035] px-4 pl-9 text-[14px] text-[#e5e2e1] placeholder:text-[#4f4945] focus-visible:border-[#7c573a]/60 focus-visible:ring-0"
                       placeholder="Search candidates"
                       value={candidateSearch}
                       onChange={(event) => setCandidateSearch(event.target.value)}
                     />
                   </div>
                   <Button
-                    className="size-8 shrink-0 rounded-full border-[#3b2a22]/55 bg-white/[0.035] p-0 text-base leading-none text-[#dac1b7] hover:bg-[#211913]"
+                    className="size-8 shrink-0 rounded-[4px] border border-[#3b2a22]/55 bg-transparent p-0 text-base leading-none text-[#6f6258] hover:border-[#5a3d2e]/60 hover:text-[#dba476]"
                     type="button"
                     variant="outline"
                     onClick={addManualQuestion}
@@ -794,7 +792,7 @@ export default function QuestionImportPage() {
                     +
                   </Button>
                   <Button
-                    className="size-8 shrink-0 rounded-full border-red-400/25 bg-red-400/10 p-0 text-sm leading-none text-red-100 hover:bg-red-400/15"
+                    className="size-8 shrink-0 rounded-[4px] border border-red-400/15 bg-red-400/5 p-0 text-sm leading-none text-red-300/50 hover:bg-red-400/10 hover:text-red-200"
                     disabled={!activeCandidate}
                     type="button"
                     variant="outline"
@@ -811,15 +809,15 @@ export default function QuestionImportPage() {
                     key={candidate.temporary_id}
                     type="button"
                     className={cn(
-                      "w-full min-w-0 rounded-xl border p-3 text-left transition-colors",
+                      "w-full min-w-0 rounded-[6px] border p-3 text-left transition-colors duration-100",
                       index === activeIndex
-                        ? "border-[#ffb595]/60 bg-[#2a211e]"
+                        ? "border-[#7c573a]/55 bg-[#211913]"
                         : "border-[#3b2a22]/40 bg-[#181410] hover:bg-[#211913]"
                     )}
                     onClick={() => selectCandidate(index, candidate)}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-semibold text-[#e5e2e1]">
+                      <span className="text-[13px] font-semibold text-[#c4b5a8]">
                         <span
                           className={cn(
                             "mr-2 inline-block size-2.5 rounded-full align-middle",
@@ -837,10 +835,10 @@ export default function QuestionImportPage() {
                         {REVIEW_STATUSES[candidate.review_status]}
                       </span>
                     </div>
-                    <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-[#a28c83]">
+                    <p className="mt-2 line-clamp-3 text-[12px] leading-relaxed text-[#77716b]">
                       {candidate.question_text.slice(0, 260)}
                     </p>
-                    <p className="mt-2 text-[11px] text-[#ffb595]">
+                    <p className="mt-2 text-[11px] tracking-[0.02em] text-[#6f6258]">
                       {Math.round(candidate.confidence * 100)}% parser confidence
                     </p>
                   </button>
@@ -854,9 +852,9 @@ export default function QuestionImportPage() {
             </Card>
 
             <section className="flex min-w-0 flex-col gap-4 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">
-              <div className="flex min-h-[76px] flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#3b2a22]/55 bg-[#1b1713] px-4 py-3">
+              <div className="flex min-h-[76px] flex-wrap items-center justify-between gap-3 rounded-[8px] border border-[#3b2a22]/55 bg-[#1b1713] px-5 py-4">
                 <div>
-                  <p className="text-sm font-semibold text-[#e5e2e1]">
+                  <p className="text-[13px] font-semibold tracking-[0.02em] text-[#c4b5a8]">
                     Candidate {activeIndex + 1} of {candidates.length}
                   </p>
                   {activeFlags.length > 0 && (
@@ -873,12 +871,12 @@ export default function QuestionImportPage() {
                     </div>
                   )}
                   {activeCandidate?.save_error && (
-                    <p className="mt-3 max-w-2xl rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                    <p className="mt-3 max-w-2xl rounded-[4px] border border-red-500/20 bg-[#1a0b0b] px-3 py-2 text-[12px] text-red-300">
                       {activeCandidate.save_error}
                     </p>
                   )}
                   {activeCandidate?.import_notes && (
-                    <p className="mt-2 max-w-2xl text-sm text-[#dac1b7]">
+                    <p className="mt-2 max-w-2xl text-[12px] tracking-[0.01em] text-[#6f6258]">
                       {activeCandidate.import_notes}
                     </p>
                   )}
@@ -887,7 +885,7 @@ export default function QuestionImportPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-full border-[#3b2a22]/55 bg-[#181410] text-[#dac1b7] hover:bg-[#211913]"
+                    className="h-8 rounded-[4px] border border-[#3b2a22]/55 bg-transparent px-3 text-[12px] tracking-[0.04em] text-[#6f6258] hover:border-[#5a3d2e]/60 hover:text-[#9a8880]"
                     disabled={activeIndex === 0}
                     onClick={() => selectCandidate(activeIndex - 1)}
                   >
@@ -897,7 +895,7 @@ export default function QuestionImportPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-full border-[#3b2a22]/55 bg-[#181410] text-[#dac1b7] hover:bg-[#211913]"
+                    className="h-8 rounded-[4px] border border-[#3b2a22]/55 bg-transparent px-3 text-[12px] tracking-[0.04em] text-[#6f6258] hover:border-[#5a3d2e]/60 hover:text-[#9a8880]"
                     disabled={activeIndex >= candidates.length - 1}
                     onClick={() => selectCandidate(activeIndex + 1)}
                   >
@@ -907,7 +905,7 @@ export default function QuestionImportPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-full border-[#3b2a22]/55 bg-[#181410] text-[#dac1b7] hover:bg-[#211913]"
+                    className="h-8 rounded-[4px] border border-[#3b2a22]/55 bg-transparent px-3 text-[12px] tracking-[0.04em] text-[#6f6258] hover:border-[#5a3d2e]/60 hover:text-[#9a8880]"
                     onClick={() => markCurrent("skipped")}
                   >
                     <SkipForward className="size-4" />
@@ -916,7 +914,7 @@ export default function QuestionImportPage() {
                   <Button
                     type="button"
                     variant="destructive"
-                    className="rounded-full"
+                    className="h-8 rounded-[4px] border border-red-400/20 bg-red-500/8 px-3 text-[12px] tracking-[0.04em] text-red-300 hover:bg-red-500/14"
                     onClick={() => markCurrent("rejected")}
                   >
                     <X className="size-4" />
@@ -924,7 +922,7 @@ export default function QuestionImportPage() {
                   </Button>
                   <Button
                     type="button"
-                    className="rounded-full bg-[#ccb2a3d3] text-[#1a1817] hover:bg-[#ddbeaa]"
+                    className="h-8 rounded-[4px] border border-[#7c573a]/55 bg-[#1e1511] px-4 text-[12px] font-semibold uppercase tracking-[0.04em] text-[#dba476] hover:border-[#c8864a]/65 hover:bg-[#261a12] hover:text-[#f0c99e] disabled:opacity-40"
                     disabled={status === "saving" || !draft}
                     onClick={() => acceptCurrent(draft)}
                   >
