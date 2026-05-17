@@ -12,6 +12,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  FileText,
   Keyboard,
   Lightbulb,
   Loader2,
@@ -771,67 +772,88 @@ function McqResultCard({ result }) {
   )
 }
 
-function SubmittedFilePreview({ files }) {
+function SubmittedFilePreview({ files, submissionType = "photo" }) {
   const imageFiles = files.filter((file) => file.mime_type?.startsWith("image/"))
   const pdfFiles = files.filter((file) => file.mime_type === "application/pdf" || file.name?.toLowerCase().endsWith(".pdf"))
   const [activeIndex, setActiveIndex] = useState(0)
   const displayIndex = Math.min(activeIndex, Math.max(imageFiles.length - 1, 0))
   const activeImage = imageFiles[displayIndex]
+  const typeLabel = titleCase(submissionType === "file" ? "File" : submissionType)
+  const pageLabel = imageFiles.length > 1 ? `Page ${displayIndex + 1} / ${imageFiles.length}` : ""
+  const metadata = [typeLabel, pageLabel].filter(Boolean).join(" · ")
 
   if (!imageFiles.length && !pdfFiles.length) return null
 
   return (
-    <section className="mb-4 rounded-[3px] border border-white/[0.06] bg-[#17110e] p-4">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8f8982]">
-        Your Submission
-      </p>
+    <section className="mb-4 rounded-[6px] border border-[#4a3328]/50 bg-[#141210] p-5">
+      <div className="mb-3 flex items-center justify-between gap-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8f8982]">
+          Your Submission
+        </p>
+        {metadata && (
+          <p className="shrink-0 text-[11px] text-[#5f5953]">
+            {metadata}
+          </p>
+        )}
+      </div>
       {activeImage && (
-        <div className="mt-3">
-          <div className="flex items-center justify-center rounded-[3px] border border-white/[0.06] bg-[#120f0d] p-3">
+        <div className="rounded-[4px] border border-[#2a2420] bg-[#0f0d0c] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
+          <div className="group relative overflow-hidden rounded-t-[4px]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={activeImage.data_url}
               alt={activeImage.name || "Submitted work"}
-              className="max-h-[320px] max-w-full object-contain"
+              className="max-h-[380px] w-full object-contain"
             />
+            {imageFiles.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  className="absolute left-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full border border-[#3b2a22]/70 bg-[#0f0d0c]/80 text-[#d99658] opacity-0 transition-opacity group-hover:opacity-100 disabled:opacity-0"
+                  onClick={() => setActiveIndex((index) => Math.max(0, index - 1))}
+                  disabled={displayIndex === 0}
+                  aria-label="Previous submission image"
+                >
+                  <ChevronLeft className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full border border-[#3b2a22]/70 bg-[#0f0d0c]/80 text-[#d99658] opacity-0 transition-opacity group-hover:opacity-100 disabled:opacity-0"
+                  onClick={() => setActiveIndex((index) => Math.min(imageFiles.length - 1, index + 1))}
+                  disabled={displayIndex >= imageFiles.length - 1}
+                  aria-label="Next submission image"
+                >
+                  <ChevronRight className="size-4" />
+                </button>
+              </>
+            )}
           </div>
-          {imageFiles.length > 1 && (
-            <div className="mt-3 flex items-center justify-center gap-3 text-[11px] font-semibold tracking-[0.08em] text-[#8f8982]">
-              <button
-                type="button"
-                className="inline-flex size-8 items-center justify-center rounded-[2px] border border-white/[0.06] text-[#d99658] transition-colors hover:border-[#7c573a]/70 disabled:cursor-not-allowed disabled:opacity-45"
-                onClick={() => setActiveIndex((index) => Math.max(0, index - 1))}
-                disabled={displayIndex === 0}
-                aria-label="Previous submission image"
-              >
-                <ChevronLeft className="size-4" />
-              </button>
-              <span>{displayIndex + 1} / {imageFiles.length}</span>
-              <button
-                type="button"
-                className="inline-flex size-8 items-center justify-center rounded-[2px] border border-white/[0.06] text-[#d99658] transition-colors hover:border-[#7c573a]/70 disabled:cursor-not-allowed disabled:opacity-45"
-                onClick={() => setActiveIndex((index) => Math.min(imageFiles.length - 1, index + 1))}
-                disabled={displayIndex >= imageFiles.length - 1}
-                aria-label="Next submission image"
-              >
-                <ChevronRight className="size-4" />
-              </button>
-            </div>
-          )}
+          <p className="truncate border-t border-[#1f1c1a] px-2 py-1.5 text-[11px] text-[#4f4a45]">
+            {activeImage.name || "Submitted image"}
+          </p>
         </div>
       )}
       {pdfFiles.length > 0 && (
         <div className="mt-3 grid gap-2">
           {pdfFiles.map((file, index) => (
-            <a
+            <div
               key={`${file.name}-${index}`}
-              href={file.data_url}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-[3px] border border-white/[0.06] bg-[#120f0d] px-3 py-2 text-[12px] text-[#b7aca1] transition-colors hover:border-[#7c573a]/70 hover:text-[#dba476]"
+              className="flex items-center gap-3 rounded-[3px] border border-[#2d2926] bg-[#111009] px-4 py-3"
             >
-              PDF submitted — {file.name || "submission.pdf"}
-            </a>
+              <FileText className="size-4 shrink-0 text-[#8f8982]" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] text-[#b7aca1]">{file.name || "submission.pdf"}</p>
+                <p className="mt-0.5 text-[11px] text-[#4f4a45]">{file.mime_type || "application/pdf"}</p>
+              </div>
+              <a
+                href={file.data_url}
+                target="_blank"
+                rel="noreferrer"
+                className="shrink-0 text-[12px] text-[#dba476] underline-offset-2 hover:text-[#f0c99e] hover:underline"
+              >
+                Open
+              </a>
+            </div>
           ))}
         </div>
       )}
@@ -863,8 +885,10 @@ function AnswerArea({
   const [submittedFiles, setSubmittedFiles] = useState([])
   const handwritingRef = useRef(null)
   const isMcq = question?.question_type === "mcq"
-  const locked = submitted
+  const locked = submitted && !markingDisabled
   const canMoveNext = Boolean((markingResult || betaSampleRevealed) && !markingLoading)
+  const answerTabs = markingDisabled ? ["type", "draw"] : ["type", "draw", "photo"]
+  const activeAnswerTab = markingDisabled && activeTab === "photo" ? "type" : activeTab
 
   useEffect(() => {
     if (activeTab !== "draw" && questionLocked) {
@@ -890,7 +914,7 @@ function AnswerArea({
       onNextQuestion?.()
       return
     }
-    if (locked) return
+    if (locked && !markingDisabled) return
     if (isMcq) {
       if (!selectedMcqOption) {
         onSubmit({})
@@ -903,13 +927,13 @@ function AnswerArea({
     }
     if (markingDisabled) {
       setSubmitted(true)
-      setSubmittedTab(activeTab)
+      setSubmittedTab(activeAnswerTab)
       onBetaReveal?.()
       return
     }
     setSubmitted(true)
-    setSubmittedTab(activeTab)
-    if (activeTab === "draw" && handwritingRef.current) {
+    setSubmittedTab(activeAnswerTab)
+    if (activeAnswerTab === "draw" && handwritingRef.current) {
       const exportPayload = await handwritingRef.current.exportAnswer()
       setSubmittedFiles([])
       const formData = new FormData()
@@ -928,7 +952,7 @@ function AnswerArea({
       return
     }
 
-    if (activeTab === "type") {
+    if (activeAnswerTab === "type") {
       setSubmittedFiles([])
       onSubmit({
         submission_type: "text",
@@ -971,9 +995,8 @@ function AnswerArea({
         </div>
       )}
 
-      {!markingDisabled && (
       <div className="mb-5 flex gap-8 border-b border-white/[0.06]">
-        {["type", "draw", "photo"].map((tab) => (
+        {answerTabs.map((tab) => (
           <button
             key={tab}
             type="button"
@@ -981,7 +1004,7 @@ function AnswerArea({
             disabled={locked}
             className={cn(
               "h-9 border-b text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors",
-              activeTab === tab
+              activeAnswerTab === tab
                 ? "border-[#e8e4dc] text-[#e8e4dc]"
                 : "border-transparent text-[#4f4a45] hover:text-[#8f8982]",
               locked && "pointer-events-none opacity-65"
@@ -991,13 +1014,8 @@ function AnswerArea({
           </button>
         ))}
       </div>
-      )}
 
-      {markingDisabled ? (
-        <div className="rounded-[3px] border border-white/[0.06] bg-[#1b1713] px-5 py-6 text-[13px] leading-relaxed text-[#7a726b]">
-          When you are ready, use Submit Answer to reveal the sample solution. Your working is not saved during beta.
-        </div>
-      ) : activeTab === "type" ? (
+      {activeAnswerTab === "type" ? (
         <div className="rounded-[3px] border border-white/[0.06] bg-[#1b1713] p-5">
           <textarea
             value={typedAnswer}
@@ -1026,7 +1044,7 @@ function AnswerArea({
             </span>
           </div>
         </div>
-      ) : activeTab === "draw" ? (
+      ) : activeAnswerTab === "draw" ? (
         <HandwritingCanvas
           ref={handwritingRef}
           lockedQuestionHeight={lockedQuestionHeight}
@@ -1035,7 +1053,7 @@ function AnswerArea({
           questionLocked={questionLocked}
           readOnly={locked}
         />
-      ) : activeTab === "photo" ? (
+      ) : activeAnswerTab === "photo" ? (
         <div className="rounded-[3px] border border-white/[0.06] bg-[#1a1714] p-5">
           <label className={cn(
             "flex min-h-36 flex-col items-center justify-center rounded-[3px] border border-dashed border-white/[0.09] px-4 py-8 text-center text-[13px] tracking-[0.04em] text-[#6f6861] transition-colors hover:border-[#9b673d]/45 hover:text-[#dba476]",
@@ -1079,7 +1097,7 @@ function AnswerArea({
         </div>
       ) : (
         <div className="flex min-h-44 items-center justify-center rounded-[3px] border border-white/[0.06] bg-[#1a1714] text-[13px] tracking-[0.04em] text-[#4f4a45]">
-          {titleCase(activeTab)} tools are coming soon.
+          {titleCase(activeAnswerTab)} tools are coming soon.
         </div>
       )}
 
@@ -1099,7 +1117,7 @@ function AnswerArea({
         <>
           <div className="mt-5 rounded-[3px] border border-white/[0.06] bg-[#1a1714] p-5">
             {markingResult && submittedTab === "photo" && submittedFiles.length > 0 && (
-              <SubmittedFilePreview files={submittedFiles} />
+              <SubmittedFilePreview files={submittedFiles} submissionType={submittedTab} />
             )}
             {markingError && (
               <div className="flex items-center gap-4">

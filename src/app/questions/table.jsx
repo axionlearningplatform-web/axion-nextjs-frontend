@@ -12,6 +12,7 @@ import {
 import fetcher from "@/lib/fetcher"
 import { cn } from "@/lib/utils"
 import { useVirtualizer } from "@tanstack/react-virtual"
+import { Check, ChevronDown } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import useSWR from "swr"
@@ -20,10 +21,6 @@ const QUESTIONS_API_URL = "/api/questions/"
 const TAGS_API_URL = "/api/questions/tags/"
 const PAGE_SIZE = 75
 const SEARCH_DEBOUNCE_MS = 260
-
-/** Extra right padding so the native select chevron clears the curved border. */
-const FILTER_SELECT_CLASS =
-  "h-10 w-full min-w-[140px] cursor-pointer rounded-full border border-[#3b2a22]/55 bg-[#181410] py-2 pl-4 pr-12 text-sm text-[#e5e2e1] outline-none focus:border-[#ffb595]/40"
 
 const MODERATION_FILTER_OPTIONS = [
   { value: "", label: "Any status" },
@@ -39,6 +36,14 @@ const QUESTION_TYPE_FILTER_OPTIONS = [
   { value: "mcq", label: "MCQ" },
 ]
 
+const LEVEL_FILTER_OPTIONS = [
+  { value: "", label: "Any level" },
+  { value: "foundational", label: "Foundational" },
+  { value: "intermediate", label: "Intermediate" },
+  { value: "exam_practice", label: "Exam Practice" },
+  { value: "challenge", label: "Challenge" },
+]
+
 function questionTypeLabel(value) {
   return String(value || "saq").toLowerCase() === "mcq" ? "MCQ" : "SAQ"
 }
@@ -48,6 +53,220 @@ function titleCase(value = "") {
     .replaceAll("-", " ")
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
+
+function FilterDropdown({ active = false, label, onChange, options, value }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    function closeOnOutsideClick(event) {
+      if (ref.current && !ref.current.contains(event.target)) {
+        setOpen(false)
+      }
+    }
+    function closeOnEscape(event) {
+      if (event.key === "Escape") setOpen(false)
+    }
+    document.addEventListener("mousedown", closeOnOutsideClick)
+    document.addEventListener("keydown", closeOnEscape)
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick)
+      document.removeEventListener("keydown", closeOnEscape)
+    }
+  }, [open])
+
+  return (
+    <div ref={ref} className="relative min-w-[160px]">
+      <button
+        type="button"
+        aria-expanded={open}
+        className={cn(
+          "flex h-10 w-full items-center justify-between gap-2 rounded-full border border-[#3b2a22]/55 bg-[#181410] px-4 text-[13px] text-[#c8bdb6] transition-colors hover:border-[#7c573a]/70 hover:text-[#e8e0d8]",
+          active && "border-[#7c573a]/70 text-[#dba476]"
+        )}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span className="truncate">{label}</span>
+        <ChevronDown className={cn("size-4 shrink-0 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div
+          role="listbox"
+          className="absolute left-0 top-[calc(100%+8px)] z-30 min-w-full overflow-hidden rounded-[8px] border border-[#3b2a22]/55 bg-[#181410] py-1 shadow-[0_12px_40px_rgba(0,0,0,0.55)]"
+        >
+          {options.map((option) => {
+            const selected = String(value) === String(option.value)
+            return (
+              <button
+                key={option.value || "any"}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-[13px] text-[#c8bdb6] transition-colors hover:bg-[#251a14] hover:text-[#e8e0d8]"
+                onClick={() => {
+                  onChange(option.value)
+                  setOpen(false)
+                }}
+              >
+                <span className="flex size-3 items-center justify-center text-[#dba476]">
+                  {selected && <Check className="size-3" />}
+                </span>
+                <span className="whitespace-nowrap">{option.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function TagFilterDropdown({
+  active,
+  label,
+  layer1Id,
+  layer1Options,
+  layer2Id,
+  onClear,
+  onSelectLayer1,
+  onSelectLayer2,
+}) {
+  const [open, setOpen] = useState(false)
+  const [focusedLayer1Id, setFocusedLayer1Id] = useState(layer1Id || "")
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    function closeOnOutsideClick(event) {
+      if (ref.current && !ref.current.contains(event.target)) {
+        setOpen(false)
+      }
+    }
+    function closeOnEscape(event) {
+      if (event.key === "Escape") setOpen(false)
+    }
+    document.addEventListener("mousedown", closeOnOutsideClick)
+    document.addEventListener("keydown", closeOnEscape)
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick)
+      document.removeEventListener("keydown", closeOnEscape)
+    }
+  }, [open])
+
+  const currentFocusedLayer1Id = focusedLayer1Id || layer1Id || layer1Options[0]?.id || ""
+  const focusedLayer1 = layer1Options.find((tag) => String(tag.id) === String(currentFocusedLayer1Id))
+  const focusedChildren = focusedLayer1?.children || []
+
+  return (
+    <div ref={ref} className="relative min-w-[160px]">
+      <button
+        type="button"
+        aria-expanded={open}
+        className={cn(
+          "flex h-10 w-full items-center justify-between gap-2 rounded-full border border-[#3b2a22]/55 bg-[#181410] px-4 text-[13px] text-[#c8bdb6] transition-colors hover:border-[#7c573a]/70 hover:text-[#e8e0d8]",
+          active && "border-[#7c573a]/70 text-[#dba476]"
+        )}
+        onClick={() => {
+          setFocusedLayer1Id(layer1Id || layer1Options[0]?.id || "")
+          setOpen((value) => !value)
+        }}
+      >
+        <span className="truncate">{label}</span>
+        <ChevronDown className={cn("size-4 shrink-0 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div
+          role="listbox"
+          className="absolute right-0 top-[calc(100%+8px)] z-30 grid w-[min(560px,calc(100vw-48px))] grid-cols-[minmax(0,1fr)_minmax(0,1fr)] overflow-hidden rounded-[8px] border border-[#3b2a22]/55 bg-[#181410] shadow-[0_12px_40px_rgba(0,0,0,0.55)]"
+        >
+          <div className="border-r border-[#3b2a22]/55 py-1">
+            <button
+              type="button"
+              role="option"
+              aria-selected={!layer1Id && !layer2Id}
+              className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-[13px] text-[#c8bdb6] transition-colors hover:bg-[#251a14] hover:text-[#e8e0d8]"
+              onClick={() => {
+                onClear()
+                setOpen(false)
+              }}
+            >
+              <span className="flex size-3 items-center justify-center text-[#dba476]">
+                {!layer1Id && !layer2Id && <Check className="size-3" />}
+              </span>
+              Any tag
+            </button>
+            {layer1Options.map((tag) => {
+              const selected = String(layer1Id) === String(tag.id) && !layer2Id
+              const focused = String(currentFocusedLayer1Id) === String(tag.id)
+              const hasChildren = (tag.children || []).length > 0
+              return (
+                <button
+                  key={tag.id}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  className={cn(
+                    "flex w-full items-center gap-2 px-4 py-2.5 text-left text-[13px] text-[#c8bdb6] transition-colors hover:bg-[#251a14] hover:text-[#e8e0d8]",
+                    focused && "bg-[#251a14] text-[#e8e0d8]"
+                  )}
+                  onMouseEnter={() => setFocusedLayer1Id(tag.id)}
+                  onFocus={() => setFocusedLayer1Id(tag.id)}
+                  onClick={() => {
+                    setFocusedLayer1Id(tag.id)
+                    if (!hasChildren) {
+                      onSelectLayer1(tag.id)
+                      setOpen(false)
+                    } else {
+                      onSelectLayer1(tag.id)
+                    }
+                  }}
+                >
+                  <span className="flex size-3 items-center justify-center text-[#dba476]">
+                    {selected && <Check className="size-3" />}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{tag.name}</span>
+                  {hasChildren && <span className="text-[#5f5953]">›</span>}
+                </button>
+              )
+            })}
+          </div>
+          <div className="py-1">
+            {focusedLayer1 ? (
+              focusedChildren.length > 0 ? (
+                focusedChildren.map((tag) => {
+                  const selected = String(layer2Id) === String(tag.id)
+                  return (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      role="option"
+                      aria-selected={selected}
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-[13px] text-[#c8bdb6] transition-colors hover:bg-[#251a14] hover:text-[#e8e0d8]"
+                      onClick={() => {
+                        onSelectLayer2(focusedLayer1.id, tag.id)
+                        setOpen(false)
+                      }}
+                    >
+                      <span className="flex size-3 items-center justify-center text-[#dba476]">
+                        {selected && <Check className="size-3" />}
+                      </span>
+                      <span className="min-w-0 truncate">{tag.name}</span>
+                    </button>
+                  )
+                })
+              ) : (
+                <p className="px-4 py-3 text-[13px] text-[#5f5953]">No subtopics</p>
+              )
+            ) : (
+              <p className="px-4 py-3 text-[13px] text-[#5f5953]">Choose a tag</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 const QuestionRow = memo(function QuestionRow({ item, onRowClick }) {
@@ -87,10 +306,10 @@ const QuestionRow = memo(function QuestionRow({ item, onRowClick }) {
           {questionTypeLabel(item.question_type)}
         </span>
       </TableCell>
-      <TableCell className="max-w-[520px] px-4">
+      <TableCell className="min-w-[260px] max-w-none px-4">
         <div className="overflow-hidden text-ellipsis line-clamp-3 break-words">{preview}</div>
       </TableCell>
-      <TableCell className="max-w-48 px-4 text-[#dac1b7]">
+      <TableCell className="w-44 shrink-0 px-4 text-[#dac1b7]">
         <div className="line-clamp-2 whitespace-normal break-words">
           {item.import_source || "Manual"}
         </div>
@@ -142,6 +361,7 @@ export default function QuestionTable() {
   const [layer2Id, setLayer2Id] = useState("")
   const [moderationFilter, setModerationFilter] = useState("")
   const [questionTypeFilter, setQuestionTypeFilter] = useState("")
+  const [levelFilter, setLevelFilter] = useState("")
   const [page, setPage] = useState(0)
 
   useEffect(() => {
@@ -153,7 +373,7 @@ export default function QuestionTable() {
 
   useEffect(() => {
     setPage(0)
-  }, [debouncedSearch, layer1Id, layer2Id, moderationFilter, questionTypeFilter, subjectSlug])
+  }, [debouncedSearch, layer1Id, layer2Id, moderationFilter, questionTypeFilter, levelFilter, subjectSlug])
 
   const {
     data: subjects = [],
@@ -175,6 +395,28 @@ export default function QuestionTable() {
       (t) => t.layer === 2 && String(t.parent_id) === String(layer1Id)
     )
   }, [filterTags, layer1Id])
+  const layer1TagOptions = useMemo(
+    () => layer1Options.map((tag) => ({
+      ...tag,
+      children: filterTags.filter(
+        (child) => child.layer === 2 && String(child.parent_id) === String(tag.id)
+      ),
+    })),
+    [filterTags, layer1Options]
+  )
+  const selectedLayer1 = useMemo(
+    () => layer1Options.find((tag) => String(tag.id) === String(layer1Id)),
+    [layer1Id, layer1Options]
+  )
+  const selectedLayer2 = useMemo(
+    () => layer2Options.find((tag) => String(tag.id) === String(layer2Id)),
+    [layer2Id, layer2Options]
+  )
+  const tagFilterLabel = selectedLayer1
+    ? selectedLayer2
+      ? `${selectedLayer1.name} › ${selectedLayer2.name}`
+      : selectedLayer1.name
+    : "Any tag"
 
   const questionsListUrl = useMemo(() => {
     const p = new URLSearchParams()
@@ -185,10 +427,11 @@ export default function QuestionTable() {
     if (layer2Id) p.set("layer2_tag_id", String(layer2Id))
     if (moderationFilter) p.set("moderation_status", moderationFilter)
     if (questionTypeFilter) p.set("question_type", questionTypeFilter)
+    if (levelFilter) p.set("level", levelFilter)
     p.set("limit", String(PAGE_SIZE))
     p.set("offset", String(page * PAGE_SIZE))
     return `${QUESTIONS_API_URL}?${p.toString()}`
-  }, [lockedSubject?.id, subjectSlug, debouncedSearch, layer1Id, layer2Id, moderationFilter, questionTypeFilter, page])
+  }, [lockedSubject?.id, subjectSlug, debouncedSearch, layer1Id, layer2Id, moderationFilter, questionTypeFilter, levelFilter, page])
 
   const swrKey = questionsListUrl
 
@@ -220,7 +463,7 @@ export default function QuestionTable() {
 
   useEffect(() => {
     scrollParentRef.current?.scrollTo({ top: 0 })
-  }, [page, debouncedSearch, layer1Id, layer2Id, moderationFilter, questionTypeFilter, lockedSubject?.id])
+  }, [page, debouncedSearch, layer1Id, layer2Id, moderationFilter, questionTypeFilter, levelFilter, lockedSubject?.id])
 
   const virtualRows = rowVirtualizer.getVirtualItems()
   const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0
@@ -249,7 +492,7 @@ export default function QuestionTable() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-8 py-10">
+    <div className="mx-auto w-full max-w-[1600px] px-8 py-10">
       <div className="mb-8">
         <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#ffb595]">
           {lockedSubject?.name || "Question Database"}
@@ -258,7 +501,7 @@ export default function QuestionTable() {
       </div>
 
       <div className="mb-6 flex flex-wrap items-end gap-3">
-        <div className="min-w-[200px] flex-1">
+        <div className="min-w-[220px] flex-1">
           <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#a28c83]">
             Search
           </label>
@@ -269,115 +512,103 @@ export default function QuestionTable() {
             onChange={(e) => setSearchInput(e.target.value)}
           />
         </div>
-        <div className="min-w-[140px]">
+        <div className="min-w-[160px]">
           <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#a28c83]">
             Question Type
           </label>
-          <select
-            className={FILTER_SELECT_CLASS}
+          <FilterDropdown
+            active={Boolean(questionTypeFilter)}
+            label={QUESTION_TYPE_FILTER_OPTIONS.find((opt) => opt.value === questionTypeFilter)?.label || "Any type"}
+            onChange={setQuestionTypeFilter}
+            options={QUESTION_TYPE_FILTER_OPTIONS}
             value={questionTypeFilter}
-            onChange={(e) => setQuestionTypeFilter(e.target.value)}
-          >
-            {QUESTION_TYPE_FILTER_OPTIONS.map((opt) => (
-              <option key={opt.value || "any"} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          />
         </div>
         <div className="min-w-[160px]">
           <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#a28c83]">
             Status
           </label>
-          <select
-            className={FILTER_SELECT_CLASS}
+          <FilterDropdown
+            active={Boolean(moderationFilter)}
+            label={MODERATION_FILTER_OPTIONS.find((opt) => opt.value === moderationFilter)?.label || "Any status"}
+            onChange={setModerationFilter}
+            options={MODERATION_FILTER_OPTIONS}
             value={moderationFilter}
-            onChange={(e) => setModerationFilter(e.target.value)}
-          >
-            {MODERATION_FILTER_OPTIONS.map((opt) => (
-              <option key={opt.value || "any"} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          />
+        </div>
+        <div className="min-w-[160px]">
+          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#a28c83]">
+            Level
+          </label>
+          <FilterDropdown
+            active={Boolean(levelFilter)}
+            label={LEVEL_FILTER_OPTIONS.find((opt) => opt.value === levelFilter)?.label || "Any level"}
+            onChange={setLevelFilter}
+            options={LEVEL_FILTER_OPTIONS}
+            value={levelFilter}
+          />
         </div>
         {lockedSubject && (
-          <>
-            <div className="min-w-[160px]">
-              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#a28c83]">
-                Layer 1
-              </label>
-              <select
-                className={FILTER_SELECT_CLASS}
-                value={layer1Id}
-                onChange={(e) => {
-                  setLayer1Id(e.target.value)
-                  setLayer2Id("")
-                }}
-              >
-                <option value="">Any topic</option>
-                {layer1Options.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="min-w-[160px]">
-              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#a28c83]">
-                Layer 2
-              </label>
-              <select
-                className={cn(FILTER_SELECT_CLASS, !layer1Id && "opacity-40")}
-                disabled={!layer1Id}
-                value={layer2Id}
-                onChange={(e) => setLayer2Id(e.target.value)}
-              >
-                <option value="">Any subtopic</option>
-                {layer2Options.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </>
+          <div className="min-w-[160px]">
+            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#a28c83]">
+              Tags
+            </label>
+            <TagFilterDropdown
+              active={Boolean(layer1Id || layer2Id)}
+              label={tagFilterLabel}
+              layer1Id={layer1Id}
+              layer1Options={layer1TagOptions}
+              layer2Id={layer2Id}
+              onClear={() => {
+                setLayer1Id("")
+                setLayer2Id("")
+              }}
+              onSelectLayer1={(id) => {
+                setLayer1Id(id)
+                setLayer2Id("")
+              }}
+              onSelectLayer2={(parentId, id) => {
+                setLayer1Id(parentId)
+                setLayer2Id(id)
+              }}
+            />
+          </div>
         )}
       </div>
 
-      <div className="rounded-2xl border border-[#3b2a22]/55 bg-[#1b1713]/90 p-3">
+      <div className="rounded-2xl border border-[#3b2a22]/55 bg-[#1b1713]/90 p-4">
         <div ref={scrollParentRef} className="max-h-[min(70vh,720px)] overflow-auto">
-          <Table className="w-full table-fixed border-separate border-spacing-y-2">
+          <Table className="w-full table-auto border-separate border-spacing-y-2">
             <TableHeader className="sticky top-0 z-10 bg-[#1b1713]/95 backdrop-blur-sm [&_tr]:border-0">
               <TableRow className="border-0 hover:bg-transparent">
-                <TableHead className="w-28 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
+                <TableHead className="w-32 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                   Status
                 </TableHead>
-                <TableHead className="w-20 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
+                <TableHead className="w-16 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                   ID
                 </TableHead>
-                <TableHead className="w-24 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
+                <TableHead className="w-20 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                   Type
                 </TableHead>
-                <TableHead className="px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
+                <TableHead className="min-w-[320px] px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                   Question
                 </TableHead>
-                <TableHead className="w-48 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
+                <TableHead className="w-44 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                   Source
                 </TableHead>
-                <TableHead className="w-52 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
+                <TableHead className="w-56 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                   Topics
                 </TableHead>
-                <TableHead className="w-36 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
+                <TableHead className="w-32 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                   Creator
                 </TableHead>
-                <TableHead className="w-24 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
+                <TableHead className="w-16 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                   Marks
                 </TableHead>
                 <TableHead className="w-36 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                   Level
                 </TableHead>
-                <TableHead className="w-36 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
+                <TableHead className="w-28 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                   Created
                 </TableHead>
               </TableRow>
