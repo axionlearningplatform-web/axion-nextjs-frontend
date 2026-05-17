@@ -397,6 +397,8 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   const velocityRef = useRef(0)
   const predictedPointsRef = useRef([])
   const lastEraserPointRef = useRef(null)
+  // Maps stroke id → setTimeout timer id for pending live stroke-eraser deletions
+  const pendingEraserDeletionsRef = useRef(new Map())
 
   // ── Eraser highlight state (ref so RAF can read, no render cost) ─────────
   const eraserHighlightIdsRef = useRef(new Set())
@@ -713,6 +715,9 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
       cancelAnimationFrame(highlightRafIdRef.current)
       highlightRafIdRef.current = null
     }
+    const pending = pendingEraserDeletionsRef.current
+    for (const timerId of pending.values()) clearTimeout(timerId)
+    pending.clear()
   }, [cancelPredAnimation])
 
   // Redraw committed when page data changes
@@ -723,6 +728,10 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   // Clear eraser state when switching away from eraser tools
   useEffect(() => {
     if (tool !== "stroke-eraser" && tool !== "pixel-eraser") {
+      const pending = pendingEraserDeletionsRef.current
+      for (const timerId of pending.values()) clearTimeout(timerId)
+      pending.clear()
+
       const hadHighlight = eraserHighlightIdsRef.current.size > 0
       eraserHighlightIdsRef.current = new Set()
       queueMicrotask(() => setEraserPoint(null))
@@ -774,6 +783,28 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   // ─────────────────────────────────────────────────────────────────────────
   // Eraser cursor helpers
   // ─────────────────────────────────────────────────────────────────────────
+  function commitLiveErasure(strokeId) {
+    pendingEraserDeletionsRef.current.delete(strokeId)
+    eraserHighlightIdsRef.current.delete(strokeId)
+
+    updateCurrentPage((page) => {
+      const target = page.strokes.find((s) => s.id === strokeId)
+      if (!target) return page
+      return {
+        ...page,
+        strokes: page.strokes.filter((s) => s.id !== strokeId),
+        history: [
+          ...(page.history || []),
+          { type: "erase", strokes: [target] },
+        ],
+        redoStack: [],
+      }
+    })
+
+    highlightDirtyRef.current = true
+    scheduleHighlightRedraw()
+  }
+
   function updateEraserCursor(event) {
     if (
       (tool !== "stroke-eraser" && tool !== "pixel-eraser") ||
@@ -803,6 +834,30 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
         highlightDirtyRef.current = true
         scheduleHighlightRedraw()
       }
+
+      const pending = pendingEraserDeletionsRef.current
+
+      for (const [id, timerId] of pending) {
+        if (!hitIds.has(id)) {
+          clearTimeout(timerId)
+          pending.delete(id)
+        }
+      }
+
+      if (activePointerRef.current !== null) {
+        for (const id of hitIds) {
+          if (!pending.has(id)) {
+            const timerId = setTimeout(() => {
+              if (activePointerRef.current !== null) {
+                commitLiveErasure(id)
+              } else {
+                pending.delete(id)
+              }
+            }, 120)
+            pending.set(id, timerId)
+          }
+        }
+      }
       setEraserPoint({ ...point, hitCount: hitIds.size })
     } else {
       // pixel eraser — just cursor position, no highlight
@@ -811,6 +866,10 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   }
 
   function clearEraserCursor() {
+    const pending = pendingEraserDeletionsRef.current
+    for (const timerId of pending.values()) clearTimeout(timerId)
+    pending.clear()
+
     const prev = eraserHighlightIdsRef.current
     eraserHighlightIdsRef.current = new Set()
     setEraserPoint(null)
@@ -1008,6 +1067,10 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
 
     // ── STROKE ERASER ──────────────────────────────────────────────────────
     if (completedStroke.tool === "stroke-eraser") {
+      const pending = pendingEraserDeletionsRef.current
+      for (const timerId of pending.values()) clearTimeout(timerId)
+      pending.clear()
+
       const eraserPath = completedStroke.points
       const radius = Math.max(eraserSize, 1)
 
