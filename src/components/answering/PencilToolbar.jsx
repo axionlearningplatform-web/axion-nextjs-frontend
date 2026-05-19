@@ -27,12 +27,14 @@ export default function PencilToolbar({
   activeTool,
   canRedo,
   canUndo,
+  eraserPanelOpen = true,
   eraserSize,
   lockedQuestionHeight = 0,
   navbarHeight = 64,
   onClear,
   onRedo,
   onEraserSizeChange,
+  onToggleEraserPanel,
   onToggleQuestionLock,
   onToolChange,
   onUndo,
@@ -46,6 +48,13 @@ export default function PencilToolbar({
     { label: "M", value: 24 },
     { label: "L", value: 42 },
   ]
+  const selectEraser = (nextTool) => {
+    if (activeTool === nextTool) {
+      onToggleEraserPanel?.()
+      return
+    }
+    onToolChange(nextTool)
+  }
 
   return (
     <div
@@ -66,10 +75,10 @@ export default function PencilToolbar({
         <ToolButton active={activeTool === "pen"} label="Pen (P)" onClick={() => onToolChange("pen")}>
           <PenLine className="size-4" />
         </ToolButton>
-        <ToolButton active={activeTool === "stroke-eraser"} label="Full stroke eraser (E)" onClick={() => onToolChange("stroke-eraser")}>
+        <ToolButton active={activeTool === "stroke-eraser"} label="Full stroke eraser (E)" onClick={() => selectEraser("stroke-eraser")}>
           <Eraser className="size-4" />
         </ToolButton>
-        <ToolButton active={activeTool === "pixel-eraser"} label="Pixel eraser" onClick={() => onToolChange("pixel-eraser")}>
+        <ToolButton active={activeTool === "pixel-eraser"} label="Pixel eraser" onClick={() => selectEraser("pixel-eraser")}>
           <span className="relative flex size-4 items-center justify-center">
             <Eraser className="size-4" />
             <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-current" />
@@ -94,7 +103,7 @@ export default function PencilToolbar({
         </ToolButton>
       </div>
 
-      {eraserActive && (
+      {eraserActive && eraserPanelOpen && (
         <div className="w-[230px] rounded-[14px] border border-white/[0.08] bg-[#15110e]/85 p-3 shadow-[0_18px_50px_rgba(0,0,0,0.34)] backdrop-blur-md">
           <div className="mb-2 flex items-center justify-between gap-3">
             <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8f8982]">

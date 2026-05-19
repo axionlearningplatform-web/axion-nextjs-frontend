@@ -414,6 +414,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   const [currentPageIndex, setCurrentPageIndex] = useState(0)
   const [tool, setTool] = useState("pen")
   const [eraserSize, setEraserSize] = useState(DEFAULT_ERASER_SIZE)
+  const [eraserPanelOpen, setEraserPanelOpen] = useState(true)
   const [eraserPoint, setEraserPoint] = useState(null)
   const [writingSurfaceActive, setWritingSurfaceActive] = useState(false)
   const [navbarHeight, setNavbarHeight] = useState(64)
@@ -428,6 +429,14 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     if (typeof window === "undefined") return 2
     return Math.min(Math.max(window.devicePixelRatio || 2, 2), 3)
   }, [])
+
+  const selectTool = useCallback((nextTool) => {
+    if (readOnly) return
+    if (nextTool === "stroke-eraser" || nextTool === "pixel-eraser") {
+      setEraserPanelOpen(true)
+    }
+    setTool(nextTool)
+  }, [readOnly])
 
   const cancelPredAnimation = useCallback(() => {
     if (predRafIdRef.current != null) {
@@ -748,13 +757,15 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     function onKey(e) {
       if (e.key === "e" || e.key === "E") {
         e.preventDefault()
-        setTool((t) =>
-          t === "stroke-eraser" || t === "pixel-eraser" ? "pen" : "stroke-eraser"
+        selectTool(
+          tool === "stroke-eraser" || tool === "pixel-eraser"
+            ? "pen"
+            : "stroke-eraser"
         )
       }
       if (e.key === "p" || e.key === "P") {
         e.preventDefault()
-        setTool("pen")
+        selectTool("pen")
       }
       if (e.key === "q" || e.key === "Q") {
         e.preventDefault()
@@ -763,7 +774,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [onToggleQuestionLock, writingSurfaceActive])
+  }, [onToggleQuestionLock, selectTool, tool, writingSurfaceActive])
 
   // ─────────────────────────────────────────────────────────────────────────
   // Page state helpers
@@ -1348,14 +1359,16 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
             activeTool={tool}
             canRedo={canRedo}
             canUndo={canUndo}
+            eraserPanelOpen={eraserPanelOpen}
             eraserSize={eraserSize}
             lockedQuestionHeight={lockedQuestionHeight}
             navbarHeight={navbarHeight}
             onClear={clearPage}
             onEraserSizeChange={readOnly ? () => {} : setEraserSize}
             onRedo={redo}
+            onToggleEraserPanel={readOnly ? () => {} : () => setEraserPanelOpen((value) => !value)}
             onToggleQuestionLock={onToggleQuestionLock}
-            onToolChange={readOnly ? () => {} : setTool}
+            onToolChange={selectTool}
             onUndo={undo}
             questionLocked={questionLocked}
             rightOffset={toolbarRightOffset}
