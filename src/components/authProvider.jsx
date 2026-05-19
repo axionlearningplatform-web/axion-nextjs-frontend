@@ -84,8 +84,9 @@ export function AuthProvider({children}){
             nextUrl.startsWith("/") &&
             !nextUrl.startsWith("//") &&
             !invalidNextUrl.some((url) => nextUrl === url || nextUrl.startsWith(`${url}?`))
-        router.replace(nextUrlValid ? nextUrl : LOGIN_REDIRECT_URL)
-        router.refresh()
+        const destination = nextUrlValid ? nextUrl : LOGIN_REDIRECT_URL
+        // Hard navigation ensures cookies committed by the login route are sent.
+        window.location.replace(destination)
     }
     const logout = () => {
         clearUserContext()

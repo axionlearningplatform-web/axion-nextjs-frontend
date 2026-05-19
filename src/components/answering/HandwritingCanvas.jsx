@@ -853,7 +853,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
               } else {
                 pending.delete(id)
               }
-            }, 120)
+            }, 0)
             pending.set(id, timerId)
           }
         }
