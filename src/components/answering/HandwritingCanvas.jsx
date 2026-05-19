@@ -363,6 +363,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     lockedQuestionHeight = 0,
     onSubmit,
     onToggleQuestionLock,
+    isVisible = true,
     questionId,
     questionLocked = false,
     readOnly = false,
@@ -677,6 +678,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
 
     const updateRightOffset = () => {
       const rect = wrapper.getBoundingClientRect()
+      if (rect.width === 0 && rect.height === 0) return
       setToolbarRightOffset(window.innerWidth - rect.right + 16)
       if (window.innerWidth < 768) {
         setToolbarSticky(false)
@@ -704,6 +706,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
         return
       }
       const rect = wrapper.getBoundingClientRect()
+      if (rect.width === 0 && rect.height === 0) return
       // Barrier = navbar bottom + locked question panel height (0 when unlocked).
       // Toolbar natural position = rect.top + 16 (top-4 offset inside wrapper).
       // Go sticky when toolbar would be within 8px of the barrier — matching
@@ -717,6 +720,31 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     window.addEventListener("scroll", checkSticky, { passive: true })
     return () => window.removeEventListener("scroll", checkSticky)
   }, [navbarHeight, lockedQuestionHeight])
+
+  useEffect(() => {
+    if (!isVisible) return undefined
+    const frameId = requestAnimationFrame(() => {
+      const wrapper = canvasWrapperRef.current
+      if (!wrapper) return
+      const rect = wrapper.getBoundingClientRect()
+      if (rect.width === 0 && rect.height === 0) return
+
+      setToolbarRightOffset(window.innerWidth - rect.right + 16)
+      if (window.innerWidth < 768) {
+        setToolbarSticky(false)
+      } else {
+        const barrier = navbarHeight + lockedQuestionHeight
+        setToolbarSticky(rect.top + 16 < barrier + 8)
+      }
+
+      const activeCanvas = activeCanvasRef.current
+      if (activeCanvas) {
+        const canvasRect = activeCanvas.getBoundingClientRect()
+        canvasBoundsRef.current = { left: canvasRect.left, top: canvasRect.top }
+      }
+    })
+    return () => cancelAnimationFrame(frameId)
+  }, [isVisible, lockedQuestionHeight, navbarHeight])
 
   useEffect(() => () => {
     cancelPredAnimation()

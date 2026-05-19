@@ -1015,7 +1015,7 @@ function AnswerArea({
         ))}
       </div>
 
-      {activeAnswerTab === "type" ? (
+      <div className={activeAnswerTab === "type" ? "block" : "hidden"}>
         <div className="rounded-[3px] border border-white/[0.06] bg-[#1b1713] p-5">
           <textarea
             value={typedAnswer}
@@ -1044,16 +1044,21 @@ function AnswerArea({
             </span>
           </div>
         </div>
-      ) : activeAnswerTab === "draw" ? (
+      </div>
+
+      <div className={activeAnswerTab === "draw" ? "block" : "hidden"}>
         <HandwritingCanvas
           ref={handwritingRef}
+          isVisible={activeAnswerTab === "draw"}
           lockedQuestionHeight={lockedQuestionHeight}
           onToggleQuestionLock={onToggleQuestionLock}
           questionId={questionId}
           questionLocked={questionLocked}
           readOnly={locked}
         />
-      ) : activeAnswerTab === "photo" ? (
+      </div>
+
+      <div className={activeAnswerTab === "photo" && !markingDisabled ? "block" : "hidden"}>
         <div className="rounded-[3px] border border-white/[0.06] bg-[#1a1714] p-5">
           <label className={cn(
             "flex min-h-36 flex-col items-center justify-center rounded-[3px] border border-dashed border-white/[0.09] px-4 py-8 text-center text-[13px] tracking-[0.04em] text-[#6f6861] transition-colors hover:border-[#9b673d]/45 hover:text-[#dba476]",
@@ -1095,11 +1100,7 @@ function AnswerArea({
             </div>
           )}
         </div>
-      ) : (
-        <div className="flex min-h-44 items-center justify-center rounded-[3px] border border-white/[0.06] bg-[#1a1714] text-[13px] tracking-[0.04em] text-[#4f4a45]">
-          {titleCase(activeAnswerTab)} tools are coming soon.
-        </div>
-      )}
+      </div>
 
       <div className="mt-5 flex justify-end">
         <button
