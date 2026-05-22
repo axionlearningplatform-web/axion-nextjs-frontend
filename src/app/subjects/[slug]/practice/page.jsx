@@ -1348,6 +1348,7 @@ function QuestionView({
   onNextQuestion,
   onSelectMcqOption,
   onSubmitAnswer,
+  practiceAttemptKey,
   question,
   selectedMcqOption,
   timer,
@@ -1593,7 +1594,7 @@ function QuestionView({
       </section>
 
       <AnswerArea
-        key={question.id}
+        key={`${question.id}-${practiceAttemptKey}`}
         betaSampleRevealed={betaSampleRevealed}
         markingDisabled={markingDisabled}
         markingError={markingError}
@@ -1628,6 +1629,7 @@ export default function DailyPracticePage() {
   const [markingError, setMarkingError] = useState("")
   const [betaSampleRevealed, setBetaSampleRevealed] = useState(false)
   const [selectedMcqOption, setSelectedMcqOption] = useState("")
+  const [practiceAttemptKey, setPracticeAttemptKey] = useState(0)
 
   const membership = auth.subjectMemberships?.find(
     (item) => item.subject.slug === params.slug
@@ -1721,6 +1723,7 @@ export default function DailyPracticePage() {
       )
       if (!matchingQuestion) {
         setQuestion(null)
+        setPracticeAttemptKey((value) => value + 1)
         return
       }
       const nextQuestion = { ...matchingQuestion }
@@ -1731,6 +1734,7 @@ export default function DailyPracticePage() {
         )
       }
       setQuestion(nextQuestion)
+      setPracticeAttemptKey((value) => value + 1)
       setMarkingResult(null)
       setMarkingError("")
       setBetaSampleRevealed(false)
@@ -1880,6 +1884,7 @@ export default function DailyPracticePage() {
             setMarkingError("")
           }}
           onSubmitAnswer={submitAnswer}
+          practiceAttemptKey={practiceAttemptKey}
           question={question}
           selectedMcqOption={selectedMcqOption}
           timer={timer}

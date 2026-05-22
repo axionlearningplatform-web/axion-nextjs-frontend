@@ -320,8 +320,8 @@ export default function FavouritesTable({ subject }) {
 
   return (
     <>
-      <div className="mb-6 flex flex-wrap items-end gap-3">
-        <div className="min-w-[220px] flex-1">
+      <div className="mb-6 grid items-end gap-3 lg:grid-cols-[minmax(280px,1fr)_160px_160px_200px]">
+        <div className="min-w-[220px]">
           <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#a28c83]">
             Search
           </label>
@@ -357,7 +357,7 @@ export default function FavouritesTable({ subject }) {
           />
         </div>
         {subject && (
-          <div className="min-w-[160px]">
+          <div className="min-w-[160px] lg:min-w-0">
             <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#a28c83]">
               Tags
             </label>
@@ -384,7 +384,7 @@ export default function FavouritesTable({ subject }) {
         )}
       </div>
 
-      <div className="rounded-2xl border border-[#3b2a22]/55 bg-[#1b1713]/90 p-4">
+      <div className="rounded-[12px] border border-[#3b2a22]/55 bg-[#1b1713]/90 p-4">
         {favourites.length === 0 && !isValidating ? (
           <div className="flex min-h-[320px] items-center justify-center px-6 text-center font-serif text-xl italic text-[#77716b]">
             No saved questions yet. Start practising and save questions as you go.
@@ -397,13 +397,13 @@ export default function FavouritesTable({ subject }) {
                   <TableHead className="w-20 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                     Type
                   </TableHead>
-                  <TableHead className="max-w-[520px] px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
+                  <TableHead className="max-w-[420px] px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                     Question Preview
                   </TableHead>
                   <TableHead className="w-36 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                     Level
                   </TableHead>
-                  <TableHead className="w-64 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
+                  <TableHead className="w-56 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                     Topics/Tags
                   </TableHead>
                 </TableRow>
@@ -424,7 +424,7 @@ export default function FavouritesTable({ subject }) {
                           {questionTypeLabel(item.question_type)}
                         </span>
                       </TableCell>
-                      <TableCell className="max-w-[520px] px-4">
+                      <TableCell className="max-w-[420px] px-4">
                         <div className="overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,black_70%,transparent_100%)]">
                           {preview}
                         </div>
@@ -434,7 +434,7 @@ export default function FavouritesTable({ subject }) {
                           {titleCase(item.level || "exam_practice")}
                         </span>
                       </TableCell>
-                      <TableCell className="min-w-0 max-w-[16rem] px-4 align-top">
+                      <TableCell className="min-w-0 max-w-[14rem] px-4 align-top">
                         <div className="flex min-w-0 flex-wrap content-start gap-1.5">
                           {tags.slice(0, 4).map((tag) => (
                             <span
