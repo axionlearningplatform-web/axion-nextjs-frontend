@@ -9,6 +9,7 @@ import useSWR, { preload } from "swr"
 import {
   ArrowLeft,
   ArrowRight,
+  Bookmark,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -22,6 +23,7 @@ import {
 
 import HandwritingCanvas from "@/components/answering/HandwritingCanvas"
 import { useAuth } from "@/components/authProvider"
+import SaveQuestionModal from "@/components/favourites/SaveQuestionModal"
 import fetcher from "@/lib/fetcher"
 import { cn } from "@/lib/utils"
 import { subjectIsMathematics } from "@/lib/subjectMath"
@@ -250,7 +252,7 @@ function latexFirstPrepare(value) {
   return raw
 }
 
-function MarkdownMath({ children, className }) {
+export function MarkdownMath({ children, className }) {
   const markdown = prepareMarkdown(latexFirstPrepare(children))
 
   return (
@@ -623,7 +625,7 @@ function PracticeHome({ config, dataLoading, onGenerate, onOpenModal, subject, u
   )
 }
 
-function Attachment({ attachment }) {
+export function Attachment({ attachment }) {
   if (!attachment?.data_url || !attachment?.mime_type?.startsWith("image/")) return null
 
   return (
@@ -643,7 +645,7 @@ function Attachment({ attachment }) {
   )
 }
 
-function DiagramSvg({ svg }) {
+export function DiagramSvg({ svg }) {
   if (!svg) return null
 
   return (
@@ -672,7 +674,7 @@ function sampleAnswersForQuestion(question) {
     : []
 }
 
-function SampleAnswers({ question }) {
+export function SampleAnswers({ question }) {
   const sampleAnswers = sampleAnswersForQuestion(question)
   if (!sampleAnswers.length) return null
 
@@ -700,7 +702,7 @@ function SampleAnswers({ question }) {
   )
 }
 
-function MarkingCriteriaSummary({ question }) {
+export function MarkingCriteriaSummary({ question }) {
   if (subjectIsMathematics({ name: question?.subject })) return null
 
   const partRows = (question?.parts || [])
@@ -883,12 +885,27 @@ function AnswerArea({
   const [submitted, setSubmitted] = useState(false)
   const [submittedTab, setSubmittedTab] = useState(null)
   const [submittedFiles, setSubmittedFiles] = useState([])
+  const [saveModalOpen, setSaveModalOpen] = useState(false)
+  const [savingFavourite, setSavingFavourite] = useState(false)
+  const [favouriteOverride, setFavouriteOverride] = useState(null)
   const handwritingRef = useRef(null)
   const isMcq = question?.question_type === "mcq"
   const locked = submitted && !markingDisabled
   const canMoveNext = Boolean((markingResult || betaSampleRevealed) && !markingLoading)
   const answerTabs = markingDisabled ? ["type", "draw"] : ["type", "draw", "photo"]
   const activeAnswerTab = markingDisabled && activeTab === "photo" ? "type" : activeTab
+  const favouriteStatusUrl =
+    canMoveNext && questionId ? `${QUESTIONS_API_URL}favourites/${questionId}/exists/` : null
+  const {
+    data: favouriteStatus,
+    mutate: mutateFavouriteStatus,
+  } = useSWR(favouriteStatusUrl, fetcher, {
+    revalidateOnFocus: false,
+  })
+  const resolvedFavouriteStatus = favouriteOverride || favouriteStatus || {
+    favourited: false,
+    note: "",
+  }
 
   useEffect(() => {
     if (activeTab !== "draw" && questionLocked) {
@@ -970,10 +987,68 @@ function AnswerArea({
     onSubmit({ submission_type: "file", files })
   }
 
+  async function openSaveModal() {
+    if (favouriteStatusUrl) {
+      const latest = await mutateFavouriteStatus()
+      if (latest) setFavouriteOverride(latest)
+    }
+    setSaveModalOpen(true)
+  }
+
+  async function saveFavourite(note) {
+    if (!questionId) return
+    setSavingFavourite(true)
+    try {
+      const response = await fetch(`${QUESTIONS_API_URL}favourites/`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          question_id: questionId,
+          note,
+        }),
+      })
+      const data = await parseJsonResponse(response)
+      if (!response.ok) {
+        throw new Error(data.detail || `Could not save this question (HTTP ${response.status}).`)
+      }
+      const nextStatus = {
+        favourited: true,
+        note: data.note || note || "",
+      }
+      setFavouriteOverride(nextStatus)
+      mutateFavouriteStatus(nextStatus, false)
+      setSaveModalOpen(false)
+    } finally {
+      setSavingFavourite(false)
+    }
+  }
+
   return (
     <section className="border-t border-white/[0.06] px-6 py-6 md:px-12">
       {isMcq ? (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-3">
+          {canMoveNext && (
+            <button
+              type="button"
+              onClick={openSaveModal}
+              className={cn(
+                "inline-flex h-11 items-center justify-center gap-3 rounded-[2px] border border-[#9b673d]/42 bg-transparent px-7 text-[12px] font-medium tracking-[0.06em] text-[#dba476] transition-colors hover:border-[#c8864a]/62 hover:bg-[#c8864a]/10 hover:text-[#efbd94]",
+                resolvedFavouriteStatus.favourited && "border-[#c8864a]/62 bg-[#c8864a]/12 text-[#efbd94]"
+              )}
+            >
+              <Bookmark
+                className={cn(
+                  "size-[18px]",
+                  resolvedFavouriteStatus.favourited && "fill-current"
+                )}
+              />
+              Save Question
+            </button>
+          )}
           <button
             type="button"
             disabled={markingLoading || (submitted && !canMoveNext)}
@@ -1102,7 +1177,25 @@ function AnswerArea({
         </div>
       </div>
 
-      <div className="mt-5 flex justify-end">
+      <div className="mt-5 flex justify-end gap-3">
+        {canMoveNext && (
+          <button
+            type="button"
+            onClick={openSaveModal}
+            className={cn(
+              "inline-flex h-11 items-center justify-center gap-3 rounded-[2px] border border-[#9b673d]/42 bg-transparent px-7 text-[12px] font-medium tracking-[0.06em] text-[#dba476] transition-colors hover:border-[#c8864a]/62 hover:bg-[#c8864a]/10 hover:text-[#efbd94]",
+              resolvedFavouriteStatus.favourited && "border-[#c8864a]/62 bg-[#c8864a]/12 text-[#efbd94]"
+            )}
+          >
+            <Bookmark
+              className={cn(
+                "size-[18px]",
+                resolvedFavouriteStatus.favourited && "fill-current"
+              )}
+            />
+            Save Question
+          </button>
+        )}
         <button
           type="button"
           disabled={markingLoading || (submitted && !canMoveNext)}
@@ -1228,6 +1321,15 @@ function AnswerArea({
         </>
       )}
       </>
+      )}
+      {saveModalOpen && (
+        <SaveQuestionModal
+          existingNote={resolvedFavouriteStatus.note || ""}
+          favourited={Boolean(resolvedFavouriteStatus.favourited)}
+          loading={savingFavourite}
+          onClose={() => setSaveModalOpen(false)}
+          onSave={saveFavourite}
+        />
       )}
     </section>
   )

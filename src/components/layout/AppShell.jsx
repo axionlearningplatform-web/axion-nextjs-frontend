@@ -267,12 +267,12 @@ export default function AppShell({ children }) {
             disabled
           />
           <NavItem
-            href={subjectBase}
+            href={`${subjectBase}/progress/favourites`}
             icon={BarChart3}
             label="Progress"
-            active={false}
+            active={pathname.startsWith(`${subjectBase}/progress`)}
             collapsed={collapsed}
-            disabled
+            disabled={!currentSubject}
           />
 
           {canUseQuestionBank && (
