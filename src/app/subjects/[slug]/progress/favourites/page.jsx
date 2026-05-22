@@ -27,7 +27,7 @@ export default function SubjectFavouritesPage() {
 
   return (
     <main className="min-h-[calc(100vh-64px)] bg-[#16130f] text-[#e5e2e1]">
-      <div className="mx-auto w-full max-w-[1180px] px-8 py-10">
+      <div className="mx-auto w-full max-w-[1600px] px-8 py-10">
         <div className="mb-8">
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#ffb595]">
             {subject.name}

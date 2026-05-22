@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import useSWR from "swr"
-import { ArrowLeft, Keyboard, Loader2, RotateCcw, Sigma } from "lucide-react"
+import { ArrowLeft, Keyboard, Loader2, Pencil, RotateCcw, Sigma } from "lucide-react"
 
 import HandwritingCanvas from "@/components/answering/HandwritingCanvas"
+import SaveQuestionModal from "@/components/favourites/SaveQuestionModal"
 import fetcher from "@/lib/fetcher"
 import { cn } from "@/lib/utils"
 import {
@@ -29,7 +30,7 @@ function levelLabel(value = "") {
   return titleCase(value || "exam_practice")
 }
 
-function PracticeAnswerArea({ question, questionId }) {
+function PracticeAnswerArea({ favouriteStatus, onEditNote, question, questionId }) {
   const [activeTab, setActiveTab] = useState("type")
   const [typedAnswer, setTypedAnswer] = useState("")
   const [revealed, setRevealed] = useState(false)
@@ -118,6 +119,26 @@ function PracticeAnswerArea({ question, questionId }) {
 
       {revealed && (
         <>
+          {favouriteStatus?.favourited && (
+            <section className="mt-5 rounded-[3px] border border-[#7c573a]/35 bg-[#1a1511] px-5 py-4">
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#dba476]">
+                  Your Note
+                </p>
+                <button
+                  type="button"
+                  onClick={onEditNote}
+                  className="inline-flex h-8 items-center gap-2 rounded-[2px] border border-[#7c573a]/45 px-3 text-[11px] font-semibold tracking-[0.04em] text-[#dba476] transition-colors hover:border-[#c8864a]/70 hover:bg-[#c8864a]/10"
+                >
+                  <Pencil className="size-3.5" />
+                  Edit
+                </button>
+              </div>
+              <p className="mt-3 whitespace-pre-wrap text-[14px] leading-relaxed text-[#c4b5a8]">
+                {String(favouriteStatus.note || "").trim() || "No note saved."}
+              </p>
+            </section>
+          )}
           <SampleAnswers question={question} />
           <MarkingCriteriaSummary question={question} />
         </>
@@ -131,14 +152,49 @@ export default function FavouriteQuestionPage() {
   const router = useRouter()
   const questionId = params?.questionId
   const backHref = `/subjects/${params.slug}/progress/favourites`
+  const [editingNote, setEditingNote] = useState(false)
+  const [savingNote, setSavingNote] = useState(false)
   const { data: question, isLoading: questionLoading } = useSWR(
     questionId ? `${QUESTIONS_API_URL}${questionId}/` : null,
     fetcher
   )
-  const { data: favouriteStatus } = useSWR(
+  const {
+    data: favouriteStatus,
+    mutate: mutateFavouriteStatus,
+  } = useSWR(
     questionId ? `${QUESTIONS_API_URL}favourites/${questionId}/exists/` : null,
     fetcher
   )
+
+  async function saveNote(note) {
+    if (!questionId) return
+    setSavingNote(true)
+    try {
+      const response = await fetch(`${QUESTIONS_API_URL}favourites/`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          question_id: Number(questionId),
+          note,
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(data.detail || `Could not update this note (HTTP ${response.status}).`)
+      }
+      mutateFavouriteStatus({
+        favourited: true,
+        note: data.note || note || "",
+      }, false)
+      setEditingNote(false)
+    } finally {
+      setSavingNote(false)
+    }
+  }
 
   useEffect(() => {
     window.scrollTo({ top: 0 })
@@ -179,7 +235,6 @@ export default function FavouriteQuestionPage() {
   const displayQuestionText = question.question_text?.trim()
     ? (/^Q\)\./i.test(question.question_text.trim()) ? question.question_text : `Q). ${question.question_text}`)
     : ""
-  const note = String(favouriteStatus?.note || "").trim()
 
   return (
     <main className="min-h-[calc(100vh-64px)] bg-[#171412] text-[#eee9e4]">
@@ -272,16 +327,6 @@ export default function FavouriteQuestionPage() {
               </div>
             )}
 
-            {note && (
-              <section className="mt-10 rounded-[3px] border border-[#7c573a]/35 bg-[#1a1511] px-5 py-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#dba476]">
-                  Your Note
-                </p>
-                <p className="mt-3 whitespace-pre-wrap text-[14px] leading-relaxed text-[#c4b5a8]">
-                  {note}
-                </p>
-              </section>
-            )}
           </div>
           {question.import_source && (
             <p className="pt-1 text-right text-[15px] tracking-[0.04em] text-[#6e6259]">
@@ -291,7 +336,21 @@ export default function FavouriteQuestionPage() {
         </article>
       </section>
 
-      <PracticeAnswerArea question={question} questionId={question.id} />
+      <PracticeAnswerArea
+        favouriteStatus={favouriteStatus}
+        onEditNote={() => setEditingNote(true)}
+        question={question}
+        questionId={question.id}
+      />
+      {editingNote && (
+        <SaveQuestionModal
+          existingNote={favouriteStatus?.note || ""}
+          favourited
+          loading={savingNote}
+          onClose={() => setEditingNote(false)}
+          onSave={saveNote}
+        />
+      )}
     </main>
   )
 }

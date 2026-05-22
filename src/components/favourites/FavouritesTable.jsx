@@ -10,10 +10,12 @@ import {
 } from "@/components/ui/table"
 import fetcher from "@/lib/fetcher"
 import { cn } from "@/lib/utils"
-import { Check, ChevronDown } from "lucide-react"
+import { Check, ChevronDown, Loader2, Pencil, Trash2 } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
 import useSWR from "swr"
+
+import SaveQuestionModal from "@/components/favourites/SaveQuestionModal"
 
 const FAVOURITES_API_URL = "/api/questions/favourites/"
 const TAGS_API_URL = "/api/questions/tags/"
@@ -265,6 +267,9 @@ export default function FavouritesTable({ subject }) {
   const [layer2Id, setLayer2Id] = useState("")
   const [questionTypeFilter, setQuestionTypeFilter] = useState("")
   const [levelFilter, setLevelFilter] = useState("")
+  const [editingFavourite, setEditingFavourite] = useState(null)
+  const [savingNote, setSavingNote] = useState(false)
+  const [deletingQuestionId, setDeletingQuestionId] = useState(null)
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS)
@@ -310,18 +315,65 @@ export default function FavouritesTable({ subject }) {
     return `${FAVOURITES_API_URL}?${query.toString()}`
   }, [debouncedSearch, layer1Id, layer2Id, levelFilter, questionTypeFilter, subjectId, subjectSlug])
 
-  const { data: favourites = [], error, isLoading, isValidating } = useSWR(favouritesUrl, fetcher, {
+  const {
+    data: favourites = [],
+    error,
+    isLoading,
+    isValidating,
+    mutate,
+  } = useSWR(favouritesUrl, fetcher, {
     revalidateOnFocus: false,
     keepPreviousData: true,
   })
+
+  async function saveNote(note) {
+    if (!editingFavourite?.question?.id) return
+    setSavingNote(true)
+    try {
+      const response = await fetch(FAVOURITES_API_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          question_id: editingFavourite.question.id,
+          note,
+        }),
+      })
+      if (!response.ok) throw new Error("Could not update note.")
+      await mutate()
+      setEditingFavourite(null)
+    } finally {
+      setSavingNote(false)
+    }
+  }
+
+  async function deleteFavourite(questionId) {
+    setDeletingQuestionId(questionId)
+    try {
+      const response = await fetch(`${FAVOURITES_API_URL}${questionId}/`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+        },
+      })
+      if (!response.ok) throw new Error("Could not remove favourite.")
+      await mutate()
+    } finally {
+      setDeletingQuestionId(null)
+    }
+  }
 
   if (error) return <div className="p-10 text-[#ffb4ab]">Failed to load favourites</div>
   if (isLoading && !favourites.length) return <div className="p-10 text-[#dac1b7]">Loading favourites...</div>
 
   return (
     <>
-      <div className="mb-6 grid items-end gap-3 lg:grid-cols-[minmax(280px,1fr)_160px_160px_200px]">
-        <div className="min-w-[220px]">
+      <div className="mb-6 flex flex-wrap items-end gap-3">
+        <div className="min-w-[220px] flex-1">
           <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#a28c83]">
             Search
           </label>
@@ -357,7 +409,7 @@ export default function FavouritesTable({ subject }) {
           />
         </div>
         {subject && (
-          <div className="min-w-[160px] lg:min-w-0">
+          <div className="min-w-[160px]">
             <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#a28c83]">
               Tags
             </label>
@@ -384,7 +436,7 @@ export default function FavouritesTable({ subject }) {
         )}
       </div>
 
-      <div className="rounded-[12px] border border-[#3b2a22]/55 bg-[#1b1713]/90 p-4">
+      <div className="rounded-2xl border border-[#3b2a22]/55 bg-[#1b1713]/90 p-4">
         {favourites.length === 0 && !isValidating ? (
           <div className="flex min-h-[320px] items-center justify-center px-6 text-center font-serif text-xl italic text-[#77716b]">
             No saved questions yet. Start practising and save questions as you go.
@@ -397,14 +449,17 @@ export default function FavouritesTable({ subject }) {
                   <TableHead className="w-20 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                     Type
                   </TableHead>
-                  <TableHead className="max-w-[420px] px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
+                  <TableHead className="max-w-[520px] px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                     Question Preview
                   </TableHead>
                   <TableHead className="w-36 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                     Level
                   </TableHead>
-                  <TableHead className="w-56 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
+                  <TableHead className="w-64 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                     Topics/Tags
+                  </TableHead>
+                  <TableHead className="w-28 px-4 text-right text-xs font-bold uppercase tracking-wide text-[#a28c83]">
+                    Actions
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -424,7 +479,7 @@ export default function FavouritesTable({ subject }) {
                           {questionTypeLabel(item.question_type)}
                         </span>
                       </TableCell>
-                      <TableCell className="max-w-[420px] px-4">
+                      <TableCell className="max-w-[520px] px-4">
                         <div className="overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,black_70%,transparent_100%)]">
                           {preview}
                         </div>
@@ -434,7 +489,7 @@ export default function FavouritesTable({ subject }) {
                           {titleCase(item.level || "exam_practice")}
                         </span>
                       </TableCell>
-                      <TableCell className="min-w-0 max-w-[14rem] px-4 align-top">
+                      <TableCell className="min-w-0 max-w-[16rem] px-4 align-top">
                         <div className="flex min-w-0 flex-wrap content-start gap-1.5">
                           {tags.slice(0, 4).map((tag) => (
                             <span
@@ -453,6 +508,37 @@ export default function FavouritesTable({ subject }) {
                           {tags.length === 0 && <span className="text-xs text-[#6f5c55]">Untagged</span>}
                         </div>
                       </TableCell>
+                      <TableCell className="px-4">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            aria-label="Edit favourite note"
+                            className="inline-flex size-9 items-center justify-center rounded-[2px] border border-[#7c573a]/45 text-[#dba476] transition-colors hover:border-[#c8864a]/70 hover:bg-[#c8864a]/10"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setEditingFavourite(favourite)
+                            }}
+                          >
+                            <Pencil className="size-4" />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="Remove from favourites"
+                            disabled={deletingQuestionId === item.id}
+                            className="inline-flex size-9 items-center justify-center rounded-[2px] border border-[#7c573a]/35 text-[#9b8f84] transition-colors hover:border-[#d99658]/55 hover:bg-[#d99658]/8 hover:text-[#dba476] disabled:cursor-not-allowed disabled:opacity-55"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              deleteFavourite(item.id)
+                            }}
+                          >
+                            {deletingQuestionId === item.id ? (
+                              <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="size-4" />
+                            )}
+                          </button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   )
                 })}
@@ -461,6 +547,15 @@ export default function FavouritesTable({ subject }) {
           </div>
         )}
       </div>
+      {editingFavourite && (
+        <SaveQuestionModal
+          existingNote={editingFavourite.note || ""}
+          favourited
+          loading={savingNote}
+          onClose={() => setEditingFavourite(null)}
+          onSave={saveNote}
+        />
+      )}
     </>
   )
 }
