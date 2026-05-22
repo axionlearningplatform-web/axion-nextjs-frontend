@@ -32,6 +32,14 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 
+const emptySolution = (name = "Main Solution", isPreferred = true) => ({
+  id: crypto.randomUUID(),
+  name,
+  is_preferred: isPreferred,
+  tag_requirements: [],
+  tag_ids: [],
+})
+
 const emptyPart = (index = 0) => ({
   id: crypto.randomUUID(),
   label: String.fromCharCode(97 + index),
@@ -42,6 +50,7 @@ const emptyPart = (index = 0) => ({
   answer_value: "",
   tag_ids: [],
   tag_requirements: [],
+  solutions: [emptySolution()],
   attachments: [],
   tikz_visuals: [],
   marking_criteria: [],
@@ -719,6 +728,53 @@ function syncTagRequirements(selectedIds, existing = [], tags = []) {
     }))
 }
 
+function normalizeSolutionsForState(solutions = [], legacyRequirements = []) {
+  const rows = Array.isArray(solutions) && solutions.length
+    ? solutions
+    : [{
+        ...emptySolution(),
+        tag_requirements: legacyRequirements || [],
+      }]
+
+  const normalized = rows.map((solution, index) => {
+    const requirements = solution.tag_requirements || []
+    return {
+      id: solution.id || crypto.randomUUID(),
+      name: solution.name || (index === 0 ? "Main Solution" : ""),
+      is_preferred: Boolean(solution.is_preferred),
+      tag_requirements: requirements,
+      tag_ids: solution.tag_ids || requirements.map((requirement) => Number(requirement.tag_id)).filter(Boolean),
+    }
+  })
+
+  if (!normalized.some((solution) => solution.is_preferred) && normalized[0]) {
+    normalized[0].is_preferred = true
+  }
+
+  let preferredSeen = false
+  return normalized.map((solution) => {
+    if (solution.is_preferred && !preferredSeen) {
+      preferredSeen = true
+      return solution
+    }
+    return { ...solution, is_preferred: false }
+  })
+}
+
+function solutionsPayload(solutions = [], tags = []) {
+  const normalized = normalizeSolutionsForState(solutions)
+  return normalized.map((solution) => ({
+    id: solution.id,
+    name: solution.name,
+    is_preferred: Boolean(solution.is_preferred),
+    tag_requirements: syncTagRequirements(
+      solution.tag_ids || [],
+      solution.tag_requirements || [],
+      tags
+    ),
+  }))
+}
+
 function TagRequirementAmounts({ tags, selectedIds, requirements, onChange }) {
   const selectedTags = selectedIds
     .map((id) => tags.find((tag) => tag.id === id))
@@ -754,6 +810,141 @@ function TagRequirementAmounts({ tags, selectedIds, requirements, onChange }) {
           />
         </label>
       ))}
+    </div>
+  )
+}
+
+function SolutionPathwaysEditor({ parentSelectedIds, solutions, tags, onChange }) {
+  const displayedSolutions = normalizeSolutionsForState(solutions)
+
+  function updateSolution(solutionId, patch) {
+    onChange(displayedSolutions.map((solution) =>
+      solution.id === solutionId ? { ...solution, ...patch } : solution
+    ))
+  }
+
+  function setPreferred(solutionId) {
+    onChange(displayedSolutions.map((solution) => ({
+      ...solution,
+      is_preferred: solution.id === solutionId,
+    })))
+  }
+
+  function addSolution() {
+    onChange([
+      ...displayedSolutions,
+      emptySolution("", false),
+    ])
+  }
+
+  function deleteSolution(solutionId) {
+    if (displayedSolutions.length <= 1) return
+    const next = displayedSolutions.filter((solution) => solution.id !== solutionId)
+    if (!next.some((solution) => solution.is_preferred) && next[0]) {
+      next[0] = { ...next[0], is_preferred: true }
+    }
+    onChange(next)
+  }
+
+  return (
+    <div className="mt-4 grid gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <SectionTitle>Solution Pathways</SectionTitle>
+        <Button
+          className="h-8 rounded-[6px] border border-[#3b2a22]/55 bg-transparent px-3 text-[13px] text-[#9a8880] hover:border-[#5a3d2e]/70 hover:bg-transparent hover:text-[#dba476]"
+          type="button"
+          variant="outline"
+          onClick={addSolution}
+        >
+          <Plus className="size-4" />
+          Add alternate solution
+        </Button>
+      </div>
+
+      {displayedSolutions.map((solution, index) => {
+        const hasName = Boolean(String(solution.name || "").trim())
+        return (
+          <details
+            className="group overflow-hidden rounded-[8px] border border-[#3b2a22]/55 bg-[#181410]"
+            key={solution.id}
+            open
+          >
+            <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 transition-colors hover:bg-[#181410] [&::-webkit-details-marker]:hidden">
+              <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+                <span
+                  className={cn(
+                    "size-2.5 shrink-0 rounded-full",
+                    hasName ? "bg-[#342a24]" : "bg-red-400/80"
+                  )}
+                  title={hasName ? "Solution named" : "Solution name required"}
+                />
+                <Input
+                  className={cn(
+                    "h-8 min-w-[200px] max-w-[360px] rounded-[4px] border-[#3b2a22]/55 bg-white/[0.035] text-sm text-[#e5e2e1]",
+                    !hasName && "border-red-400/50"
+                  )}
+                  placeholder="Solution name e.g. Integration by Parts"
+                  value={solution.name}
+                  onClick={(event) => event.stopPropagation()}
+                  onChange={(event) => updateSolution(solution.id, { name: event.target.value })}
+                />
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5 pr-1 sm:gap-2">
+                <button
+                  type="button"
+                  title="Preferred — AI will use this if solution is ambiguous"
+                  className={cn(
+                    "size-4 rounded-full border border-[#4a3428] transition-colors",
+                    solution.is_preferred ? "bg-[#d49a71]" : "bg-[#342a24] hover:bg-[#5a3d2e]"
+                  )}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setPreferred(solution.id)
+                  }}
+                />
+                <Button
+                  className="rounded-full"
+                  size="sm"
+                  type="button"
+                  variant="destructive"
+                  disabled={displayedSolutions.length <= 1}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    deleteSolution(solution.id)
+                  }}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+                <ChevronDown className="size-4 shrink-0 text-[#a28c83] transition-transform group-open:rotate-180" />
+              </div>
+            </summary>
+
+            <div className="grid gap-3 border-t border-[#3b2a22]/55 p-4">
+              <TagTaxonomyPicker
+                tags={tags}
+                selectedIds={solution.tag_ids || []}
+                parentSelectedIds={parentSelectedIds}
+                deepOnly
+                onChange={(value) => {
+                  updateSolution(solution.id, {
+                    tag_ids: value,
+                    tag_requirements: syncTagRequirements(value, solution.tag_requirements || [], tags),
+                  })
+                }}
+              />
+              <TagRequirementAmounts
+                tags={tags}
+                selectedIds={solution.tag_ids || []}
+                requirements={solution.tag_requirements || []}
+                onChange={(value) => updateSolution(solution.id, { tag_requirements: value })}
+              />
+              <p className="text-[11px] text-[#6f6258]">
+                Pathway {index + 1}: Layer 1 and 2 tags are inherited from the question.
+              </p>
+            </div>
+          </details>
+        )
+      })}
     </div>
   )
 }
@@ -1137,6 +1328,7 @@ export function QuestionEditor({
   const [parts, setParts] = useState([])
   const [attachments, setAttachments] = useState([])
   const [tagRequirements, setTagRequirements] = useState([])
+  const [solutions, setSolutions] = useState([])
   const [tagIds, setTagIds] = useState([])
   const [useTagMarking, setUseTagMarking] = useState(true)
   const [rootMarkingCriteria, setRootMarkingCriteria] = useState([])
@@ -1216,6 +1408,7 @@ export function QuestionEditor({
         answer_value: part.answer_value || "",
         tag_ids: part.tag_ids || [],
         tag_requirements: part.tag_requirements || [],
+        solutions: normalizeSolutionsForState(part.solutions || [], part.tag_requirements || []),
         attachments: part.attachments || [],
         tikz_visuals: part.tikz_visuals || [],
         marking_criteria: normalizeCriteriaRows(
@@ -1227,6 +1420,7 @@ export function QuestionEditor({
     )
     setAttachments(initialData.attachments || [])
     setTagRequirements(initialData.tag_requirements || [])
+    setSolutions(normalizeSolutionsForState(initialData.solutions || [], initialData.tag_requirements || []))
     setTagIds(initialData.tag_ids || [])
     setUseTagMarking(initialData.use_tag_marking !== false)
     setRootMarkingCriteria(
@@ -1268,6 +1462,7 @@ export function QuestionEditor({
   }
 
   function payload() {
+    const includeSolutionPathways = taggingMode === "full" && !isMcq
     return {
       subject,
       subject_id: subjectId ? Number(subjectId) : null,
@@ -1291,6 +1486,7 @@ export function QuestionEditor({
         answer_value: part.answer_type === "value" ? part.answer_value || "" : "",
         tag_ids: part.tag_ids || [],
         tag_requirements: syncTagRequirements(part.tag_ids || [], part.tag_requirements || [], tags),
+        solutions: includeSolutionPathways ? solutionsPayload(part.solutions || [], tags) : [],
         attachments: part.attachments || [],
         tikz_visuals: part.tikz_visuals || [],
         marking_criteria: normalizeCriteriaRows(
@@ -1314,6 +1510,7 @@ export function QuestionEditor({
       explanation: isMcq ? explanation : "",
       tag_ids: tagIds,
       tag_requirements: isMcq || parts.length ? [] : syncTagRequirements(tagIds, tagRequirements, tags),
+      solutions: includeSolutionPathways && parts.length === 0 ? solutionsPayload(solutions, tags) : [],
       import_source: importSource,
     }
   }
@@ -1343,6 +1540,17 @@ export function QuestionEditor({
         return "Select the correct multiple choice answer."
       }
       return ""
+    }
+
+    if (taggingMode === "full" && normalizeSolutionsForState(solutions).some((solution) => !String(solution.name || "").trim())) {
+      return "All solution pathways must have a name."
+    }
+    if (taggingMode === "full") {
+      for (const part of parts) {
+        if (normalizeSolutionsForState(part.solutions || []).some((solution) => !String(solution.name || "").trim())) {
+          return `All solution pathways in part (${part.label || "?"}) must have a name.`
+        }
+      }
     }
 
     if (!isMathSubject) {
@@ -1378,7 +1586,7 @@ export function QuestionEditor({
     if (!onDraftChange) return
     onDraftChange(payload())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject, subjectId, marks, questionType, level, questionText, sampleSolution, answerType, answerValue, tikzCode, diagramSvg, tikzVisuals, importSource, parts, attachments, tagIds, tagRequirements, tags, rootMarkingCriteria, useTagMarking, mcqOptions, correctOption, shuffleOptions, explanation])
+  }, [subject, subjectId, marks, questionType, level, questionText, sampleSolution, answerType, answerValue, tikzCode, diagramSvg, tikzVisuals, importSource, parts, attachments, tagIds, tagRequirements, solutions, tags, rootMarkingCriteria, useTagMarking, mcqOptions, correctOption, shuffleOptions, explanation])
 
   return (
     <div className={cn("grid gap-8", !hidePreview && "lg:grid-cols-2")}>
@@ -1849,6 +2057,20 @@ export function QuestionEditor({
                         </DropdownSection>
                         )}
 
+                        {showTagging && taggingMode === "full" && !isMcq && (
+                          <SolutionPathwaysEditor
+                            parentSelectedIds={tagIds}
+                            solutions={part.solutions || []}
+                            tags={tags}
+                            onChange={(value) => {
+                              const next = [...parts]
+                              next[index] = { ...part, solutions: value }
+                              setParts(next)
+                              if (validationMessage) setValidationMessage("")
+                            }}
+                          />
+                        )}
+
                       </div>
                     </details>
                   ))}
@@ -1911,17 +2133,30 @@ export function QuestionEditor({
                           setTagRequirements(syncTagRequirements(value, tagRequirements, tags))
                           if (validationMessage) setValidationMessage("")
                         }}
-                        showDeep={isMcq || parts.length === 0}
+                        showDeep={isMcq || (parts.length === 0 && taggingMode !== "full")}
                         includeMicroskills={!isMcq}
                       />
                     )}
-                    {!isMcq && parts.length === 0 && (
+                    {!isMcq && parts.length === 0 && taggingMode !== "full" && (
                       <TagRequirementAmounts
                         tags={tags}
                         selectedIds={tagIds}
                         requirements={tagRequirements}
                         onChange={setTagRequirements}
                       />
+                    )}
+                    {taggingMode === "full" && !isMcq && parts.length === 0 && (
+                      <div className="w-full">
+                        <SolutionPathwaysEditor
+                          parentSelectedIds={tagIds}
+                          solutions={solutions}
+                          tags={tags}
+                          onChange={(value) => {
+                            setSolutions(value)
+                            if (validationMessage) setValidationMessage("")
+                          }}
+                        />
+                      </div>
                     )}
                   </div>
                 </Field>

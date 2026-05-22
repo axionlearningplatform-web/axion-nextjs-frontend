@@ -1282,6 +1282,11 @@ function AnswerArea({
                   <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
                     {part.label}: {part.marks_awarded}/{part.marks_possible} marks
                   </p>
+                  {part.matched_solution && (
+                    <p className="mb-2 mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#d49a71]">
+                      Marked via: {part.matched_solution}
+                    </p>
+                  )}
                   {part.lost_tags?.length > 0 && (
                     <ul className="mt-3 grid gap-2">
                       {part.lost_tags.map((item) => (
