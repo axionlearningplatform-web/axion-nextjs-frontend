@@ -658,24 +658,48 @@ export function DiagramSvg({ svg }) {
   )
 }
 
-function sampleAnswersForQuestion(question) {
+function preferredSolution(solutions = []) {
+  return solutions.find((solution) => solution.is_preferred) || solutions[0] || null
+}
+
+function solutionForMatch(solutions = [], matchedName = "") {
+  const normalized = String(matchedName || "").trim().toLowerCase()
+  if (normalized) {
+    const matched = solutions.find(
+      (solution) => String(solution.name || "").trim().toLowerCase() === normalized
+    )
+    if (matched) return matched
+  }
+  return preferredSolution(solutions)
+}
+
+function sampleAnswersForQuestion(question, markingResult = null) {
   const partAnswers = (question?.parts || [])
-    .map((part, index) => ({
-      content: String(part.sample_solution || "").trim(),
-      label: `Part ${part.label || String.fromCharCode(97 + index)}`,
-    }))
+    .map((part, index) => {
+      const resultPart = (markingResult?.parts || []).find(
+        (item) => String(item.label || "").trim().toLowerCase() === String(part.label || "").trim().toLowerCase()
+      )
+      const solution = solutionForMatch(part.solutions || [], resultPart?.matched_solution)
+      return {
+        content: String(solution?.sample_solution || part.sample_solution || "").trim(),
+        label: solution?.name
+          ? `Part ${part.label || String.fromCharCode(97 + index)} — ${solution.name}`
+          : `Part ${part.label || String.fromCharCode(97 + index)}`,
+      }
+    })
     .filter((item) => item.content)
 
   if (partAnswers.length) return partAnswers
 
-  const wholeQuestionAnswer = String(question?.sample_solution || "").trim()
+  const rootSolution = solutionForMatch(question?.solutions || [], markingResult?.parts?.[0]?.matched_solution || markingResult?.matched_solution)
+  const wholeQuestionAnswer = String(rootSolution?.sample_solution || question?.sample_solution || "").trim()
   return wholeQuestionAnswer
-    ? [{ content: wholeQuestionAnswer, label: "Sample answer" }]
+    ? [{ content: wholeQuestionAnswer, label: rootSolution?.name || "Sample answer" }]
     : []
 }
 
-export function SampleAnswers({ question }) {
-  const sampleAnswers = sampleAnswersForQuestion(question)
+export function SampleAnswers({ markingResult = null, question }) {
+  const sampleAnswers = sampleAnswersForQuestion(question, markingResult)
   if (!sampleAnswers.length) return null
 
   return (
@@ -1312,9 +1336,9 @@ function AnswerArea({
       )}
       {(markingResult || betaSampleRevealed) && (
         <>
-          <SampleAnswers question={question} />
+          <SampleAnswers markingResult={markingResult} question={question} />
           <MarkingCriteriaSummary question={question} />
-          {betaSampleRevealed && sampleAnswersForQuestion(question).length === 0 && (
+          {betaSampleRevealed && sampleAnswersForQuestion(question, markingResult).length === 0 && (
             <div className="mt-5 rounded-[3px] border border-white/[0.06] bg-[#1a1714] p-5 text-[13px] leading-relaxed text-[#9b8f84]">
               <p className="font-semibold text-[#dba476]">Sample solution</p>
               <p className="mt-2">

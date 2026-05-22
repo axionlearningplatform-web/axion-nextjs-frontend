@@ -36,6 +36,7 @@ const emptySolution = (name = "Main Solution", isPreferred = true) => ({
   id: crypto.randomUUID(),
   name,
   is_preferred: isPreferred,
+  sample_solution: "",
   tag_requirements: [],
   tag_ids: [],
 })
@@ -728,11 +729,12 @@ function syncTagRequirements(selectedIds, existing = [], tags = []) {
     }))
 }
 
-function normalizeSolutionsForState(solutions = [], legacyRequirements = []) {
+function normalizeSolutionsForState(solutions = [], legacyRequirements = [], legacySampleSolution = "") {
   const rows = Array.isArray(solutions) && solutions.length
     ? solutions
     : [{
         ...emptySolution(),
+        sample_solution: legacySampleSolution || "",
         tag_requirements: legacyRequirements || [],
       }]
 
@@ -742,6 +744,7 @@ function normalizeSolutionsForState(solutions = [], legacyRequirements = []) {
       id: solution.id || crypto.randomUUID(),
       name: solution.name || (index === 0 ? "Main Solution" : ""),
       is_preferred: Boolean(solution.is_preferred),
+      sample_solution: solution.sample_solution || "",
       tag_requirements: requirements,
       tag_ids: solution.tag_ids || requirements.map((requirement) => Number(requirement.tag_id)).filter(Boolean),
     }
@@ -767,6 +770,7 @@ function solutionsPayload(solutions = [], tags = []) {
     id: solution.id,
     name: solution.name,
     is_preferred: Boolean(solution.is_preferred),
+    sample_solution: solution.sample_solution || "",
     tag_requirements: syncTagRequirements(
       solution.tag_ids || [],
       solution.tag_requirements || [],
@@ -814,7 +818,13 @@ function TagRequirementAmounts({ tags, selectedIds, requirements, onChange }) {
   )
 }
 
-function SolutionPathwaysEditor({ parentSelectedIds, solutions, tags, onChange }) {
+function SolutionPathwaysEditor({
+  allowStructureChange = false,
+  parentSelectedIds,
+  solutions,
+  tags,
+  onChange,
+}) {
   const displayedSolutions = normalizeSolutionsForState(solutions)
 
   function updateSolution(solutionId, patch) {
@@ -850,15 +860,17 @@ function SolutionPathwaysEditor({ parentSelectedIds, solutions, tags, onChange }
     <div className="mt-4 grid gap-3">
       <div className="flex items-center justify-between gap-3">
         <SectionTitle>Solution Pathways</SectionTitle>
-        <Button
-          className="h-8 rounded-[6px] border border-[#3b2a22]/55 bg-transparent px-3 text-[13px] text-[#9a8880] hover:border-[#5a3d2e]/70 hover:bg-transparent hover:text-[#dba476]"
-          type="button"
-          variant="outline"
-          onClick={addSolution}
-        >
-          <Plus className="size-4" />
-          Add alternate solution
-        </Button>
+        {allowStructureChange && (
+          <Button
+            className="h-8 rounded-[6px] border border-[#3b2a22]/55 bg-transparent px-3 text-[13px] text-[#9a8880] hover:border-[#5a3d2e]/70 hover:bg-transparent hover:text-[#dba476]"
+            type="button"
+            variant="outline"
+            onClick={addSolution}
+          >
+            <Plus className="size-4" />
+            Add alternate solution
+          </Button>
+        )}
       </div>
 
       {displayedSolutions.map((solution, index) => {
@@ -902,19 +914,21 @@ function SolutionPathwaysEditor({ parentSelectedIds, solutions, tags, onChange }
                     setPreferred(solution.id)
                   }}
                 />
-                <Button
-                  className="rounded-full"
-                  size="sm"
-                  type="button"
-                  variant="destructive"
-                  disabled={displayedSolutions.length <= 1}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    deleteSolution(solution.id)
-                  }}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
+                {allowStructureChange && (
+                  <Button
+                    className="rounded-full"
+                    size="sm"
+                    type="button"
+                    variant="destructive"
+                    disabled={displayedSolutions.length <= 1}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      deleteSolution(solution.id)
+                    }}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                )}
                 <ChevronDown className="size-4 shrink-0 text-[#a28c83] transition-transform group-open:rotate-180" />
               </div>
             </summary>
@@ -943,6 +957,147 @@ function SolutionPathwaysEditor({ parentSelectedIds, solutions, tags, onChange }
               </p>
             </div>
           </details>
+        )
+      })}
+    </div>
+  )
+}
+
+function SolutionSamplePathwaysEditor({ solutions, onChange }) {
+  const displayedSolutions = useMemo(
+    () => normalizeSolutionsForState(solutions),
+    [solutions]
+  )
+  const [openId, setOpenId] = useState(displayedSolutions[0]?.id || "")
+  const activeOpenId = displayedSolutions.some((solution) => solution.id === openId)
+    ? openId
+    : displayedSolutions[0]?.id || ""
+
+  function updateSolution(solutionId, patch) {
+    onChange(displayedSolutions.map((solution) =>
+      solution.id === solutionId ? { ...solution, ...patch } : solution
+    ))
+  }
+
+  function setPreferred(solutionId) {
+    onChange(displayedSolutions.map((solution) => ({
+      ...solution,
+      is_preferred: solution.id === solutionId,
+    })))
+  }
+
+  function addSolution() {
+    const next = emptySolution("", false)
+    onChange([...displayedSolutions, next])
+    setOpenId(next.id)
+  }
+
+  function deleteSolution(solutionId) {
+    if (displayedSolutions.length <= 1) return
+    const next = displayedSolutions.filter((solution) => solution.id !== solutionId)
+    if (!next.some((solution) => solution.is_preferred) && next[0]) {
+      next[0] = { ...next[0], is_preferred: true }
+    }
+    onChange(next)
+    setOpenId(next[0]?.id || "")
+  }
+
+  return (
+    <div className="grid gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <SectionTitle>Sample Solution Pathways</SectionTitle>
+        <Button
+          className="h-8 rounded-[6px] border border-[#3b2a22]/55 bg-transparent px-3 text-[13px] text-[#9a8880] hover:border-[#5a3d2e]/70 hover:bg-transparent hover:text-[#dba476]"
+          type="button"
+          variant="outline"
+          onClick={addSolution}
+        >
+          <Plus className="size-4" />
+          Add alternate solution
+        </Button>
+      </div>
+
+      {displayedSolutions.map((solution, index) => {
+        const hasName = Boolean(String(solution.name || "").trim())
+        const isOpen = activeOpenId === solution.id
+        return (
+          <div
+            className="overflow-hidden rounded-[8px] border border-[#3b2a22]/55 bg-[#181410]"
+            key={solution.id}
+          >
+            <button
+              type="button"
+              className="flex w-full cursor-pointer list-none items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-[#181410]"
+              onClick={() => setOpenId(isOpen ? "" : solution.id)}
+            >
+              <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+                <span
+                  className={cn(
+                    "size-2.5 shrink-0 rounded-full",
+                    hasName ? "bg-[#342a24]" : "bg-red-400/80"
+                  )}
+                  title={hasName ? "Solution named" : "Solution name required"}
+                />
+                <Input
+                  className={cn(
+                    "h-8 min-w-[200px] max-w-[360px] rounded-[4px] border-[#3b2a22]/55 bg-white/[0.035] text-sm text-[#e5e2e1]",
+                    !hasName && "border-red-400/50"
+                  )}
+                  placeholder="Solution name e.g. Integration by Parts"
+                  value={solution.name}
+                  onClick={(event) => event.stopPropagation()}
+                  onChange={(event) => updateSolution(solution.id, { name: event.target.value })}
+                />
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5 pr-1 sm:gap-2">
+                <span
+                  role="button"
+                  tabIndex={0}
+                  title="Preferred — shown if solution is ambiguous"
+                  className={cn(
+                    "size-4 rounded-full border border-[#4a3428] transition-colors",
+                    solution.is_preferred ? "bg-[#d49a71]" : "bg-[#342a24] hover:bg-[#5a3d2e]"
+                  )}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setPreferred(solution.id)
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      setPreferred(solution.id)
+                    }
+                  }}
+                />
+                <Button
+                  className="rounded-full"
+                  size="sm"
+                  type="button"
+                  variant="destructive"
+                  disabled={displayedSolutions.length <= 1}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    deleteSolution(solution.id)
+                  }}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+                <ChevronDown className={cn("size-4 shrink-0 text-[#a28c83] transition-transform", isOpen && "rotate-180")} />
+              </div>
+            </button>
+
+            {isOpen && (
+              <div className="grid gap-3 border-t border-[#3b2a22]/55 p-4">
+                <SampleSolutionEditor
+                  compact={index > 0}
+                  value={solution.sample_solution || ""}
+                  onChange={(value) => updateSolution(solution.id, { sample_solution: value })}
+                  showAnswerMetadata={false}
+                />
+              </div>
+            )}
+          </div>
         )
       })}
     </div>
@@ -1408,7 +1563,7 @@ export function QuestionEditor({
         answer_value: part.answer_value || "",
         tag_ids: part.tag_ids || [],
         tag_requirements: part.tag_requirements || [],
-        solutions: normalizeSolutionsForState(part.solutions || [], part.tag_requirements || []),
+        solutions: normalizeSolutionsForState(part.solutions || [], part.tag_requirements || [], part.sample_solution || ""),
         attachments: part.attachments || [],
         tikz_visuals: part.tikz_visuals || [],
         marking_criteria: normalizeCriteriaRows(
@@ -1420,7 +1575,7 @@ export function QuestionEditor({
     )
     setAttachments(initialData.attachments || [])
     setTagRequirements(initialData.tag_requirements || [])
-    setSolutions(normalizeSolutionsForState(initialData.solutions || [], initialData.tag_requirements || []))
+    setSolutions(normalizeSolutionsForState(initialData.solutions || [], initialData.tag_requirements || [], initialData.sample_solution || ""))
     setTagIds(initialData.tag_ids || [])
     setUseTagMarking(initialData.use_tag_marking !== false)
     setRootMarkingCriteria(
@@ -1463,6 +1618,7 @@ export function QuestionEditor({
 
   function payload() {
     const includeSolutionPathways = taggingMode === "full" && !isMcq
+    const preferredRootSolution = normalizeSolutionsForState(solutions).find((solution) => solution.is_preferred) || normalizeSolutionsForState(solutions)[0]
     return {
       subject,
       subject_id: subjectId ? Number(subjectId) : null,
@@ -1481,7 +1637,9 @@ export function QuestionEditor({
         label: part.label,
         text: part.text,
         marks: criteriaRowCount(part.marks, part.marking_criteria),
-        sample_solution: part.sample_solution || "",
+        sample_solution: includeSolutionPathways
+          ? (normalizeSolutionsForState(part.solutions || []).find((solution) => solution.is_preferred) || normalizeSolutionsForState(part.solutions || [])[0])?.sample_solution || ""
+          : part.sample_solution || "",
         answer_type: part.answer_type || "proof",
         answer_value: part.answer_type === "value" ? part.answer_value || "" : "",
         tag_ids: part.tag_ids || [],
@@ -1499,7 +1657,7 @@ export function QuestionEditor({
       marking_criteria: isMcq || parts.length
         ? []
         : normalizeCriteriaRows(criteriaRowCount(marks, rootMarkingCriteria), rootMarkingCriteria),
-      sample_solution: isMcq || parts.length ? "" : sampleSolution,
+      sample_solution: isMcq || parts.length ? "" : includeSolutionPathways ? preferredRootSolution?.sample_solution || "" : sampleSolution,
       answer_type: isMcq || parts.length ? "proof" : answerType,
       answer_value: !isMcq && !parts.length && answerType === "value" ? answerValue : "",
       marking_enabled: !isMcq,
@@ -1573,12 +1731,19 @@ export function QuestionEditor({
     if (parts.length) {
       const missingPart = parts.find((part) => !String(part.text || "").trim())
       if (missingPart) return `Question text is required for part (${missingPart.label || "?"}).`
-      const missingSolution = parts.find((part) => !String(part.sample_solution || "").trim())
+      const missingSolution = parts.find((part) => (
+        taggingMode === "full"
+          ? normalizeSolutionsForState(part.solutions || []).some((solution) => !String(solution.sample_solution || "").trim())
+          : !String(part.sample_solution || "").trim()
+      ))
       if (missingSolution) return `Sample solution is required for part (${missingSolution.label || "?"}).`
       return ""
     }
 
-    if (!sampleSolution.trim()) return "Sample solution is required."
+    if (taggingMode === "full" && normalizeSolutionsForState(solutions).some((solution) => !String(solution.sample_solution || "").trim())) {
+      return "Sample solution is required for every solution pathway."
+    }
+    if (taggingMode !== "full" && !sampleSolution.trim()) return "Sample solution is required."
     return ""
   }
 
@@ -1967,36 +2132,48 @@ export function QuestionEditor({
 
                         <DropdownSection
                           title="Sample Solution"
-                          summary={part.sample_solution?.trim() ? "ready" : "required"}
-                          defaultOpen={!part.sample_solution?.trim()}
+                          summary={`${normalizeSolutionsForState(part.solutions || []).filter((solution) => String(solution.sample_solution || "").trim()).length}/${normalizeSolutionsForState(part.solutions || []).length} ready`}
+                          defaultOpen={!normalizeSolutionsForState(part.solutions || []).some((solution) => String(solution.sample_solution || "").trim())}
                         >
-                          <SampleSolutionEditor
-                            compact
-                            value={part.sample_solution || ""}
-                            onChange={(value) => {
-                              const next = [...parts]
-                              next[index] = { ...part, sample_solution: value }
-                              setParts(next)
-                              if (validationMessage) setValidationMessage("")
-                            }}
-                            answerType={part.answer_type || "proof"}
-                            answerValue={part.answer_value || ""}
-                            answerTypeName={`answer_type_${index}`}
-                            onAnswerTypeChange={(value) => {
-                              const next = [...parts]
-                              next[index] = {
-                                ...part,
-                                answer_type: value,
-                                answer_value: value === "value" ? part.answer_value || "" : "",
-                              }
-                              setParts(next)
-                            }}
-                            onAnswerValueChange={(value) => {
-                              const next = [...parts]
-                              next[index] = { ...part, answer_value: value }
-                              setParts(next)
-                            }}
-                          />
+                          {taggingMode === "full" ? (
+                            <SolutionSamplePathwaysEditor
+                              solutions={part.solutions || []}
+                              onChange={(value) => {
+                                const next = [...parts]
+                                next[index] = { ...part, solutions: value }
+                                setParts(next)
+                                if (validationMessage) setValidationMessage("")
+                              }}
+                            />
+                          ) : (
+                            <SampleSolutionEditor
+                              compact
+                              value={part.sample_solution || ""}
+                              onChange={(value) => {
+                                const next = [...parts]
+                                next[index] = { ...part, sample_solution: value }
+                                setParts(next)
+                                if (validationMessage) setValidationMessage("")
+                              }}
+                              answerType={part.answer_type || "proof"}
+                              answerValue={part.answer_value || ""}
+                              answerTypeName={`answer_type_${index}`}
+                              onAnswerTypeChange={(value) => {
+                                const next = [...parts]
+                                next[index] = {
+                                  ...part,
+                                  answer_type: value,
+                                  answer_value: value === "value" ? part.answer_value || "" : "",
+                                }
+                                setParts(next)
+                              }}
+                              onAnswerValueChange={(value) => {
+                                const next = [...parts]
+                                next[index] = { ...part, answer_value: value }
+                                setParts(next)
+                              }}
+                            />
+                          )}
                         </DropdownSection>
 
                         {!isMathSubject && (
@@ -2081,24 +2258,38 @@ export function QuestionEditor({
                   <div className="grid gap-4">
                     <DropdownSection
                       title="Sample Solution"
-                      summary={sampleSolution.trim() ? "ready" : "required"}
-                      defaultOpen={!sampleSolution.trim()}
+                      summary={taggingMode === "full"
+                        ? `${normalizeSolutionsForState(solutions).filter((solution) => String(solution.sample_solution || "").trim()).length}/${normalizeSolutionsForState(solutions).length} ready`
+                        : sampleSolution.trim() ? "ready" : "required"}
+                      defaultOpen={taggingMode === "full"
+                        ? !normalizeSolutionsForState(solutions).some((solution) => String(solution.sample_solution || "").trim())
+                        : !sampleSolution.trim()}
                     >
-                      <SampleSolutionEditor
-                        value={sampleSolution}
-                        onChange={(value) => {
-                          setSampleSolution(value)
-                          if (validationMessage) setValidationMessage("")
-                        }}
-                        answerType={answerType}
-                        answerValue={answerValue}
-                        answerTypeName="answer_type_question"
-                        onAnswerTypeChange={(value) => {
-                          setAnswerType(value)
-                          if (value !== "value") setAnswerValue("")
-                        }}
-                        onAnswerValueChange={setAnswerValue}
-                      />
+                      {taggingMode === "full" ? (
+                        <SolutionSamplePathwaysEditor
+                          solutions={solutions}
+                          onChange={(value) => {
+                            setSolutions(value)
+                            if (validationMessage) setValidationMessage("")
+                          }}
+                        />
+                      ) : (
+                        <SampleSolutionEditor
+                          value={sampleSolution}
+                          onChange={(value) => {
+                            setSampleSolution(value)
+                            if (validationMessage) setValidationMessage("")
+                          }}
+                          answerType={answerType}
+                          answerValue={answerValue}
+                          answerTypeName="answer_type_question"
+                          onAnswerTypeChange={(value) => {
+                            setAnswerType(value)
+                            if (value !== "value") setAnswerValue("")
+                          }}
+                          onAnswerValueChange={setAnswerValue}
+                        />
+                      )}
                     </DropdownSection>
                     {!isMathSubject && (
                       <DropdownSection
