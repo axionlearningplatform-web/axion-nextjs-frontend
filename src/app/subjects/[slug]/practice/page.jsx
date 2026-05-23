@@ -294,6 +294,97 @@ export function MarkdownMath({ children, className }) {
   )
 }
 
+function TagWithLatex({ name, className }) {
+  const prepared = String(name || "").replace(/\$([^$]+)\$/g, (_, expr) => `\\(${expr}\\)`)
+
+  return (
+    <span className={cn("inline", className)}>
+      <ReactMarkdown
+        remarkPlugins={[remarkMath]}
+        rehypePlugins={[rehypeKatex]}
+        components={{
+          p: ({ children }) => <span>{children}</span>,
+        }}
+      >
+        {prepared}
+      </ReactMarkdown>
+    </span>
+  )
+}
+
+function MarkingCanvasAnnotation({ canvasPages, sillymistakes, ocrLines }) {
+  const page = canvasPages?.[0]
+  const pageBlob = page?.blob
+  const objectUrl = useMemo(
+    () => (pageBlob ? URL.createObjectURL(pageBlob) : null),
+    [pageBlob]
+  )
+  const totalLines = Math.max(ocrLines?.length || 1, 1)
+
+  useEffect(() => {
+    if (!objectUrl) return undefined
+    return () => URL.revokeObjectURL(objectUrl)
+  }, [objectUrl])
+
+  if (!canvasPages?.length || !sillymistakes?.length || !objectUrl) return null
+
+  const annotations = sillymistakes
+    .filter((mistake) => Number.isFinite(Number(mistake.line)))
+    .map((mistake, index) => {
+      const lineIndex = Math.max(0, Math.min(Number(mistake.line) - 1, totalLines - 1))
+      const yFraction = lineIndex / totalLines
+      const heightFraction = 1.5 / totalLines
+      return {
+        ...mistake,
+        number: index + 1,
+        yPercent: yFraction * 100,
+        heightPercent: Math.max(heightFraction * 100, 4),
+      }
+    })
+
+  if (!annotations.length) return null
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-[4px] border border-white/[0.06]">
+      <p className="border-b border-white/[0.06] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
+        Your working
+      </p>
+      <div className="relative" style={{ lineHeight: 0 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={objectUrl}
+          alt="Your submitted working"
+          className="block w-full"
+          style={{ filter: "invert(1) brightness(0.85)" }}
+        />
+        {annotations.map((annotation) => (
+          <div
+            key={`${annotation.tag}-${annotation.number}`}
+            className="pointer-events-none absolute left-[2%] right-[2%]"
+            style={{
+              top: `${annotation.yPercent}%`,
+              height: `${annotation.heightPercent}%`,
+              border: "2px solid rgba(200, 134, 74, 0.85)",
+              backgroundColor: "rgba(200, 134, 74, 0.12)",
+              borderRadius: "3px",
+            }}
+          >
+            <span
+              className="absolute right-0 top-0 flex size-5 items-center justify-center rounded-bl-[3px] rounded-tr-[2px] text-[10px] font-bold"
+              style={{
+                backgroundColor: "rgba(200, 134, 74, 0.9)",
+                color: "#120c08",
+              }}
+            >
+              {annotation.number}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function SelectionChip({ children, onRemove, muted = false }) {
   return (
     <button
@@ -909,6 +1000,7 @@ function AnswerArea({
   const [submitted, setSubmitted] = useState(false)
   const [submittedTab, setSubmittedTab] = useState(null)
   const [submittedFiles, setSubmittedFiles] = useState([])
+  const [submittedCanvasPages, setSubmittedCanvasPages] = useState(null)
   const [saveModalOpen, setSaveModalOpen] = useState(false)
   const [savingFavourite, setSavingFavourite] = useState(false)
   const [favouriteOverride, setFavouriteOverride] = useState(null)
@@ -963,6 +1055,7 @@ function AnswerArea({
       }
       setSubmitted(true)
       setSubmittedTab("mcq")
+      setSubmittedCanvasPages(null)
       onSubmit({})
       return
     }
@@ -976,6 +1069,14 @@ function AnswerArea({
     setSubmittedTab(activeAnswerTab)
     if (activeAnswerTab === "draw" && handwritingRef.current) {
       const exportPayload = await handwritingRef.current.exportAnswer()
+      setSubmittedCanvasPages(
+        exportPayload.pages.map((page) => ({
+          blob: page.blob,
+          width: page.width,
+          height: page.height,
+          mimeType: page.mime_type,
+        }))
+      )
       setSubmittedFiles([])
       const formData = new FormData()
       formData.append("submission_type", "draw")
@@ -995,6 +1096,7 @@ function AnswerArea({
 
     if (activeAnswerTab === "type") {
       setSubmittedFiles([])
+      setSubmittedCanvasPages(null)
       onSubmit({
         submission_type: "text",
         files: [{
@@ -1008,6 +1110,7 @@ function AnswerArea({
     }
 
     setSubmittedFiles(files)
+    setSubmittedCanvasPages(null)
     onSubmit({ submission_type: "file", files })
   }
 
@@ -1253,82 +1356,150 @@ function AnswerArea({
             )}
             {markingResult && (
               <div className="grid gap-4">
-              <div className="flex flex-wrap items-center gap-3 text-[13px] text-[#b7aca1]">
-                <span className="font-serif text-[22px] text-[#eee9e4]">
-                  {markingResult.marks_awarded}/{markingResult.marks_possible}
-                </span>
-                <span className="text-[#4f4a45]">question marks</span>
-                {Number(markingResult.tag_score_possible || 0) > 0 && (
-                  <>
-                    <span className="text-[#5b5048]">·</span>
-                    <span>{markingResult.tag_score}/{markingResult.tag_score_possible} tag score</span>
-                  </>
+                <div className="flex flex-wrap items-center gap-3 text-[13px] text-[#b7aca1]">
+                  <span className="font-serif text-[22px] text-[#eee9e4]">
+                    {markingResult.marks_awarded}/{markingResult.marks_possible}
+                  </span>
+                  <span className="text-[#4f4a45]">marks</span>
+                  {Number(markingResult.tag_score_possible || 0) > 0 && (
+                    <>
+                      <span className="text-[#5b5048]">·</span>
+                      <span>{markingResult.tag_score}/{markingResult.tag_score_possible} tag score</span>
+                    </>
+                  )}
+                </div>
+                {(markingResult.feedback || markingResult.next_step_advice) && (
+                  <div className="rounded-[4px] border border-white/[0.06] bg-[#120f0d] px-4 py-3">
+                    {markingResult?.marking_parse_failed && (
+                      <p className="text-[13px] text-[#d99658]">
+                        Marking could not be scored for this response - see the sample answer below.
+                      </p>
+                    )}
+                    {markingResult.feedback && (
+                      <MarkdownMath className="text-[13px] leading-relaxed text-[#b7aca1] [&_.katex]:text-[#e8e4dc] [&_p]:my-0">
+                        {markingResult.feedback}
+                      </MarkdownMath>
+                    )}
+                    {markingResult.next_step_advice && (
+                      <MarkdownMath className="mt-2 text-[13px] leading-relaxed text-[#dba476] [&_.katex]:text-[#f0d8ba] [&_p]:my-0">
+                        {markingResult.next_step_advice}
+                      </MarkdownMath>
+                    )}
+                  </div>
                 )}
-              </div>
-              {(markingResult.feedback || markingResult.next_step_advice) && (
-                <div className="grid gap-3 rounded-[4px] border border-white/[0.06] bg-[#120f0d] p-3 text-[13px] leading-relaxed text-[#b7aca1]">
-                  {markingResult?.marking_parse_failed && (
+                {markingResult?.ocr_empty && (
+                  <div className="rounded-[3px] border border-[#d99658]/25 bg-[#d99658]/8 p-5">
                     <p className="text-[13px] text-[#d99658]">
-                      Marking could not be scored for this response - see the sample answer below.
+                      No handwriting detected - your canvas may have been blank. Try resubmitting or switch to the Photo tab.
                     </p>
-                  )}
-                  {markingResult.feedback && (
-                    <MarkdownMath className="text-[13px] leading-relaxed text-[#b7aca1] [&_.katex]:text-[#e8e4dc]">
-                      {markingResult.feedback}
-                    </MarkdownMath>
-                  )}
-                  {markingResult.next_step_advice && (
-                    <MarkdownMath className="text-[13px] leading-relaxed text-[#dba476] [&_.katex]:text-[#f0d8ba]">
-                      {markingResult.next_step_advice}
-                    </MarkdownMath>
-                  )}
-                </div>
-              )}
-              {markingResult?.ocr_empty && (
-                <div className="rounded-[3px] border border-[#d99658]/25 bg-[#d99658]/8 p-5">
-                  <p className="text-[13px] text-[#d99658]">
-                    No handwriting detected - your canvas may have been blank. Try resubmitting or switch to the Photo tab.
-                  </p>
-                </div>
-              )}
-              {markingResult?.ocr_failed && (
-                <div className="rounded-[3px] border border-[#d99658]/25 bg-[#d99658]/8 p-5">
-                  <p className="text-[13px] font-semibold text-[#d99658]">
-                    Handwriting not recognised
-                  </p>
-                  <p className="mt-1 text-[13px] text-[#9b8f84]">
-                    Your working was received but couldn&apos;t be read clearly. Try resubmitting, or switch to the Photo tab for a clearer image.
-                  </p>
-                </div>
-              )}
-              {markingResult.marks_awarded < markingResult.marks_possible && (markingResult.parts || []).map((part) => (
-                <div key={part.label} className="border-t border-white/[0.06] pt-4">
-                  <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
-                    {part.label}: {part.marks_awarded}/{part.marks_possible} marks
-                  </p>
-                  {part.matched_solution && (
-                    <p className="mb-2 mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#d49a71]">
-                      Marked via: {part.matched_solution}
+                  </div>
+                )}
+                {markingResult?.ocr_failed && (
+                  <div className="rounded-[3px] border border-[#d99658]/25 bg-[#d99658]/8 p-5">
+                    <p className="text-[13px] font-semibold text-[#d99658]">
+                      Handwriting not recognised
                     </p>
+                    <p className="mt-1 text-[13px] text-[#9b8f84]">
+                      Your working was received but couldn&apos;t be read clearly. Try resubmitting, or switch to the Photo tab for a clearer image.
+                    </p>
+                  </div>
+                )}
+                {markingResult.marks_awarded < markingResult.marks_possible &&
+                  (markingResult.parts || []).map((part) => {
+                    const sillymistakes = part.silly_mistakes || []
+                    const knowledgeGaps = part.knowledge_gaps || []
+                    const hasSilly = sillymistakes.length > 0
+                    const hasGaps = knowledgeGaps.length > 0
+                    if (!hasSilly && !hasGaps) return null
+
+                    return (
+                      <div key={part.label} className="grid gap-3">
+                        {part.matched_solution && (
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#d49a71]">
+                            Via: {part.matched_solution}
+                          </p>
+                        )}
+
+                        {hasSilly && (
+                          <div className="rounded-[4px] border border-[#c8864a]/20 bg-[#c8864a]/[0.06]">
+                            <p className="border-b border-[#c8864a]/15 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c8864a]">
+                              Silly mistakes
+                            </p>
+                            <ul className="grid divide-y divide-white/[0.04]">
+                              {sillymistakes.map((item, index) => (
+                                <li key={item.tag} className="flex items-start gap-3 px-3 py-2.5">
+                                  <span
+                                    className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-[3px] text-[10px] font-bold"
+                                    style={{
+                                      backgroundColor: "rgba(200,134,74,0.85)",
+                                      color: "#120c08",
+                                    }}
+                                  >
+                                    {index + 1}
+                                  </span>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2 text-[12px]">
+                                      <TagWithLatex
+                                        name={item.tag}
+                                        className="font-semibold text-[#dba476]"
+                                      />
+                                      <span className="text-[#5b5048]">
+                                        {item.score}/{item.max_score}
+                                      </span>
+                                    </div>
+                                    <p className="mt-0.5 text-[12px] leading-relaxed text-[#9b8f84]">
+                                      {item.reason}
+                                    </p>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {hasGaps && (
+                          <div className="rounded-[4px] border border-white/[0.06] bg-[#1a1714]">
+                            <p className="border-b border-white/[0.06] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#6f6258]">
+                              Knowledge gaps
+                            </p>
+                            <ul className="grid divide-y divide-white/[0.04]">
+                              {knowledgeGaps.map((item) => (
+                                <li key={item.tag} className="px-3 py-2.5">
+                                  <div className="flex items-center gap-2 text-[12px]">
+                                    <span className="size-1.5 shrink-0 rounded-full bg-[#4f4a45]" />
+                                    <TagWithLatex
+                                      name={item.tag}
+                                      className="font-semibold text-[#8f8982]"
+                                    />
+                                    <span className="text-[#4f4a45]">
+                                      {item.score}/{item.max_score}
+                                    </span>
+                                  </div>
+                                  {item.hint && (
+                                    <p className="mt-1 pl-4 text-[12px] leading-relaxed text-[#6f6258]">
+                                      {item.hint}
+                                    </p>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                {submittedCanvasPages &&
+                  (markingResult.parts || []).some((part) =>
+                    (part.silly_mistakes || []).some((mistake) => mistake.line != null)
+                  ) && (
+                    <MarkingCanvasAnnotation
+                      canvasPages={submittedCanvasPages}
+                      sillymistakes={(markingResult.parts || [])
+                        .flatMap((part) => part.silly_mistakes || [])
+                        .filter((mistake) => mistake.line != null)}
+                      ocrLines={markingResult.ocr_lines || []}
+                    />
                   )}
-                  {part.lost_tags?.length > 0 && (
-                    <ul className="mt-3 grid gap-2">
-                      {part.lost_tags.map((item) => (
-                        <li key={item.tag} className="text-[13px] leading-relaxed text-[#9b8f84]">
-                          <span className="text-[#dba476]">{item.tag}</span>
-                          <span className="text-[#5b5048]">
-                            {" "}
-                            {item.score}/{item.max_score}:{" "}
-                          </span>
-                          <MarkdownMath className="inline-block max-w-full text-[13px] leading-relaxed [&_.katex]:text-[#cfc3b8] [&_p]:my-0 [&_p]:inline">
-                            {item.reason || ""}
-                          </MarkdownMath>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ))}
               </div>
             )}
           </div>
