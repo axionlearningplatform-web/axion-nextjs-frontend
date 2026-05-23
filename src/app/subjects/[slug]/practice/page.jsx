@@ -312,13 +312,22 @@ function TagWithLatex({ name, className }) {
   )
 }
 
+function prepareMistakeLatex(value) {
+  const raw = String(value || "").trim()
+  if (!raw) return ""
+  if (raw.includes("$") || raw.startsWith("\\(") || raw.startsWith("\\[") || raw.startsWith("\\begin")) {
+    return raw
+  }
+  return `\\(${raw}\\)`
+}
+
 function normaliseSillyMistake(item, index) {
   if (item?.title) {
     return {
       number: index + 1,
       label: item.title,
       description: item.detail || "",
-      line: item.line ?? null,
+      latex: prepareMistakeLatex(item.latex),
       score: null,
       maxScore: null,
     }
@@ -327,7 +336,7 @@ function normaliseSillyMistake(item, index) {
     number: index + 1,
     label: item?.label || item?.tag || "",
     description: item?.description || item?.reason || "",
-    line: item?.line ?? null,
+    latex: prepareMistakeLatex(item?.latex),
     score: item?.score ?? null,
     maxScore: item?.maxScore ?? item?.max_score ?? null,
   }
@@ -348,80 +357,6 @@ function normaliseKnowledgeGap(item) {
     score: item?.score ?? null,
     maxScore: item?.maxScore ?? item?.max_score ?? null,
   }
-}
-
-function MarkingCanvasAnnotation({ canvasPages, sillymistakes, ocrLines }) {
-  const page = canvasPages?.[0]
-  const pageBlob = page?.blob
-  const objectUrl = useMemo(
-    () => (pageBlob ? URL.createObjectURL(pageBlob) : null),
-    [pageBlob]
-  )
-  const totalLines = Math.max(ocrLines?.length || 1, 1)
-
-  useEffect(() => {
-    if (!objectUrl) return undefined
-    return () => URL.revokeObjectURL(objectUrl)
-  }, [objectUrl])
-
-  if (!canvasPages?.length || !sillymistakes?.length || !objectUrl) return null
-
-  const annotations = sillymistakes
-    .map(normaliseSillyMistake)
-    .filter((mistake) => Number.isFinite(Number(mistake.line)))
-    .map((mistake, index) => {
-      const lineIndex = Math.max(0, Math.min(Number(mistake.line) - 1, totalLines - 1))
-      const yFraction = lineIndex / totalLines
-      const heightFraction = 1.5 / totalLines
-      return {
-        ...mistake,
-        number: index + 1,
-        yPercent: yFraction * 100,
-        heightPercent: Math.max(heightFraction * 100, 4),
-      }
-    })
-
-  if (!annotations.length) return null
-
-  return (
-    <div className="mt-4 overflow-hidden rounded-[4px] border border-white/[0.06]">
-      <p className="border-b border-white/[0.06] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#8f8982]">
-        Your working
-      </p>
-      <div className="relative" style={{ lineHeight: 0 }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={objectUrl}
-          alt="Your submitted working"
-          className="block w-full"
-          style={{ filter: "invert(1) brightness(0.85)" }}
-        />
-        {annotations.map((annotation) => (
-          <div
-            key={`${annotation.label}-${annotation.number}`}
-            className="pointer-events-none absolute left-[2%] right-[2%]"
-            style={{
-              top: `${annotation.yPercent}%`,
-              height: `${annotation.heightPercent}%`,
-              border: "2px solid rgba(200, 134, 74, 0.85)",
-              backgroundColor: "rgba(200, 134, 74, 0.12)",
-              borderRadius: "3px",
-            }}
-          >
-            <span
-              className="absolute right-0 top-0 flex size-5 items-center justify-center rounded-bl-[3px] rounded-tr-[2px] text-[10px] font-bold"
-              style={{
-                backgroundColor: "rgba(200, 134, 74, 0.9)",
-                color: "#120c08",
-              }}
-            >
-              {annotation.number}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
 }
 
 function SelectionChip({ children, onRemove, muted = false }) {
@@ -1039,7 +974,6 @@ function AnswerArea({
   const [submitted, setSubmitted] = useState(false)
   const [submittedTab, setSubmittedTab] = useState(null)
   const [submittedFiles, setSubmittedFiles] = useState([])
-  const [submittedCanvasPages, setSubmittedCanvasPages] = useState(null)
   const [saveModalOpen, setSaveModalOpen] = useState(false)
   const [savingFavourite, setSavingFavourite] = useState(false)
   const [favouriteOverride, setFavouriteOverride] = useState(null)
@@ -1094,7 +1028,6 @@ function AnswerArea({
       }
       setSubmitted(true)
       setSubmittedTab("mcq")
-      setSubmittedCanvasPages(null)
       onSubmit({})
       return
     }
@@ -1108,14 +1041,6 @@ function AnswerArea({
     setSubmittedTab(activeAnswerTab)
     if (activeAnswerTab === "draw" && handwritingRef.current) {
       const exportPayload = await handwritingRef.current.exportAnswer()
-      setSubmittedCanvasPages(
-        exportPayload.pages.map((page) => ({
-          blob: page.blob,
-          width: page.width,
-          height: page.height,
-          mimeType: page.mime_type,
-        }))
-      )
       setSubmittedFiles([])
       const formData = new FormData()
       formData.append("submission_type", "draw")
@@ -1135,7 +1060,6 @@ function AnswerArea({
 
     if (activeAnswerTab === "type") {
       setSubmittedFiles([])
-      setSubmittedCanvasPages(null)
       onSubmit({
         submission_type: "text",
         files: [{
@@ -1149,7 +1073,6 @@ function AnswerArea({
     }
 
     setSubmittedFiles(files)
-    setSubmittedCanvasPages(null)
     onSubmit({ submission_type: "file", files })
   }
 
@@ -1497,6 +1420,11 @@ function AnswerArea({
                                     <p className="mt-0.5 text-[12px] leading-relaxed text-[#9b8f84]">
                                       {item.description}
                                     </p>
+                                    {item.latex && (
+                                      <MarkdownMath className="mt-2 rounded-[3px] border border-[#c8864a]/15 bg-[#120f0d]/70 px-2.5 py-2 text-[13px] leading-relaxed text-[#d8c4b0] [&_.katex]:text-[#efd0b2] [&_p]:my-0">
+                                        {item.latex}
+                                      </MarkdownMath>
+                                    )}
                                   </div>
                                 </li>
                               ))}
@@ -1505,31 +1433,31 @@ function AnswerArea({
                         )}
 
                         {hasGaps && (
-                          <div className="rounded-[4px] border border-white/[0.06] bg-[#1a1714]">
-                            <p className="border-b border-white/[0.06] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#6f6258]">
+                          <div className="rounded-[4px] border border-[#b24a4a]/20 bg-[#b24a4a]/[0.06]">
+                            <p className="border-b border-[#b24a4a]/15 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c66a6a]">
                               Knowledge gaps
                             </p>
                             <ul className="grid divide-y divide-white/[0.04]">
                               {knowledgeGaps.map((item) => (
                                 <li key={item.label} className="px-3 py-2.5">
                                   <div className="flex items-center gap-2 text-[12px]">
-                                    <span className="size-1.5 shrink-0 rounded-full bg-[#4f4a45]" />
+                                    <span className="size-1.5 shrink-0 rounded-full bg-[#b24a4a]/70" />
                                     {item.score !== null ? (
                                       <TagWithLatex
                                         name={item.label}
-                                        className="font-semibold text-[#8f8982]"
+                                        className="font-semibold text-[#c98282]"
                                       />
                                     ) : (
-                                      <span className="font-semibold text-[#8f8982]">{item.label}</span>
+                                      <span className="font-semibold text-[#c98282]">{item.label}</span>
                                     )}
                                     {item.score !== null && (
-                                      <span className="text-[#4f4a45]">
+                                      <span className="text-[#7f5555]">
                                         {item.score}/{item.maxScore}
                                       </span>
                                     )}
                                   </div>
                                   {item.description && (
-                                    <p className="mt-1 pl-4 text-[12px] leading-relaxed text-[#6f6258]">
+                                    <p className="mt-1 pl-4 text-[12px] leading-relaxed text-[#9b6f6f]">
                                       {item.description}
                                     </p>
                                   )}
@@ -1541,18 +1469,6 @@ function AnswerArea({
                       </div>
                     )
                   })}
-                {submittedCanvasPages &&
-                  (markingResult.parts || []).some((part) =>
-                    (part.silly_mistakes || []).some((mistake) => mistake.line != null)
-                  ) && (
-                    <MarkingCanvasAnnotation
-                      canvasPages={submittedCanvasPages}
-                      sillymistakes={(markingResult.parts || [])
-                        .flatMap((part) => part.silly_mistakes || [])
-                        .filter((mistake) => mistake.line != null)}
-                      ocrLines={markingResult.ocr_lines || []}
-                    />
-                  )}
               </div>
             )}
           </div>
