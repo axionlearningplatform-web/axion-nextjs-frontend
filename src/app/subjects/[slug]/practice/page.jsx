@@ -312,6 +312,44 @@ function TagWithLatex({ name, className }) {
   )
 }
 
+function normaliseSillyMistake(item, index) {
+  if (item?.title) {
+    return {
+      number: index + 1,
+      label: item.title,
+      description: item.detail || "",
+      line: item.line ?? null,
+      score: null,
+      maxScore: null,
+    }
+  }
+  return {
+    number: index + 1,
+    label: item?.label || item?.tag || "",
+    description: item?.description || item?.reason || "",
+    line: item?.line ?? null,
+    score: item?.score ?? null,
+    maxScore: item?.maxScore ?? item?.max_score ?? null,
+  }
+}
+
+function normaliseKnowledgeGap(item) {
+  if (item?.title) {
+    return {
+      label: item.title,
+      description: item.detail || "",
+      score: null,
+      maxScore: null,
+    }
+  }
+  return {
+    label: item?.label || item?.tag || "",
+    description: item?.description || item?.hint || "",
+    score: item?.score ?? null,
+    maxScore: item?.maxScore ?? item?.max_score ?? null,
+  }
+}
+
 function MarkingCanvasAnnotation({ canvasPages, sillymistakes, ocrLines }) {
   const page = canvasPages?.[0]
   const pageBlob = page?.blob
@@ -329,6 +367,7 @@ function MarkingCanvasAnnotation({ canvasPages, sillymistakes, ocrLines }) {
   if (!canvasPages?.length || !sillymistakes?.length || !objectUrl) return null
 
   const annotations = sillymistakes
+    .map(normaliseSillyMistake)
     .filter((mistake) => Number.isFinite(Number(mistake.line)))
     .map((mistake, index) => {
       const lineIndex = Math.max(0, Math.min(Number(mistake.line) - 1, totalLines - 1))
@@ -359,7 +398,7 @@ function MarkingCanvasAnnotation({ canvasPages, sillymistakes, ocrLines }) {
         />
         {annotations.map((annotation) => (
           <div
-            key={`${annotation.tag}-${annotation.number}`}
+            key={`${annotation.label}-${annotation.number}`}
             className="pointer-events-none absolute left-[2%] right-[2%]"
             style={{
               top: `${annotation.yPercent}%`,
@@ -1406,8 +1445,10 @@ function AnswerArea({
                 )}
                 {markingResult.marks_awarded < markingResult.marks_possible &&
                   (markingResult.parts || []).map((part) => {
-                    const sillymistakes = part.silly_mistakes || []
-                    const knowledgeGaps = part.knowledge_gaps || []
+                    const rawSilly = part.silly_mistakes || []
+                    const rawGaps = part.knowledge_gaps || []
+                    const sillymistakes = rawSilly.map(normaliseSillyMistake)
+                    const knowledgeGaps = rawGaps.map(normaliseKnowledgeGap)
                     const hasSilly = sillymistakes.length > 0
                     const hasGaps = knowledgeGaps.length > 0
                     if (!hasSilly && !hasGaps) return null
@@ -1426,8 +1467,8 @@ function AnswerArea({
                               Silly mistakes
                             </p>
                             <ul className="grid divide-y divide-white/[0.04]">
-                              {sillymistakes.map((item, index) => (
-                                <li key={item.tag} className="flex items-start gap-3 px-3 py-2.5">
+                              {sillymistakes.map((item) => (
+                                <li key={`${item.label}-${item.number}`} className="flex items-start gap-3 px-3 py-2.5">
                                   <span
                                     className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-[3px] text-[10px] font-bold"
                                     style={{
@@ -1435,20 +1476,26 @@ function AnswerArea({
                                       color: "#120c08",
                                     }}
                                   >
-                                    {index + 1}
+                                    {item.number}
                                   </span>
                                   <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2 text-[12px]">
-                                      <TagWithLatex
-                                        name={item.tag}
-                                        className="font-semibold text-[#dba476]"
-                                      />
-                                      <span className="text-[#5b5048]">
-                                        {item.score}/{item.max_score}
-                                      </span>
+                                      {item.score !== null ? (
+                                        <TagWithLatex
+                                          name={item.label}
+                                          className="font-semibold text-[#dba476]"
+                                        />
+                                      ) : (
+                                        <span className="font-semibold text-[#dba476]">{item.label}</span>
+                                      )}
+                                      {item.score !== null && (
+                                        <span className="text-[#5b5048]">
+                                          {item.score}/{item.maxScore}
+                                        </span>
+                                      )}
                                     </div>
                                     <p className="mt-0.5 text-[12px] leading-relaxed text-[#9b8f84]">
-                                      {item.reason}
+                                      {item.description}
                                     </p>
                                   </div>
                                 </li>
@@ -1464,20 +1511,26 @@ function AnswerArea({
                             </p>
                             <ul className="grid divide-y divide-white/[0.04]">
                               {knowledgeGaps.map((item) => (
-                                <li key={item.tag} className="px-3 py-2.5">
+                                <li key={item.label} className="px-3 py-2.5">
                                   <div className="flex items-center gap-2 text-[12px]">
                                     <span className="size-1.5 shrink-0 rounded-full bg-[#4f4a45]" />
-                                    <TagWithLatex
-                                      name={item.tag}
-                                      className="font-semibold text-[#8f8982]"
-                                    />
-                                    <span className="text-[#4f4a45]">
-                                      {item.score}/{item.max_score}
-                                    </span>
+                                    {item.score !== null ? (
+                                      <TagWithLatex
+                                        name={item.label}
+                                        className="font-semibold text-[#8f8982]"
+                                      />
+                                    ) : (
+                                      <span className="font-semibold text-[#8f8982]">{item.label}</span>
+                                    )}
+                                    {item.score !== null && (
+                                      <span className="text-[#4f4a45]">
+                                        {item.score}/{item.maxScore}
+                                      </span>
+                                    )}
                                   </div>
-                                  {item.hint && (
+                                  {item.description && (
                                     <p className="mt-1 pl-4 text-[12px] leading-relaxed text-[#6f6258]">
-                                      {item.hint}
+                                      {item.description}
                                     </p>
                                   )}
                                 </li>
