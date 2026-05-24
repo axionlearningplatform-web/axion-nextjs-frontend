@@ -2204,7 +2204,7 @@ export function QuestionEditor({
                           setTagIds(value)
                           if (validationMessage) setValidationMessage("")
                         }}
-                        showDeep={isMcq || (parts.length === 0 && taggingMode !== "full")}
+                        showDeep={isMcq || parts.length === 0}
                       />
                     )}
                     {taggingMode === "full" && !isMcq && parts.length === 0 && (
