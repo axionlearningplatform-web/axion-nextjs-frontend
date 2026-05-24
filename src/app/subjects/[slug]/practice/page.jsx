@@ -975,6 +975,7 @@ function AnswerArea({
   const [submittedTab, setSubmittedTab] = useState(null)
   const [submittedFiles, setSubmittedFiles] = useState([])
   const [saveModalOpen, setSaveModalOpen] = useState(false)
+  const [saveFavouriteNotice, setSaveFavouriteNotice] = useState("")
   const [savingFavourite, setSavingFavourite] = useState(false)
   const [favouriteOverride, setFavouriteOverride] = useState(null)
   const handwritingRef = useRef(null)
@@ -1077,6 +1078,7 @@ function AnswerArea({
   }
 
   async function openSaveModal() {
+    setSaveFavouriteNotice("")
     if (favouriteStatusUrl) {
       const latest = await mutateFavouriteStatus()
       if (latest) setFavouriteOverride(latest)
@@ -1084,7 +1086,20 @@ function AnswerArea({
     setSaveModalOpen(true)
   }
 
-  async function saveFavourite(note) {
+  function strokeDataHasInk(strokeData) {
+    return (strokeData?.pages || []).some((page) =>
+      (page?.strokes || []).some((stroke) => (stroke?.points || []).length > 0)
+    )
+  }
+
+  function canvasHasInk() {
+    const pages = handwritingRef.current?.getPages?.() || []
+    return pages.some((page) =>
+      (page?.strokes || []).some((stroke) => (stroke?.points || []).length > 0)
+    )
+  }
+
+  async function saveFavourite(note, responsePayload = null) {
     if (!questionId) return
     setSavingFavourite(true)
     try {
@@ -1107,6 +1122,61 @@ function AnswerArea({
       const nextStatus = {
         favourited: true,
         note: data.note || note || "",
+      }
+      if (responsePayload !== null) {
+        let responseSubmissionType = null
+        let responseText = ""
+        let strokeDataToSave = {}
+
+        if (activeAnswerTab === "draw" && handwritingRef.current) {
+          const exported = await handwritingRef.current.exportAnswer()
+          if (strokeDataHasInk(exported.stroke_data)) {
+            responseSubmissionType = "draw"
+            strokeDataToSave = exported.stroke_data
+          }
+        } else if (activeAnswerTab === "type") {
+          const trimmedAnswer = typedAnswer.trim()
+          if (trimmedAnswer) {
+            responseSubmissionType = "text"
+            responseText = trimmedAnswer
+          } else if (canvasHasInk() && handwritingRef.current) {
+            const exported = await handwritingRef.current.exportAnswer()
+            if (strokeDataHasInk(exported.stroke_data)) {
+              responseSubmissionType = "draw"
+              strokeDataToSave = exported.stroke_data
+            }
+          }
+        }
+
+        if (!responseSubmissionType) {
+          setFavouriteOverride(nextStatus)
+          mutateFavouriteStatus(nextStatus, false)
+          setSaveFavouriteNotice("No unique response data to store/save.")
+          return
+        }
+
+        const responseSave = await fetch(`${QUESTIONS_API_URL}favourites/responses/`, {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            question_id: questionId,
+            submission_type: responseSubmissionType,
+            text_response: responseText,
+            stroke_data: strokeDataToSave || {},
+            marking_result: markingResult || {},
+            marks_awarded: markingResult?.marks_awarded ?? null,
+            marks_possible: markingResult?.marks_possible ?? null,
+            note: responsePayload.note || "",
+          }),
+        })
+        const responseSaveData = await parseJsonResponse(responseSave)
+        if (!responseSave.ok) {
+          throw new Error(responseSaveData.detail || `Could not save this response (HTTP ${responseSave.status}).`)
+        }
       }
       setFavouriteOverride(nextStatus)
       mutateFavouriteStatus(nextStatus, false)
@@ -1490,11 +1560,19 @@ function AnswerArea({
       )}
       {saveModalOpen && (
         <SaveQuestionModal
+          canSaveResponse={canMoveNext && !isMcq && (activeAnswerTab === "type" || activeAnswerTab === "draw")}
           existingNote={resolvedFavouriteStatus.note || ""}
           favourited={Boolean(resolvedFavouriteStatus.favourited)}
           loading={savingFavourite}
+          markingResult={markingResult}
+          marksAwarded={markingResult?.marks_awarded ?? null}
+          marksPossible={markingResult?.marks_possible ?? null}
+          notice={saveFavouriteNotice}
           onClose={() => setSaveModalOpen(false)}
           onSave={saveFavourite}
+          strokeData={null}
+          submissionType={activeAnswerTab === "draw" ? "draw" : activeAnswerTab === "type" ? "text" : null}
+          textResponse={activeAnswerTab === "type" ? typedAnswer : null}
         />
       )}
     </section>

@@ -2,7 +2,7 @@ import { Plus, Trash2 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-export default function PageNavigator({ currentPageIndex, onAddPage, onDeletePage, onSelectPage, pages }) {
+export default function PageNavigator({ currentPageIndex, onAddPage, onDeletePage, onSelectPage, pages, readOnly = false }) {
   return (
     <aside className="flex select-none gap-2 overflow-x-auto border-b border-white/[0.06] bg-[#14100d] p-3 md:w-28 md:flex-col md:overflow-y-auto md:border-b-0 md:border-r">
       {pages.map((page, index) => (
@@ -18,7 +18,7 @@ export default function PageNavigator({ currentPageIndex, onAddPage, onDeletePag
           )}
         >
           <span>Page {index + 1}</span>
-          {pages.length > 1 && (
+          {!readOnly && pages.length > 1 && (
             <span
               role="button"
               tabIndex={-1}
@@ -35,14 +35,16 @@ export default function PageNavigator({ currentPageIndex, onAddPage, onDeletePag
           )}
         </button>
       ))}
-      <button
-        type="button"
-        onClick={onAddPage}
-        className="inline-flex h-16 min-w-20 items-center justify-center gap-1.5 rounded-[8px] border border-dashed border-white/[0.09] text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6f6861] transition-colors hover:border-[#8b5e42]/55 hover:text-[#d8c4b0] md:min-w-0"
-      >
-        <Plus className="size-3.5" />
-        Add
-      </button>
+      {!readOnly && (
+        <button
+          type="button"
+          onClick={onAddPage}
+          className="inline-flex h-16 min-w-20 items-center justify-center gap-1.5 rounded-[8px] border border-dashed border-white/[0.09] text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6f6861] transition-colors hover:border-[#8b5e42]/55 hover:text-[#d8c4b0] md:min-w-0"
+        >
+          <Plus className="size-3.5" />
+          Add
+        </button>
+      )}
     </aside>
   )
 }

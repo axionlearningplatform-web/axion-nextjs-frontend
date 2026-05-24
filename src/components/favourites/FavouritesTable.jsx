@@ -12,12 +12,13 @@ import fetcher from "@/lib/fetcher"
 import { cn } from "@/lib/utils"
 import { Check, ChevronDown, Loader2, Pencil, Trash2 } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import useSWR from "swr"
 
 import SaveQuestionModal from "@/components/favourites/SaveQuestionModal"
 
 const FAVOURITES_API_URL = "/api/questions/favourites/"
+const FAVOURITE_RESPONSES_API_URL = "/api/questions/favourites/responses/"
 const TAGS_API_URL = "/api/questions/tags/"
 const SEARCH_DEBOUNCE_MS = 260
 
@@ -44,6 +45,15 @@ function titleCase(value = "") {
     .replaceAll("-", " ")
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
+
+function formatAttemptDate(value) {
+  if (!value) return "Unknown date"
+  return new Date(value).toLocaleString()
+}
+
+function responseIsMarked(response) {
+  return response?.marks_awarded !== null && response?.marks_awarded !== undefined
 }
 
 function FilterDropdown({ active = false, label, onChange, options, value }) {
@@ -268,8 +278,12 @@ export default function FavouritesTable({ subject }) {
   const [questionTypeFilter, setQuestionTypeFilter] = useState("")
   const [levelFilter, setLevelFilter] = useState("")
   const [editingFavourite, setEditingFavourite] = useState(null)
+  const [editingResponseId, setEditingResponseId] = useState(null)
+  const [editNoteValue, setEditNoteValue] = useState("")
   const [savingNote, setSavingNote] = useState(false)
   const [deletingQuestionId, setDeletingQuestionId] = useState(null)
+  const [deletingResponseId, setDeletingResponseId] = useState(null)
+  const [expandedIds, setExpandedIds] = useState(new Set())
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS)
@@ -367,6 +381,56 @@ export default function FavouritesTable({ subject }) {
     }
   }
 
+  function toggleExpanded(favouriteId) {
+    setExpandedIds((current) => {
+      const next = new Set(current)
+      if (next.has(favouriteId)) next.delete(favouriteId)
+      else next.add(favouriteId)
+      return next
+    })
+  }
+
+  function startEditingResponse(response) {
+    setEditingResponseId(response.id)
+    setEditNoteValue(response.note || "")
+  }
+
+  async function saveResponseNote(responseId) {
+    const response = await fetch(`${FAVOURITE_RESPONSES_API_URL}${responseId}/`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ note: editNoteValue }),
+    })
+    if (!response.ok) throw new Error("Could not update response note.")
+    await mutate()
+    setEditingResponseId(null)
+    setEditNoteValue("")
+  }
+
+  async function deleteResponse(responseId) {
+    if (deletingResponseId !== responseId) {
+      setDeletingResponseId(responseId)
+      window.setTimeout(() => {
+        setDeletingResponseId((current) => (current === responseId ? null : current))
+      }, 3000)
+      return
+    }
+    const response = await fetch(`${FAVOURITE_RESPONSES_API_URL}${responseId}/`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+      },
+    })
+    if (!response.ok) throw new Error("Could not delete response.")
+    setDeletingResponseId(null)
+    await mutate()
+  }
+
   if (error) return <div className="p-10 text-[#ffb4ab]">Failed to load favourites</div>
   if (isLoading && !favourites.length) return <div className="p-10 text-[#dac1b7]">Loading favourites...</div>
 
@@ -446,6 +510,7 @@ export default function FavouritesTable({ subject }) {
             <Table className="w-full table-auto border-separate border-spacing-y-2">
               <TableHeader className="sticky top-0 z-10 bg-[#1b1713]/95 backdrop-blur-sm [&_tr]:border-0">
                 <TableRow className="border-0 hover:bg-transparent">
+                  <TableHead className="w-10 px-2" />
                   <TableHead className="w-20 px-4 text-xs font-bold uppercase tracking-wide text-[#a28c83]">
                     Type
                   </TableHead>
@@ -468,78 +533,201 @@ export default function FavouritesTable({ subject }) {
                   const item = favourite.question || {}
                   const preview = item.question_preview ?? item.question_text ?? ""
                   const tags = item.tags || []
+                  const responses = favourite.responses || []
+                  const isExpanded = expandedIds.has(favourite.id)
                   return (
-                    <TableRow
-                      key={favourite.id}
-                      className="cursor-pointer border-0 bg-[#181410] text-[#e5e2e1] shadow-sm transition-colors hover:bg-[#211913] [&>td:first-child]:rounded-l-xl [&>td:last-child]:rounded-r-xl"
-                      onClick={() => router.push(`/subjects/${subjectSlug}/progress/favourites/${item.id}`)}
-                    >
-                      <TableCell className="px-4">
-                        <span className="rounded-full border border-[#8b5e42]/45 bg-[#d49a71]/10 px-2 py-1 text-[10px] font-semibold text-[#dba476]">
-                          {questionTypeLabel(item.question_type)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="max-w-[520px] px-4">
-                        <div className="overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,black_70%,transparent_100%)]">
-                          {preview}
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-4">
-                        <span className="rounded-[2px] border border-[#7c573a]/70 bg-[#c8864a]/10 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#d99658]">
-                          {titleCase(item.level || "exam_practice")}
-                        </span>
-                      </TableCell>
-                      <TableCell className="min-w-0 max-w-[16rem] px-4 align-top">
-                        <div className="flex min-w-0 flex-wrap content-start gap-1.5">
-                          {tags.slice(0, 4).map((tag) => (
-                            <span
-                              className="max-w-full truncate rounded-full border border-[#3b2a22]/60 bg-[#211913] px-2 py-1 text-[11px] text-[#dac1b7]"
-                              key={tag.id}
-                              title={tag.name}
+                    <Fragment key={favourite.id}>
+                      <TableRow
+                        className="cursor-pointer border-0 bg-[#181410] text-[#e5e2e1] shadow-sm transition-colors hover:bg-[#211913] [&>td:first-child]:rounded-l-xl [&>td:last-child]:rounded-r-xl"
+                        onClick={() => router.push(`/subjects/${subjectSlug}/progress/favourites/${item.id}`)}
+                      >
+                        <TableCell className="px-2">
+                          {responses.length > 0 && (
+                            <button
+                              type="button"
+                              aria-label={isExpanded ? "Hide saved responses" : "Show saved responses"}
+                              className="inline-flex size-8 items-center justify-center rounded-[2px] border border-[#3b2a22]/55 text-[#8f8982] transition-colors hover:border-[#c8864a]/55 hover:text-[#dba476]"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                toggleExpanded(favourite.id)
+                              }}
                             >
-                              {tag.name}
-                            </span>
-                          ))}
-                          {tags.length > 4 && (
-                            <span className="shrink-0 rounded-full border border-[#3b2a22]/55 bg-white/[0.035] px-2 py-1 text-[11px] text-[#a28c83]">
-                              +{tags.length - 4}
-                            </span>
+                              <ChevronDown className={cn("size-4 transition-transform", isExpanded && "rotate-180")} />
+                            </button>
                           )}
-                          {tags.length === 0 && <span className="text-xs text-[#6f5c55]">Untagged</span>}
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-4">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            type="button"
-                            aria-label="Edit favourite note"
-                            className="inline-flex size-9 items-center justify-center rounded-[2px] border border-[#7c573a]/45 text-[#dba476] transition-colors hover:border-[#c8864a]/70 hover:bg-[#c8864a]/10"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              setEditingFavourite(favourite)
-                            }}
-                          >
-                            <Pencil className="size-4" />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="Remove from favourites"
-                            disabled={deletingQuestionId === item.id}
-                            className="inline-flex size-9 items-center justify-center rounded-[2px] border border-[#7c573a]/35 text-[#9b8f84] transition-colors hover:border-[#d99658]/55 hover:bg-[#d99658]/8 hover:text-[#dba476] disabled:cursor-not-allowed disabled:opacity-55"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              deleteFavourite(item.id)
-                            }}
-                          >
-                            {deletingQuestionId === item.id ? (
-                              <Loader2 className="size-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="size-4" />
+                        </TableCell>
+                        <TableCell className="px-4">
+                          <span className="rounded-full border border-[#8b5e42]/45 bg-[#d49a71]/10 px-2 py-1 text-[10px] font-semibold text-[#dba476]">
+                            {questionTypeLabel(item.question_type)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="max-w-[520px] px-4">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <div className="min-w-0 flex-1 overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,black_70%,transparent_100%)]">
+                              {preview}
+                            </div>
+                            {responses.length > 0 && (
+                              <span className="shrink-0 rounded-full border border-[#2a211a] px-2 py-0.5 text-[10px] text-[#5f5347]">
+                                {responses.length} response{responses.length > 1 ? "s" : ""}
+                              </span>
                             )}
-                          </button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-4">
+                          <span className="rounded-[2px] border border-[#7c573a]/70 bg-[#c8864a]/10 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#d99658]">
+                            {titleCase(item.level || "exam_practice")}
+                          </span>
+                        </TableCell>
+                        <TableCell className="min-w-0 max-w-[16rem] px-4 align-top">
+                          <div className="flex min-w-0 flex-wrap content-start gap-1.5">
+                            {tags.slice(0, 4).map((tag) => (
+                              <span
+                                className="max-w-full truncate rounded-full border border-[#3b2a22]/60 bg-[#211913] px-2 py-1 text-[11px] text-[#dac1b7]"
+                                key={tag.id}
+                                title={tag.name}
+                              >
+                                {tag.name}
+                              </span>
+                            ))}
+                            {tags.length > 4 && (
+                              <span className="shrink-0 rounded-full border border-[#3b2a22]/55 bg-white/[0.035] px-2 py-1 text-[11px] text-[#a28c83]">
+                                +{tags.length - 4}
+                              </span>
+                            )}
+                            {tags.length === 0 && <span className="text-xs text-[#6f5c55]">Untagged</span>}
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-4">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              aria-label="Edit favourite note"
+                              className="inline-flex size-9 items-center justify-center rounded-[2px] border border-[#7c573a]/45 text-[#dba476] transition-colors hover:border-[#c8864a]/70 hover:bg-[#c8864a]/10"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                setEditingFavourite(favourite)
+                              }}
+                            >
+                              <Pencil className="size-4" />
+                            </button>
+                            <button
+                              type="button"
+                              aria-label="Remove from favourites"
+                              disabled={deletingQuestionId === item.id}
+                              className="inline-flex size-9 items-center justify-center rounded-[2px] border border-[#7c573a]/35 text-[#9b8f84] transition-colors hover:border-[#d99658]/55 hover:bg-[#d99658]/8 hover:text-[#dba476] disabled:cursor-not-allowed disabled:opacity-55"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                deleteFavourite(item.id)
+                              }}
+                            >
+                              {deletingQuestionId === item.id ? (
+                                <Loader2 className="size-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="size-4" />
+                              )}
+                            </button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      {isExpanded && responses.length > 0 && (
+                        <TableRow className="border-0 bg-transparent hover:bg-transparent">
+                          <TableCell colSpan={6} className="px-4 pb-4 pt-0">
+                            <div className="ml-10 overflow-hidden rounded-[8px] border border-[#2a211a] bg-[#100e0c]">
+                              {responses.map((savedResponse, index) => (
+                                <div
+                                  key={savedResponse.id}
+                                  className="cursor-pointer border-b border-[#2a211a] px-4 py-3 transition-colors last:border-b-0 hover:bg-[#181410]"
+                                  onClick={() => router.push(`/subjects/${subjectSlug}/progress/favourites/${item.id}/responses/${savedResponse.id}`)}
+                                >
+                                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                                    <p className="text-[12px] font-semibold text-[#a89686]">Response {index + 1}</p>
+                                    <span
+                                      className={cn(
+                                        "rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em]",
+                                        responseIsMarked(savedResponse)
+                                          ? "border-[#6f8f5f]/35 bg-[#6f8f5f]/10 text-[#9fbe8d]"
+                                          : "border-[#9d4d45]/35 bg-[#9d4d45]/10 text-[#d48a82]"
+                                      )}
+                                    >
+                                      {responseIsMarked(savedResponse) ? "Marked" : "Unmarked"}
+                                    </span>
+                                    <p className="text-[12px] text-[#dba476]">
+                                      {responseIsMarked(savedResponse)
+                                        ? `${savedResponse.marks_awarded}/${savedResponse.marks_possible ?? "?"} marks`
+                                        : <span className="text-[#3d3530]">-</span>}
+                                    </p>
+                                    <p className="text-[12px] text-[#5f5347]">{formatAttemptDate(savedResponse.created_at)}</p>
+                                    <div className="ml-auto flex items-center gap-2">
+                                      <button
+                                        type="button"
+                                        aria-label="Edit response note"
+                                        className="inline-flex size-8 items-center justify-center rounded-[2px] border border-[#7c573a]/35 text-[#8f8982] transition-colors hover:border-[#c8864a]/60 hover:text-[#dba476]"
+                                        onClick={(event) => {
+                                          event.stopPropagation()
+                                          startEditingResponse(savedResponse)
+                                        }}
+                                      >
+                                        <Pencil className="size-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        aria-label="Delete response"
+                                        className={cn(
+                                          "inline-flex size-8 items-center justify-center rounded-[2px] border transition-colors",
+                                          deletingResponseId === savedResponse.id
+                                            ? "border-[#d99658]/60 bg-[#d99658]/8 text-[#d99658]"
+                                            : "border-[#7c573a]/25 text-[#6f6861] hover:border-[#d99658]/55 hover:text-[#dba476]"
+                                        )}
+                                        onClick={(event) => {
+                                          event.stopPropagation()
+                                          deleteResponse(savedResponse.id)
+                                        }}
+                                      >
+                                        <Trash2 className="size-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                  {editingResponseId === savedResponse.id ? (
+                                    <div
+                                      className="mt-2 flex gap-2"
+                                      onClick={(event) => event.stopPropagation()}
+                                    >
+                                      <input
+                                        value={editNoteValue}
+                                        onChange={(event) => setEditNoteValue(event.target.value)}
+                                        className="h-9 min-w-0 flex-1 rounded-[3px] border border-white/[0.06] bg-[#181410] px-3 text-[12px] text-[#c4b5a8] outline-none focus:border-[#7c573a]/55"
+                                        placeholder="Response note"
+                                      />
+                                      <button
+                                        type="button"
+                                        className="h-9 rounded-[2px] border border-[#c8864a]/50 px-3 text-[11px] font-semibold text-[#dba476] hover:bg-[#c8864a]/10"
+                                        onClick={() => saveResponseNote(savedResponse.id)}
+                                      >
+                                        Save
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="h-9 rounded-[2px] border border-white/[0.06] px-3 text-[11px] font-semibold text-[#6f6861] hover:text-[#9b8f84]"
+                                        onClick={() => {
+                                          setEditingResponseId(null)
+                                          setEditNoteValue("")
+                                        }}
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  ) : savedResponse.note ? (
+                                    <p className="mt-0.5 max-w-[420px] truncate text-[11px] text-[#4f4a45]">
+                                      {savedResponse.note}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </Fragment>
                   )
                 })}
               </TableBody>

@@ -1,0 +1,290 @@
+"use client"
+
+import { useParams, useRouter } from "next/navigation"
+import useSWR from "swr"
+import { ArrowLeft, Loader2 } from "lucide-react"
+
+import HandwritingCanvasViewer from "@/components/answering/HandwritingCanvasViewer"
+import fetcher from "@/lib/fetcher"
+import { cn } from "@/lib/utils"
+import {
+  Attachment,
+  DiagramSvg,
+  MarkdownMath,
+  MarkingCriteriaSummary,
+  SampleAnswers,
+} from "../../../../../practice/page"
+
+const QUESTIONS_API_URL = "/api/questions/"
+
+function titleCase(value = "") {
+  return value
+    .replaceAll("-", " ")
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
+
+function attemptedDate(value) {
+  if (!value) return "Attempted"
+  return `Attempted ${new Date(value).toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })}`
+}
+
+function responseIsMarked(response) {
+  return response?.marks_awarded !== null && response?.marks_awarded !== undefined
+}
+
+function MarkingResultDetails({ result }) {
+  if (!result || result.marks_awarded === undefined || result.marks_awarded === null) return null
+  return (
+    <section className="mt-6 rounded-[3px] border border-white/[0.06] bg-[#1a1714] p-5">
+      <div className="grid gap-4">
+        <div className="flex flex-wrap items-center gap-3 text-[13px] text-[#b7aca1]">
+          <span className="font-serif text-[22px] text-[#eee9e4]">
+            {result.marks_awarded}/{result.marks_possible}
+          </span>
+          <span className="text-[#4f4a45]">marks</span>
+        </div>
+        {(result.feedback || result.next_step_advice) && (
+          <div className="rounded-[4px] border border-white/[0.06] bg-[#120f0d] px-4 py-3">
+            {result.feedback && (
+              <MarkdownMath className="text-[13px] leading-relaxed text-[#b7aca1] [&_.katex]:text-[#e8e4dc] [&_p]:my-0">
+                {result.feedback}
+              </MarkdownMath>
+            )}
+            {result.next_step_advice && (
+              <MarkdownMath className="mt-2 text-[13px] leading-relaxed text-[#dba476] [&_.katex]:text-[#f0d8ba] [&_p]:my-0">
+                {result.next_step_advice}
+              </MarkdownMath>
+            )}
+          </div>
+        )}
+        {(result.parts || []).map((part) => {
+          const lostTags = part.lost_tags || []
+          if (!lostTags.length && !part.matched_solution && !part.criteria_feedback) return null
+          return (
+            <div key={part.label} className="rounded-[4px] border border-white/[0.05] bg-[#120f0d] px-4 py-3">
+              {part.matched_solution && (
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#d49a71]">
+                  Marked via: {part.matched_solution}
+                </p>
+              )}
+              {part.criteria_feedback && (
+                <p className="text-[13px] leading-relaxed text-[#9b8f84]">{part.criteria_feedback}</p>
+              )}
+              {lostTags.length > 0 && (
+                <ul className="grid gap-2">
+                  {lostTags.map((tag) => (
+                    <li key={`${part.label}-${tag.tag}`} className="text-[12px] leading-relaxed text-[#9b8f84]">
+                      <span className="font-semibold text-[#dba476]">{tag.tag}</span>
+                      <span className="text-[#5b5048]"> {tag.score}/{tag.max_score}</span>
+                      {tag.reason && <span> - {tag.reason}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+function QuestionDisplay({ question, response }) {
+  const isMcq = question.question_type === "mcq"
+  const result = response?.marking_result || {}
+  const correctOption = result.correct_option
+  const selectedOption = result.selected_option
+  const displayQuestionText = question.question_text?.trim()
+    ? (/^Q\)\./i.test(question.question_text.trim()) ? question.question_text : `Q). ${question.question_text}`)
+    : ""
+
+  return (
+    <section className="px-6 py-16 md:px-12">
+      <article className="grid gap-8 font-serif lg:grid-cols-[minmax(0,1fr)_220px]">
+        <div className="min-w-0">
+          <MarkdownMath className="font-serif text-[19px] leading-[1.75] md:text-[21px]">
+            {displayQuestionText}
+          </MarkdownMath>
+          {(question.attachments || []).map((attachment) => (
+            <Attachment key={attachment.id || attachment.name} attachment={attachment} />
+          ))}
+          <DiagramSvg svg={question.diagram_svg} />
+          {(question.tikz_visuals || []).map((visual, index) => (
+            <DiagramSvg svg={visual.svg} key={visual.id || index} />
+          ))}
+          {isMcq && (
+            <div className="mt-10 grid gap-3">
+              {(question.mcq_options || []).map((option, index) => {
+                const letter = option.letter || option.answer_letter || String.fromCharCode(65 + index)
+                const isCorrect = correctOption && String(correctOption) === String(letter)
+                const isSelected = selectedOption && String(selectedOption) === String(letter)
+                return (
+                  <div
+                    className={cn(
+                      "flex min-w-0 items-center gap-4 rounded-[6px] border bg-[#211d19] px-5 py-5 text-left",
+                      isCorrect ? "border-[#6f8f5f]/45 bg-[#1b2a18]" : "border-white/[0.07]",
+                      isSelected && !isCorrect && "border-[#9d4d45]/45 bg-[#2a1816]"
+                    )}
+                    key={`${option.id || letter}-${index}`}
+                  >
+                    <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-white/[0.08] text-sm font-semibold text-[#6f6861]">
+                      {letter}
+                    </span>
+                    <MarkdownMath className="font-serif text-[17px] leading-relaxed text-[#d8d0c8] md:text-[18px]">
+                      {option.text}
+                    </MarkdownMath>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {!isMcq && (
+            <div className="mt-10 grid gap-7">
+              {(question.parts || []).map((part, index) => (
+                <section key={part.label || index} className="grid gap-4 md:grid-cols-[34px_1fr]">
+                  <span className="font-serif text-[18px] text-[#8f8982]">
+                    ({part.label || String.fromCharCode(97 + index)})
+                  </span>
+                  <div>
+                    <MarkdownMath className="font-serif text-[18px] leading-[1.7] md:text-[19px]">
+                      {part.text}
+                    </MarkdownMath>
+                    <p className="mt-2 text-[12px] tracking-[0.04em] text-[#4f4a45]">{part.marks || 1} marks</p>
+                    {(part.attachments || []).map((attachment) => (
+                      <Attachment key={attachment.id || attachment.name} attachment={attachment} />
+                    ))}
+                    {(part.tikz_visuals || []).map((visual, visualIndex) => (
+                      <DiagramSvg svg={visual.svg} key={visual.id || visualIndex} />
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+        </div>
+        {question.import_source && (
+          <p className="pt-1 text-right text-[15px] tracking-[0.04em] text-[#6e6259]">
+            {question.import_source}
+          </p>
+        )}
+      </article>
+    </section>
+  )
+}
+
+export default function FavouriteResponsePage() {
+  const params = useParams()
+  const router = useRouter()
+  const questionId = params?.questionId
+  const responseId = params?.responseId
+  const backHref = `/subjects/${params.slug}/progress/favourites`
+  const { data: question, isLoading: questionLoading } = useSWR(
+    questionId ? `${QUESTIONS_API_URL}${questionId}/` : null,
+    fetcher
+  )
+  const { data: response, isLoading: responseLoading } = useSWR(
+    responseId ? `${QUESTIONS_API_URL}favourites/responses/${responseId}/` : null,
+    fetcher
+  )
+
+  if (questionLoading || responseLoading) {
+    return (
+      <main className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-[#171412] text-[#8f8982]">
+        <Loader2 className="size-8 animate-spin" />
+      </main>
+    )
+  }
+
+  if (!question || !response) {
+    return (
+      <main className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-[#171412] px-6">
+        <p className="text-center font-serif text-3xl italic text-[#77716b]">
+          This saved response could not be loaded.
+        </p>
+      </main>
+    )
+  }
+
+  const metadata = [
+    question.subject,
+    question.level ? titleCase(question.level) : null,
+    question.question_type === "mcq" ? "MCQ" : "SAQ",
+  ].filter(Boolean)
+
+  return (
+    <main className="min-h-[calc(100vh-64px)] bg-[#171412] text-[#eee9e4]">
+      <div className="border-b border-white/[0.06] px-6 py-5 md:px-12">
+        <button
+          type="button"
+          onClick={() => router.push(backHref)}
+          className="mb-6 inline-flex items-center gap-2 text-[13px] font-medium tracking-[0.04em] text-[#4f4a45] transition-colors hover:text-[#8f8982]"
+        >
+          <ArrowLeft className="size-[17px]" />
+          Back
+        </button>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 flex-wrap gap-2">
+            {metadata.map((item) => (
+              <span
+                key={item}
+                className="rounded-[2px] border border-[#7c573a]/70 bg-[#c8864a]/10 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#d99658]"
+              >
+                {item}
+              </span>
+            ))}
+          </div>
+          <div className="mr-8 flex flex-col items-end gap-2 text-[13px] text-[#9b8f84] lg:mr-20">
+            <span>{question.marks || 0} marks</span>
+            <span
+              className={cn(
+                "rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em]",
+                responseIsMarked(response)
+                  ? "border-[#6f8f5f]/35 bg-[#6f8f5f]/10 text-[#9fbe8d]"
+                  : "border-[#9d4d45]/35 bg-[#9d4d45]/10 text-[#d48a82]"
+              )}
+            >
+              {responseIsMarked(response) ? "Marked" : "Unmarked"}
+            </span>
+            <span>{attemptedDate(response.created_at)}</span>
+          </div>
+        </div>
+      </div>
+
+      <QuestionDisplay question={question} response={response} />
+
+      <section className="border-t border-white/[0.06] px-6 py-6 md:px-12">
+        <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8f8982]">
+          Your Response
+        </p>
+        {response.submission_type === "draw" ? (
+          <HandwritingCanvasViewer strokeData={response.stroke_data} />
+        ) : (
+          <div className="rounded-[3px] border border-white/[0.06] bg-[#1b1713] p-5">
+            <MarkdownMath className="font-serif text-base leading-relaxed text-[#e8e4dc]">
+              {response.text_response || "No text response saved."}
+            </MarkdownMath>
+          </div>
+        )}
+
+        <MarkingResultDetails result={response.marking_result} />
+
+        {response.note && (
+          <section className="mt-6 rounded-[3px] border border-[#7c573a]/35 bg-[#1a1511] px-5 py-4">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#dba476]">
+              Your Note
+            </p>
+            <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-[#c4b5a8]">{response.note}</p>
+          </section>
+        )}
+
+        <SampleAnswers markingResult={response.marking_result || null} question={question} />
+        <MarkingCriteriaSummary question={question} />
+      </section>
+    </main>
+  )
+}
