@@ -60,9 +60,19 @@ function responseIsMarked(response) {
 }
 
 function InlineMathPreview({ children }) {
+  function inlineMath(expr) {
+    return expr
+      .replace(/\\begin\{align\*?\}/g, "")
+      .replace(/\\end\{align\*?\}/g, "")
+      .replace(/\\\\/g, " ")
+      .replace(/&/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+  }
+
   const preview = String(children || "")
-    .replace(/\$\$([\s\S]*?)\$\$/g, (_, expr) => `$${expr.replace(/\s+/g, " ").trim()}$`)
-    .replace(/\\\[((?:.|\n)*?)\\\]/g, (_, expr) => `\\(${expr.replace(/\s+/g, " ").trim()}\\)`)
+    .replace(/\$\$([\s\S]*?)\$\$/g, (_, expr) => `$${inlineMath(expr)}$`)
+    .replace(/\\\[((?:.|\n)*?)\\\]/g, (_, expr) => `\\(${inlineMath(expr)}\\)`)
     .replace(/\s+/g, " ")
     .trim()
 
