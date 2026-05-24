@@ -13,6 +13,9 @@ import { cn } from "@/lib/utils"
 import { Check, ChevronDown, Loader2, Pencil, Trash2 } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
+import ReactMarkdown from "react-markdown"
+import rehypeKatex from "rehype-katex"
+import remarkMath from "remark-math"
 import useSWR from "swr"
 
 import SaveQuestionModal from "@/components/favourites/SaveQuestionModal"
@@ -54,6 +57,21 @@ function formatAttemptDate(value) {
 
 function responseIsMarked(response) {
   return response?.marks_awarded !== null && response?.marks_awarded !== undefined
+}
+
+function InlineMathPreview({ children }) {
+  return (
+    <ReactMarkdown
+      className="block min-w-0 overflow-hidden whitespace-nowrap text-inherit [&_.katex-display]:my-0 [&_.katex-display]:inline-block [&_.katex]:text-inherit [&_p]:inline"
+      remarkPlugins={[remarkMath]}
+      rehypePlugins={[rehypeKatex]}
+      components={{
+        p: ({ children: nodeChildren }) => <span>{nodeChildren}</span>,
+      }}
+    >
+      {String(children || "")}
+    </ReactMarkdown>
+  )
 }
 
 function FilterDropdown({ active = false, label, onChange, options, value }) {
@@ -564,7 +582,7 @@ export default function FavouritesTable({ subject }) {
                         <TableCell className="max-w-[520px] px-4">
                           <div className="flex min-w-0 items-center gap-2">
                             <div className="min-w-0 flex-1 overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,black_70%,transparent_100%)]">
-                              {preview}
+                              <InlineMathPreview>{preview}</InlineMathPreview>
                             </div>
                             {responses.length > 0 && (
                               <span className="shrink-0 rounded-full border border-[#2a211a] px-2 py-0.5 text-[10px] text-[#5f5347]">
@@ -632,11 +650,11 @@ export default function FavouritesTable({ subject }) {
                       {isExpanded && responses.length > 0 && (
                         <TableRow className="border-0 bg-transparent hover:bg-transparent">
                           <TableCell colSpan={6} className="px-4 pb-4 pt-0">
-                            <div className="ml-10 overflow-hidden rounded-[8px] border border-[#2a211a] bg-[#100e0c]">
+                            <div className="ml-10 overflow-hidden rounded-[8px] border border-[#3b2a22]/55 bg-[#181410]/95">
                               {responses.map((savedResponse, index) => (
                                 <div
                                   key={savedResponse.id}
-                                  className="cursor-pointer border-b border-[#2a211a] px-4 py-3 transition-colors last:border-b-0 hover:bg-[#181410]"
+                                  className="cursor-pointer border-b border-[#30231b] px-4 py-3 transition-colors last:border-b-0 hover:bg-[#211913]"
                                   onClick={() => router.push(`/subjects/${subjectSlug}/progress/favourites/${item.id}/responses/${savedResponse.id}`)}
                                 >
                                   <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
@@ -654,7 +672,7 @@ export default function FavouritesTable({ subject }) {
                                     <p className="text-[12px] text-[#dba476]">
                                       {responseIsMarked(savedResponse)
                                         ? `${savedResponse.marks_awarded}/${savedResponse.marks_possible ?? "?"} marks`
-                                        : <span className="text-[#3d3530]">-</span>}
+                                        : <span className="text-[#5f5347]">-</span>}
                                     </p>
                                     <p className="text-[12px] text-[#5f5347]">{formatAttemptDate(savedResponse.created_at)}</p>
                                     <div className="ml-auto flex items-center gap-2">

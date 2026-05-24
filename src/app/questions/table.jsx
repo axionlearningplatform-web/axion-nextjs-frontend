@@ -15,6 +15,9 @@ import { useVirtualizer } from "@tanstack/react-virtual"
 import { Check, ChevronDown } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import ReactMarkdown from "react-markdown"
+import rehypeKatex from "rehype-katex"
+import remarkMath from "remark-math"
 import useSWR from "swr"
 
 const QUESTIONS_API_URL = "/api/questions/"
@@ -53,6 +56,21 @@ function titleCase(value = "") {
     .replaceAll("-", " ")
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
+
+function InlineMathPreview({ children }) {
+  return (
+    <ReactMarkdown
+      className="block min-w-0 overflow-hidden whitespace-nowrap text-inherit [&_.katex-display]:my-0 [&_.katex-display]:inline-block [&_.katex]:text-inherit [&_p]:inline"
+      remarkPlugins={[remarkMath]}
+      rehypePlugins={[rehypeKatex]}
+      components={{
+        p: ({ children: nodeChildren }) => <span>{nodeChildren}</span>,
+      }}
+    >
+      {String(children || "")}
+    </ReactMarkdown>
+  )
 }
 
 function FilterDropdown({ active = false, label, onChange, options, value }) {
@@ -306,9 +324,11 @@ const QuestionRow = memo(function QuestionRow({ item, onRowClick }) {
           {questionTypeLabel(item.question_type)}
         </span>
       </TableCell>
-    <TableCell className="max-w-[375px] px-4">
-  <div className="overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,black_70%,transparent_100%)]">{preview}</div>
-</TableCell>
+      <TableCell className="max-w-[375px] px-4">
+        <div className="overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,black_70%,transparent_100%)]">
+          <InlineMathPreview>{preview}</InlineMathPreview>
+        </div>
+      </TableCell>
       <TableCell className="w-44 shrink-0 px-4 text-[#dac1b7]">
         <div className="line-clamp-2 whitespace-normal break-words">
           {item.import_source || "Manual"}
