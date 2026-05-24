@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 import ReactMarkdown from "react-markdown"
 import remarkMath from "remark-math"
@@ -14,23 +14,18 @@ import { cn } from "@/lib/utils"
 const SUBJECTS_API_URL = "/api/subjects/"
 const TAGS_API_URL = "/api/questions/tags/"
 const LAYERS = [
-  { id: 1, title: "Topics", hint: "Vectors, Complex, Integration", kind: "taxonomy" },
-  { id: 2, title: "Subtopics", hint: "2D vectors, equations, volumes", kind: "taxonomy" },
-  { id: 3, title: "Concepts", hint: "y-axis rotation, proof methods", kind: "taxonomy" },
-  { id: 4, title: "Microskills", hint: "tiny behaviours and traps", kind: "microskill" },
+  { id: 1, title: "Topics", hint: "Organic, Inorganic, Physical", kind: "taxonomy" },
+  { id: 2, title: "Subtopics", hint: "Alkanes, equations, equilibrium", kind: "taxonomy" },
+  { id: 3, title: "Concepts", hint: "Solution types, method categories, content areas", kind: "taxonomy" },
 ]
 
 function childrenOf(tags, parentId) {
   return tags.filter((tag) => (tag.parent_id || null) === (parentId || null))
 }
 
-function isMicroskill(tag) {
-  return tag?.tag_kind === "microskill" || tag?.layer === 4
-}
-
 function supportsRichTag(tagOrLayer) {
   const layer = typeof tagOrLayer === "number" ? tagOrLayer : tagOrLayer?.layer
-  return layer === 3 || layer === 4 || isMicroskill(tagOrLayer)
+  return layer === 3
 }
 
 function MarkdownInline({ value, fallback = "" }) {
@@ -60,7 +55,7 @@ function TagDetailCard({ tag }) {
   return (
     <div className="mt-4 min-w-0 rounded-2xl border border-[#c8864a]/20 bg-[#c8864a]/8 p-4">
       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c8864a]/65">
-        {isMicroskill(tag) ? "Microskill preview" : "Concept preview"}
+        Concept preview
       </p>
       <div className="mt-2 min-w-0 break-words text-[18px] leading-snug text-[#eee9e4] [overflow-wrap:anywhere]">
         <MarkdownInline value={tag.name} />
@@ -79,11 +74,6 @@ function TagEditPanel({ tag, onUpdated }) {
   const [description, setDescription] = useState(tag.description || "")
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState("")
-
-  useEffect(() => {
-    setName(tag.name)
-    setDescription(tag.description || "")
-  }, [tag.id, tag.name, tag.description])
 
   async function saveTag(event) {
     event.preventDefault()
@@ -176,7 +166,7 @@ function TagPill({ tag, active, deleting, onClick, onDelete }) {
           {supportsRichTag(tag) ? <MarkdownInline value={tag.name} /> : tag.name}
         </span>
         <span className="mt-1 block text-[10px] uppercase tracking-[0.16em] text-[#8c8178]">
-          {isMicroskill(tag) ? "Microskill" : `Layer ${tag.layer}`}
+          Layer {tag.layer}
           {!terminalTag && <> · {tag.children_count || 0} child tags</>}
         </span>
       </span>
@@ -207,7 +197,6 @@ function CreateTagForm({ layer, kind = "taxonomy", parent, subjectId, onCreated 
   const [message, setMessage] = useState("")
   const [saving, setSaving] = useState(false)
   const rich = supportsRichTag(layer)
-  const microskill = kind === "microskill"
 
   async function createTag(event) {
     event.preventDefault()
@@ -244,13 +233,13 @@ function CreateTagForm({ layer, kind = "taxonomy", parent, subjectId, onCreated 
   return (
     <form className="mt-4 rounded-2xl border border-[#3b2a22]/55 bg-[#181410] p-3" onSubmit={createTag}>
       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8c8178]">
-        {microskill ? "Root microskill" : parent ? `Under ${parent.name}` : "Root topic"}
+        {parent ? `Under ${parent.name}` : "Root topic"}
       </p>
       <div className="mt-3 flex gap-2">
         {rich ? (
           <textarea
             className="min-h-10 min-w-0 flex-1 resize-y rounded-xl border border-white/[0.07] bg-white/[0.035] px-3 py-2 text-sm leading-6 text-[#eee9e4] outline-none transition-colors placeholder:text-[#6f6258] focus:border-[#c8864a]/50"
-            placeholder={`New ${microskill ? "microskill" : "concept"} with LaTeX, e.g. $\\arg(z)$`}
+            placeholder="New concept with LaTeX, e.g. $\\arg(z)$"
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
@@ -273,7 +262,7 @@ function CreateTagForm({ layer, kind = "taxonomy", parent, subjectId, onCreated 
       {rich && (
         <textarea
           className="mt-2 min-h-20 w-full resize-y rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2 text-sm leading-6 text-[#eee9e4] outline-none placeholder:text-[#6f6258] focus:border-[#c8864a]/50"
-          placeholder={microskill ? "Descriptor for the microskill with LaTeX..." : "Optional"}
+          placeholder="Optional"
           value={description}
           onChange={(event) => setDescription(event.target.value)}
         />
@@ -316,15 +305,14 @@ export default function SubjectTagsPage() {
   const [deletingTagId, setDeletingTagId] = useState(null)
 
   const visibleByLayer = useMemo(() => {
-    const layer1 = tags.filter((tag) => tag.layer === 1 && !isMicroskill(tag))
+    const layer1 = tags.filter((tag) => tag.layer === 1)
     const layer2 = selected[1]
-      ? childrenOf(tags, selected[1].id).filter((tag) => tag.layer === 2 && !isMicroskill(tag))
+      ? childrenOf(tags, selected[1].id).filter((tag) => tag.layer === 2)
       : []
     const layer3 = selected[2]
-      ? childrenOf(tags, selected[2].id).filter((tag) => tag.layer === 3 && !isMicroskill(tag))
+      ? childrenOf(tags, selected[2].id).filter((tag) => tag.layer === 3)
       : []
-    const layer4 = tags.filter(isMicroskill)
-    return { 1: layer1, 2: layer2, 3: layer3, 4: layer4 }
+    return { 1: layer1, 2: layer2, 3: layer3 }
   }, [selected, tags])
 
   function selectTag(layer, tag) {
@@ -339,11 +327,9 @@ export default function SubjectTagsPage() {
       if (layer === 1) {
         delete next[2]
         delete next[3]
-        delete next[4]
       }
       if (layer === 2) {
         delete next[3]
-        delete next[4]
       }
       return next
     })
@@ -388,14 +374,14 @@ export default function SubjectTagsPage() {
             Question Tags
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#8c8178]">
-            Build the four-layer map analysts use for questions. Students only see layers 1 and 2 in Daily Practice.
+        Build the three-layer map analysts use for questions. Students only see layers 1 and 2 in Daily Practice.
           </p>
         </div>
 
-        <div className="grid min-w-0 gap-4 xl:grid-cols-[repeat(4,minmax(0,1fr))]">
+        <div className="grid min-w-0 gap-4 xl:grid-cols-3">
           {LAYERS.map((layer) => {
-            const parent = layer.id === 1 || layer.id === 4 ? null : selected[layer.id - 1]
-            const locked = layer.id > 1 && layer.id !== 4 && !parent
+            const parent = layer.id === 1 ? null : selected[layer.id - 1]
+            const locked = layer.id > 1 && !parent
             const items = visibleByLayer[layer.id] || []
 
             return (
@@ -408,7 +394,7 @@ export default function SubjectTagsPage() {
               >
                 <div className="rounded-2xl border border-white/[0.055] bg-white/[0.025] p-4">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#c8864a]/60">
-                    {layer.kind === "microskill" ? "Separate skill set" : `Layer ${layer.id}`}
+                    Layer {layer.id}
                   </p>
                   <h2 className="mt-2 font-serif text-[24px] font-semibold text-[#eee9e4]">
                     {layer.title}
@@ -447,7 +433,7 @@ export default function SubjectTagsPage() {
                           />
                           {selected[layer.id]?.id === tag.id && <TagDetailCard tag={tag} />}
                           {selected[layer.id]?.id === tag.id && (
-                            <TagEditPanel tag={tag} onUpdated={mutate} />
+                            <TagEditPanel key={`edit-${tag.id}`} tag={tag} onUpdated={mutate} />
                           )}
                         </div>
                       ))}

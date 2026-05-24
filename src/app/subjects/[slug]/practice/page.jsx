@@ -1323,12 +1323,6 @@ function AnswerArea({
                     {markingResult.marks_awarded}/{markingResult.marks_possible}
                   </span>
                   <span className="text-[#4f4a45]">marks</span>
-                  {Number(markingResult.tag_score_possible || 0) > 0 && (
-                    <>
-                      <span className="text-[#5b5048]">·</span>
-                      <span>{markingResult.tag_score}/{markingResult.tag_score_possible} tag score</span>
-                    </>
-                  )}
                 </div>
                 {(markingResult.feedback || markingResult.next_step_advice) && (
                   <div className="rounded-[4px] border border-white/[0.06] bg-[#120f0d] px-4 py-3">
@@ -1374,17 +1368,20 @@ function AnswerArea({
                     const knowledgeGaps = rawGaps.map(normaliseKnowledgeGap)
                     const hasSilly = sillymistakes.length > 0
                     const hasGaps = knowledgeGaps.length > 0
-                    if (!hasSilly && !hasGaps) return null
+                    const criteriaFeedback = String(part.criteria_feedback || "").trim()
+                    if (!criteriaFeedback && !hasSilly && !hasGaps) return null
 
                     return (
                       <div key={part.label} className="grid gap-3">
-                        {part.matched_solution && (
+                        {part.matched_concept && (
                           <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#d49a71]">
-                            Via: {part.matched_solution}
+                            Concept: {part.matched_concept}
                           </p>
                         )}
 
-                        {hasSilly && (
+                        {criteriaFeedback ? (
+                          <p className="text-[13px] leading-relaxed text-[#9b8f84]">{criteriaFeedback}</p>
+                        ) : hasSilly && (
                           <div className="rounded-[4px] border border-[#c8864a]/20 bg-[#c8864a]/[0.06]">
                             <p className="border-b border-[#c8864a]/15 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c8864a]">
                               Silly mistakes
@@ -1432,7 +1429,7 @@ function AnswerArea({
                           </div>
                         )}
 
-                        {hasGaps && (
+                        {!criteriaFeedback && hasGaps && (
                           <div className="rounded-[4px] border border-[#b24a4a]/20 bg-[#b24a4a]/[0.06]">
                             <p className="border-b border-[#b24a4a]/15 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c66a6a]">
                               Knowledge gaps

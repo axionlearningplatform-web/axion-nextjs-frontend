@@ -37,8 +37,6 @@ const emptySolution = (name = "Main Solution", isPreferred = true) => ({
   name,
   is_preferred: isPreferred,
   sample_solution: "",
-  tag_requirements: [],
-  tag_ids: [],
 })
 
 const emptyPart = (index = 0) => ({
@@ -50,7 +48,6 @@ const emptyPart = (index = 0) => ({
   answer_type: "proof",
   answer_value: "",
   tag_ids: [],
-  tag_requirements: [],
   solutions: [emptySolution()],
   attachments: [],
   tikz_visuals: [],
@@ -689,44 +686,13 @@ function getDescendantIds(tags, tagId) {
   return children.flatMap((child) => [child.id, ...getDescendantIds(tags, child.id)])
 }
 
-function isMicroskill(tag) {
-  return tag?.tag_kind === "microskill" || tag?.layer === 4
-}
-
 function isTaxonomyTag(tag) {
-  return tag && !isMicroskill(tag)
-}
-
-function isGranularMarkingTag(tag) {
-  return tag?.layer === 3 || isMicroskill(tag)
-}
-
-function selectedGranularTagCount(selectedIds = [], tags = []) {
-  const selectedSet = new Set(selectedIds)
-  return tags.filter((tag) => selectedSet.has(tag.id) && isGranularMarkingTag(tag)).length
+  return tag && tag.layer >= 1 && tag.layer <= 3 && tag.tag_kind !== "microskill"
 }
 
 function selectedLayer3TagCount(selectedIds = [], tags = []) {
   const selectedSet = new Set(selectedIds)
   return tags.filter((tag) => selectedSet.has(tag.id) && tag.layer === 3 && isTaxonomyTag(tag)).length
-}
-
-function scoreScaleForTag(tag) {
-  if (isMicroskill(tag)) return [0, 1]
-  if (tag?.layer === 3) return [0, 1, 2]
-  return []
-}
-
-function syncTagRequirements(selectedIds, existing = [], tags = []) {
-  const existingById = new Map((existing || []).map((item) => [Number(item.tag_id), item]))
-  return selectedIds
-    .map((id) => tags.find((tag) => tag.id === id))
-    .filter(isGranularMarkingTag)
-    .map((tag) => ({
-      tag_id: tag.id,
-      amount: existingById.get(tag.id)?.amount === "" ? "" : Math.max(Number(existingById.get(tag.id)?.amount || 1), 1),
-      score_scale: scoreScaleForTag(tag),
-    }))
 }
 
 function normalizeSolutionsForState(solutions = [], legacyRequirements = [], legacySampleSolution = "") {
@@ -739,14 +705,11 @@ function normalizeSolutionsForState(solutions = [], legacyRequirements = [], leg
       }]
 
   const normalized = rows.map((solution, index) => {
-    const requirements = solution.tag_requirements || []
     return {
       id: solution.id || crypto.randomUUID(),
       name: solution.name || (index === 0 ? "Main Solution" : ""),
       is_preferred: Boolean(solution.is_preferred),
       sample_solution: solution.sample_solution || "",
-      tag_requirements: requirements,
-      tag_ids: solution.tag_ids || requirements.map((requirement) => Number(requirement.tag_id)).filter(Boolean),
     }
   })
 
@@ -764,65 +727,19 @@ function normalizeSolutionsForState(solutions = [], legacyRequirements = [], leg
   })
 }
 
-function solutionsPayload(solutions = [], tags = []) {
+function solutionsPayload(solutions = []) {
   const normalized = normalizeSolutionsForState(solutions)
   return normalized.map((solution) => ({
     id: solution.id,
     name: solution.name,
     is_preferred: Boolean(solution.is_preferred),
     sample_solution: solution.sample_solution || "",
-    tag_requirements: syncTagRequirements(
-      solution.tag_ids || [],
-      solution.tag_requirements || [],
-      tags
-    ),
   }))
-}
-
-function TagRequirementAmounts({ tags, selectedIds, requirements, onChange }) {
-  const selectedTags = selectedIds
-    .map((id) => tags.find((tag) => tag.id === id))
-    .filter(isGranularMarkingTag)
-
-  if (!selectedTags.length) return null
-
-  const amountFor = (tagId) => requirements.find((item) => Number(item.tag_id) === tagId)?.amount ?? 1
-
-  return (
-    <div className="mt-3 flex flex-wrap gap-2">
-      {selectedTags.map((tag) => (
-        <label
-          className="inline-flex max-w-full items-center gap-2 rounded-full border border-[#3b2a22]/60 bg-white/[0.03] px-2.5 py-1.5 text-sm text-[#dac1b7]"
-          key={tag.id}
-        >
-          <span className="max-w-[190px] truncate">{tag.name}</span>
-          <Input
-            className="h-7 w-11 rounded-full border-[#3b2a22]/55 bg-[#181410] px-1 text-center text-xs text-[#e5e2e1] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-            min="1"
-            aria-label={`${tag.name} count`}
-            type="number"
-            value={amountFor(tag.id)}
-            onChange={(event) => {
-              const rawValue = event.target.value
-              const amount = rawValue === "" ? "" : Math.max(Number(rawValue) || 1, 1)
-              onChange(
-                syncTagRequirements(selectedIds, requirements, tags).map((item) =>
-                  Number(item.tag_id) === tag.id ? { ...item, amount } : item
-                )
-              )
-            }}
-          />
-        </label>
-      ))}
-    </div>
-  )
 }
 
 function SolutionPathwaysEditor({
   allowStructureChange = false,
-  parentSelectedIds,
   solutions,
-  tags,
   onChange,
 }) {
   const displayedSolutions = normalizeSolutionsForState(solutions)
@@ -934,26 +851,8 @@ function SolutionPathwaysEditor({
             </summary>
 
             <div className="grid gap-3 border-t border-[#3b2a22]/55 p-4">
-              <TagTaxonomyPicker
-                tags={tags}
-                selectedIds={solution.tag_ids || []}
-                parentSelectedIds={parentSelectedIds}
-                deepOnly
-                onChange={(value) => {
-                  updateSolution(solution.id, {
-                    tag_ids: value,
-                    tag_requirements: syncTagRequirements(value, solution.tag_requirements || [], tags),
-                  })
-                }}
-              />
-              <TagRequirementAmounts
-                tags={tags}
-                selectedIds={solution.tag_ids || []}
-                requirements={solution.tag_requirements || []}
-                onChange={(value) => updateSolution(solution.id, { tag_requirements: value })}
-              />
               <p className="text-[11px] text-[#6f6258]">
-                Pathway {index + 1}: Layer 1 and 2 tags are inherited from the question.
+                Pathway {index + 1}: name the approach students may use for this solution.
               </p>
             </div>
           </details>
@@ -1111,7 +1010,6 @@ function TagTaxonomyPicker({
   parentSelectedIds = [],
   deepOnly = false,
   showDeep = true,
-  includeMicroskills = true,
 }) {
   const [openRoot, setOpenRoot] = useState(null)
   const closeTimerRef = useRef(null)
@@ -1136,10 +1034,6 @@ function TagTaxonomyPicker({
     return tags.filter((tag) => tag.parent_id === parentId && tag.layer === layer && isTaxonomyTag(tag))
   }
 
-  function microskills() {
-    return tags.filter(isMicroskill)
-  }
-
   function openFlyout(tagId) {
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
     setOpenRoot(tagId)
@@ -1159,10 +1053,8 @@ function TagTaxonomyPicker({
   if (deepOnly) {
     const layer2Parents = tags.filter((tag) => tag.layer === 2 && parentSet.has(tag.id))
     const conceptTags = hasMainPath ? layer2Parents.flatMap((parent) => children(parent.id, 3)) : []
-    const microskillTags = includeMicroskills ? microskills() : []
     const groups = [
       { label: "Layer 3 concepts", tags: conceptTags },
-      includeMicroskills ? { label: "Microskills", tags: microskillTags } : null,
     ].filter(Boolean)
 
     return (
@@ -1170,8 +1062,8 @@ function TagTaxonomyPicker({
         {!hasMainPath && (
           <span className="text-sm text-[#a28c83]">Assign a Layer 1 topic and Layer 2 subtopic to unlock concept tags.</span>
         )}
-        {hasMainPath && conceptTags.length === 0 && microskillTags.length === 0 && (
-          <span className="text-sm text-[#a28c83]">No concepts or microskills exist yet.</span>
+        {hasMainPath && conceptTags.length === 0 && (
+          <span className="text-sm text-[#a28c83]">No concepts exist yet.</span>
         )}
         {groups.map((group) => group.tags.length > 0 && (
           <div className="grid gap-2" key={group.label}>
@@ -1189,7 +1081,7 @@ function TagTaxonomyPicker({
                   type="button"
                   onClick={() => toggle(tag)}
                 >
-                  {isMicroskill(tag) ? "MS" : "L3"} · {tag.name}
+                  L3 · {tag.name}
                 </button>
               ))}
             </div>
@@ -1265,7 +1157,7 @@ function TagTaxonomyPicker({
         })}
       </div>
 
-      {showDeep && (selectedIds.some((id) => tags.find((tag) => tag.id === id)?.layer === 2) || (includeMicroskills && microskills().length > 0)) && (
+      {showDeep && selectedIds.some((id) => tags.find((tag) => tag.id === id)?.layer === 2) && (
         <div className="rounded-2xl border border-[#3b2a22]/55 bg-[#181410] p-3">
           <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8c8178]">
             Granular tags for this question
@@ -1276,13 +1168,12 @@ function TagTaxonomyPicker({
             onChange={onChange}
             parentSelectedIds={selectedIds}
             deepOnly
-            includeMicroskills={includeMicroskills}
           />
         </div>
       )}
       {!showDeep && selectedIds.some((id) => tags.find((tag) => tag.id === id)?.layer === 2) && (
         <p className="rounded-2xl border border-[#3b2a22]/55 bg-[#181410] px-4 py-3 text-sm text-[#a28c83]">
-          Granular Layer 3 and 4 tags are assigned inside each part.
+          Layer 3 concept tags are assigned inside each part.
         </p>
       )}
     </div>
@@ -1482,7 +1373,6 @@ export function QuestionEditor({
   const [importSource, setImportSource] = useState("")
   const [parts, setParts] = useState([])
   const [attachments, setAttachments] = useState([])
-  const [tagRequirements, setTagRequirements] = useState([])
   const [solutions, setSolutions] = useState([])
   const [tagIds, setTagIds] = useState([])
   const [useTagMarking, setUseTagMarking] = useState(true)
@@ -1515,12 +1405,13 @@ export function QuestionEditor({
   const { data: tags = [] } = useSWR(tagsUrl, fetcher)
   const selectedTags = tags.filter((tag) => tagIds.includes(tag.id))
   const sourcePlaceholder = `e.g. HSC ${subject || lockedSubject?.name || "Chemistry"} 2025`
+  const useCriteriaMode = !isMathSubject && !useTagMarking
 
   const effectiveMarks = isMcq
     ? 1
     : parts.length
     ? Number(marks) || parts.reduce((total, part) => total + (Number(part.marks) || 0), 0)
-    : criteriaRowCount(marks, rootMarkingCriteria)
+    : Number(marks) || criteriaRowCount(marks, rootMarkingCriteria)
   const partMarksTotal = parts.reduce((total, part) => total + (Number(part.marks) || 0), 0)
 
   useEffect(() => {
@@ -1562,7 +1453,6 @@ export function QuestionEditor({
         answer_type: part.answer_type || "proof",
         answer_value: part.answer_value || "",
         tag_ids: part.tag_ids || [],
-        tag_requirements: part.tag_requirements || [],
         solutions: normalizeSolutionsForState(part.solutions || [], part.tag_requirements || [], part.sample_solution || ""),
         attachments: part.attachments || [],
         tikz_visuals: part.tikz_visuals || [],
@@ -1574,7 +1464,6 @@ export function QuestionEditor({
       }))
     )
     setAttachments(initialData.attachments || [])
-    setTagRequirements(initialData.tag_requirements || [])
     setSolutions(normalizeSolutionsForState(initialData.solutions || [], initialData.tag_requirements || [], initialData.sample_solution || ""))
     setTagIds(initialData.tag_ids || [])
     setUseTagMarking(initialData.use_tag_marking !== false)
@@ -1636,39 +1525,43 @@ export function QuestionEditor({
       parts: isMcq ? [] : parts.map((part) => ({
         label: part.label,
         text: part.text,
-        marks: criteriaRowCount(part.marks, part.marking_criteria),
+        marks: Number(part.marks) || criteriaRowCount(part.marks, part.marking_criteria),
         sample_solution: includeSolutionPathways
           ? (normalizeSolutionsForState(part.solutions || []).find((solution) => solution.is_preferred) || normalizeSolutionsForState(part.solutions || [])[0])?.sample_solution || ""
           : part.sample_solution || "",
         answer_type: part.answer_type || "proof",
         answer_value: part.answer_type === "value" ? part.answer_value || "" : "",
         tag_ids: part.tag_ids || [],
-        tag_requirements: syncTagRequirements(part.tag_ids || [], part.tag_requirements || [], tags),
-        solutions: includeSolutionPathways ? solutionsPayload(part.solutions || [], tags) : [],
+        tag_requirements: (part.tag_ids || []).map((id) => ({ tag_id: id })),
+        solutions: includeSolutionPathways ? solutionsPayload(part.solutions || []) : [],
         attachments: part.attachments || [],
         tikz_visuals: part.tikz_visuals || [],
-        marking_criteria: normalizeCriteriaRows(
-          criteriaRowCount(part.marks, part.marking_criteria),
-          part.marking_criteria || []
-        ),
+        marking_criteria: useCriteriaMode
+          ? normalizeCriteriaRows(
+              criteriaRowCount(part.marks, part.marking_criteria),
+              part.marking_criteria || []
+            )
+          : [],
         hints: [],
       })),
       attachments,
       marking_criteria: isMcq || parts.length
         ? []
-        : normalizeCriteriaRows(criteriaRowCount(marks, rootMarkingCriteria), rootMarkingCriteria),
+        : useCriteriaMode
+          ? normalizeCriteriaRows(criteriaRowCount(marks, rootMarkingCriteria), rootMarkingCriteria)
+          : [],
       sample_solution: isMcq || parts.length ? "" : includeSolutionPathways ? preferredRootSolution?.sample_solution || "" : sampleSolution,
       answer_type: isMcq || parts.length ? "proof" : answerType,
       answer_value: !isMcq && !parts.length && answerType === "value" ? answerValue : "",
       marking_enabled: !isMcq,
-      use_tag_marking: isMathSubject ? true : useTagMarking,
+      use_tag_marking: useTagMarking,
       mcq_options: isMcq ? normalizeOptionLetters(mcqOptions) : [],
       correct_option: isMcq ? correctOption : "",
       shuffle_options: isMcq ? shuffleOptions : false,
       explanation: isMcq ? explanation : "",
       tag_ids: tagIds,
-      tag_requirements: isMcq || parts.length ? [] : syncTagRequirements(tagIds, tagRequirements, tags),
-      solutions: includeSolutionPathways && parts.length === 0 ? solutionsPayload(solutions, tags) : [],
+      tag_requirements: isMcq || parts.length ? [] : (tagIds || []).map((id) => ({ tag_id: id })),
+      solutions: includeSolutionPathways && parts.length === 0 ? solutionsPayload(solutions) : [],
       import_source: importSource,
     }
   }
@@ -1711,7 +1604,7 @@ export function QuestionEditor({
       }
     }
 
-    if (!isMathSubject) {
+    if (useCriteriaMode) {
       if (parts.length) {
         for (const part of parts) {
           const need = criteriaRowCount(part.marks, part.marking_criteria)
@@ -1751,7 +1644,7 @@ export function QuestionEditor({
     if (!onDraftChange) return
     onDraftChange(payload())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject, subjectId, marks, questionType, level, questionText, sampleSolution, answerType, answerValue, tikzCode, diagramSvg, tikzVisuals, importSource, parts, attachments, tagIds, tagRequirements, solutions, tags, rootMarkingCriteria, useTagMarking, mcqOptions, correctOption, shuffleOptions, explanation])
+  }, [subject, subjectId, marks, questionType, level, questionText, sampleSolution, answerType, answerValue, tikzCode, diagramSvg, tikzVisuals, importSource, parts, attachments, tagIds, solutions, tags, rootMarkingCriteria, useTagMarking, mcqOptions, correctOption, shuffleOptions, explanation])
 
   return (
     <div className={cn("grid gap-8", !hidePreview && "lg:grid-cols-2")}>
@@ -2176,7 +2069,7 @@ export function QuestionEditor({
                           )}
                         </DropdownSection>
 
-                        {!isMathSubject && (
+                        {useCriteriaMode && (
                           <DropdownSection
                             title="Marking Criteria"
                             summary={`${(part.marking_criteria || []).filter((c) => String(c.text || "").trim()).length}/${criteriaRowCount(part.marks, part.marking_criteria)}`}
@@ -2203,8 +2096,8 @@ export function QuestionEditor({
 
                         {showTagging && (
                         <DropdownSection
-                          title="Concepts & Microskills"
-                          summary={`${selectedGranularTagCount(part.tag_ids || [], tags)} selected`}
+                          title="Concepts"
+                          summary={`${selectedLayer3TagCount(part.tag_ids || [], tags)} selected`}
                         >
                           <TagTaxonomyPicker
                             tags={tags}
@@ -2216,18 +2109,8 @@ export function QuestionEditor({
                               next[index] = {
                                 ...part,
                                 tag_ids: value,
-                                tag_requirements: syncTagRequirements(value, part.tag_requirements || [], tags),
+                                tag_requirements: value.map((id) => ({ tag_id: id })),
                               }
-                              setParts(next)
-                            }}
-                          />
-                          <TagRequirementAmounts
-                            tags={tags}
-                            selectedIds={part.tag_ids || []}
-                            requirements={part.tag_requirements || []}
-                            onChange={(value) => {
-                              const next = [...parts]
-                              next[index] = { ...part, tag_requirements: value }
                               setParts(next)
                             }}
                           />
@@ -2236,9 +2119,7 @@ export function QuestionEditor({
 
                         {showTagging && taggingMode === "full" && !isMcq && (
                           <SolutionPathwaysEditor
-                            parentSelectedIds={tagIds}
                             solutions={part.solutions || []}
-                            tags={tags}
                             onChange={(value) => {
                               const next = [...parts]
                               next[index] = { ...part, solutions: value }
@@ -2291,7 +2172,7 @@ export function QuestionEditor({
                         />
                       )}
                     </DropdownSection>
-                    {!isMathSubject && (
+                    {useCriteriaMode && (
                       <DropdownSection
                         title="Marking Criteria"
                         summary={`${rootMarkingCriteria.filter((c) => String(c.text || "").trim()).length}/${criteriaRowCount(marks, rootMarkingCriteria)}`}
@@ -2321,27 +2202,15 @@ export function QuestionEditor({
                         selectedIds={tagIds}
                         onChange={(value) => {
                           setTagIds(value)
-                          setTagRequirements(syncTagRequirements(value, tagRequirements, tags))
                           if (validationMessage) setValidationMessage("")
                         }}
                         showDeep={isMcq || (parts.length === 0 && taggingMode !== "full")}
-                        includeMicroskills={!isMcq}
-                      />
-                    )}
-                    {!isMcq && parts.length === 0 && taggingMode !== "full" && (
-                      <TagRequirementAmounts
-                        tags={tags}
-                        selectedIds={tagIds}
-                        requirements={tagRequirements}
-                        onChange={setTagRequirements}
                       />
                     )}
                     {taggingMode === "full" && !isMcq && parts.length === 0 && (
                       <div className="w-full">
                         <SolutionPathwaysEditor
-                          parentSelectedIds={tagIds}
                           solutions={solutions}
-                          tags={tags}
                           onChange={(value) => {
                             setSolutions(value)
                             if (validationMessage) setValidationMessage("")
@@ -2363,9 +2232,9 @@ export function QuestionEditor({
                       className="size-4 accent-[#c8864a]"
                     />
                     <span>
-                      Use tag-based marking
+                      Use direct marking
                       <span className="ml-2 text-xs text-[#6f6861]">
-                        (uncheck for long-form criteria marking)
+                        (uncheck for criteria marking)
                       </span>
                     </span>
                   </label>
