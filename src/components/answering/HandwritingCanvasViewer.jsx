@@ -14,20 +14,20 @@ function hasSavedInk(pages = []) {
 
 function drawPaper(ctx, width, height) {
   ctx.save()
-  ctx.fillStyle = "#f7f0e7"
+  ctx.fillStyle = "#191410"
   ctx.fillRect(0, 0, width, height)
-  ctx.strokeStyle = "rgba(90,70,54,0.14)"
+  ctx.strokeStyle = "rgba(232,216,199,0.075)"
   ctx.lineWidth = 1
-  for (let y = 64; y < height; y += 32) {
+  for (let y = 86; y < height - 46; y += 34) {
     ctx.beginPath()
-    ctx.moveTo(48, y)
-    ctx.lineTo(width - 48, y)
+    ctx.moveTo(58, y)
+    ctx.lineTo(width - 58, y)
     ctx.stroke()
   }
-  ctx.strokeStyle = "rgba(160,90,72,0.18)"
+  ctx.strokeStyle = "rgba(212,154,113,0.13)"
   ctx.beginPath()
-  ctx.moveTo(74, 0)
-  ctx.lineTo(74, height)
+  ctx.moveTo(58, 52)
+  ctx.lineTo(58, height - 52)
   ctx.stroke()
   ctx.restore()
 }
@@ -96,14 +96,17 @@ export default function HandwritingCanvasViewer({ strokeData }) {
             readOnly
           />
         )}
-        <div className="relative flex flex-1 items-center justify-center overflow-auto bg-[#100d0b] p-4">
+        <div className="relative flex min-w-0 flex-1 justify-center overflow-auto bg-[#100d0b] p-4 md:p-6">
           <div
-            className="relative max-w-full shadow-[0_18px_60px_rgba(0,0,0,0.35)]"
-            style={{ aspectRatio: `${width} / ${height}`, width: `min(${width}px, 100%)` }}
+            className="relative h-auto w-full max-w-[820px]"
+            style={{ aspectRatio: `${width} / ${height}` }}
           >
-            <canvas ref={paperCanvasRef} className="absolute inset-0" />
-            <canvas ref={committedCanvasRef} className="absolute inset-0" />
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-black/10 bg-black/35 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/70 backdrop-blur">
+            <canvas
+              ref={paperCanvasRef}
+              className="block h-full w-full rounded-[4px] border border-[#3a2b23]/70 shadow-[0_18px_70px_rgba(0,0,0,0.42)]"
+            />
+            <canvas ref={committedCanvasRef} className="pointer-events-none absolute inset-0 h-full w-full" />
+            <div className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full border border-white/[0.06] bg-[#15110e]/75 px-3 py-1.5 text-[11px] font-medium tracking-[0.06em] text-[#8f8982] backdrop-blur">
               Page {displayedPageIndex + 1} of {pages.length}
             </div>
           </div>
