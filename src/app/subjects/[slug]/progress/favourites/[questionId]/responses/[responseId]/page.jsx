@@ -3,6 +3,9 @@
 import { useParams, useRouter } from "next/navigation"
 import useSWR from "swr"
 import { ArrowLeft, Loader2 } from "lucide-react"
+import ReactMarkdown from "react-markdown"
+import remarkMath from "remark-math"
+import rehypeKatex from "rehype-katex"
 
 import HandwritingCanvasViewer from "@/components/answering/HandwritingCanvasViewer"
 import fetcher from "@/lib/fetcher"
@@ -37,6 +40,71 @@ function responseIsMarked(response) {
   return response?.marks_awarded !== null && response?.marks_awarded !== undefined
 }
 
+function TagWithLatex({ name, className }) {
+  const prepared = String(name || "").replace(/\$([^$]+)\$/g, (_, expr) => `\\(${expr}\\)`)
+
+  return (
+    <span className={cn("inline", className)}>
+      <ReactMarkdown
+        remarkPlugins={[remarkMath]}
+        rehypePlugins={[rehypeKatex]}
+        components={{
+          p: ({ children }) => <span>{children}</span>,
+        }}
+      >
+        {prepared}
+      </ReactMarkdown>
+    </span>
+  )
+}
+
+function prepareMistakeLatex(value) {
+  const raw = String(value || "").trim()
+  if (!raw) return ""
+  if (raw.includes("$") || raw.startsWith("\\(") || raw.startsWith("\\[") || raw.startsWith("\\begin")) {
+    return raw
+  }
+  return `\\(${raw}\\)`
+}
+
+function normaliseSillyMistake(item, index) {
+  if (item?.title) {
+    return {
+      number: index + 1,
+      label: item.title,
+      description: item.detail || "",
+      latex: prepareMistakeLatex(item.latex),
+      score: null,
+      maxScore: null,
+    }
+  }
+  return {
+    number: index + 1,
+    label: item?.label || item?.tag || "",
+    description: item?.description || item?.reason || "",
+    latex: prepareMistakeLatex(item?.latex),
+    score: item?.score ?? null,
+    maxScore: item?.maxScore ?? item?.max_score ?? null,
+  }
+}
+
+function normaliseKnowledgeGap(item) {
+  if (item?.title) {
+    return {
+      label: item.title,
+      description: item.detail || "",
+      score: null,
+      maxScore: null,
+    }
+  }
+  return {
+    label: item?.label || item?.tag || "",
+    description: item?.description || item?.hint || item?.reason || "",
+    score: item?.score ?? null,
+    maxScore: item?.maxScore ?? item?.max_score ?? null,
+  }
+}
+
 function MarkingResultDetails({ result }) {
   if (!result || result.marks_awarded === undefined || result.marks_awarded === null) return null
   return (
@@ -62,29 +130,96 @@ function MarkingResultDetails({ result }) {
             )}
           </div>
         )}
-        {(result.parts || []).map((part) => {
-          const lostTags = part.lost_tags || []
-          if (!lostTags.length && !part.matched_solution && !part.criteria_feedback) return null
+        {result.marks_awarded < result.marks_possible && (result.parts || []).map((part) => {
+          const sillyMistakes = (part.silly_mistakes || []).map(normaliseSillyMistake)
+          const knowledgeGaps = (part.knowledge_gaps || []).map(normaliseKnowledgeGap)
+          const hasSilly = sillyMistakes.length > 0
+          const hasGaps = knowledgeGaps.length > 0
+          const criteriaFeedback = String(part.criteria_feedback || "").trim()
+          if (!criteriaFeedback && !hasSilly && !hasGaps && !part.matched_solution && !part.matched_concept) return null
           return (
-            <div key={part.label} className="rounded-[4px] border border-white/[0.05] bg-[#120f0d] px-4 py-3">
+            <div key={part.label} className="grid gap-3">
               {part.matched_solution && (
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#d49a71]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#d49a71]">
                   Marked via: {part.matched_solution}
                 </p>
               )}
-              {part.criteria_feedback && (
-                <p className="text-[13px] leading-relaxed text-[#9b8f84]">{part.criteria_feedback}</p>
+              {part.matched_concept && (
+                <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#d49a71]">
+                  Concept: {part.matched_concept}
+                </p>
               )}
-              {lostTags.length > 0 && (
-                <ul className="grid gap-2">
-                  {lostTags.map((tag) => (
-                    <li key={`${part.label}-${tag.tag}`} className="text-[12px] leading-relaxed text-[#9b8f84]">
-                      <span className="font-semibold text-[#dba476]">{tag.tag}</span>
-                      <span className="text-[#5b5048]"> {tag.score}/{tag.max_score}</span>
-                      {tag.reason && <span> - {tag.reason}</span>}
-                    </li>
-                  ))}
-                </ul>
+
+              {criteriaFeedback ? (
+                <p className="text-[13px] leading-relaxed text-[#9b8f84]">{criteriaFeedback}</p>
+              ) : hasSilly && (
+                <div className="rounded-[4px] border border-[#c8864a]/20 bg-[#c8864a]/[0.06]">
+                  <p className="border-b border-[#c8864a]/15 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c8864a]">
+                    Silly mistakes
+                  </p>
+                  <ul className="grid divide-y divide-white/[0.04]">
+                    {sillyMistakes.map((item) => (
+                      <li key={`${item.label}-${item.number}`} className="flex items-start gap-3 px-3 py-2.5">
+                        <span
+                          className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-[3px] text-[10px] font-bold"
+                          style={{ backgroundColor: "rgba(200,134,74,0.85)", color: "#120c08" }}
+                        >
+                          {item.number}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 text-[12px]">
+                            {item.score !== null ? (
+                              <TagWithLatex name={item.label} className="font-semibold text-[#dba476]" />
+                            ) : (
+                              <span className="font-semibold text-[#dba476]">{item.label}</span>
+                            )}
+                            {item.score !== null && (
+                              <span className="text-[#5b5048]">{item.score}/{item.maxScore}</span>
+                            )}
+                          </div>
+                          <p className="mt-0.5 text-[12px] leading-relaxed text-[#9b8f84]">
+                            {item.description}
+                          </p>
+                          {item.latex && (
+                            <MarkdownMath className="mt-2 rounded-[3px] border border-[#c8864a]/15 bg-[#120f0d]/70 px-2.5 py-2 text-[13px] leading-relaxed text-[#d8c4b0] [&_.katex]:text-[#efd0b2] [&_p]:my-0">
+                              {item.latex}
+                            </MarkdownMath>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {!criteriaFeedback && hasGaps && (
+                <div className="rounded-[4px] border border-[#b24a4a]/20 bg-[#b24a4a]/[0.06]">
+                  <p className="border-b border-[#b24a4a]/15 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c66a6a]">
+                    Knowledge gaps
+                  </p>
+                  <ul className="grid divide-y divide-white/[0.04]">
+                    {knowledgeGaps.map((item) => (
+                      <li key={item.label} className="px-3 py-2.5">
+                        <div className="flex items-center gap-2 text-[12px]">
+                          <span className="size-1.5 shrink-0 rounded-full bg-[#b24a4a]/70" />
+                          {item.score !== null ? (
+                            <TagWithLatex name={item.label} className="font-semibold text-[#c98282]" />
+                          ) : (
+                            <span className="font-semibold text-[#c98282]">{item.label}</span>
+                          )}
+                          {item.score !== null && (
+                            <span className="text-[#7f5555]">{item.score}/{item.maxScore}</span>
+                          )}
+                        </div>
+                        {item.description && (
+                          <p className="mt-1 pl-4 text-[12px] leading-relaxed text-[#9b6f6f]">
+                            {item.description}
+                          </p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
           )
