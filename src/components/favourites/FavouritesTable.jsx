@@ -60,6 +60,12 @@ function responseIsMarked(response) {
 }
 
 function InlineMathPreview({ children }) {
+  const preview = String(children || "")
+    .replace(/\$\$([\s\S]*?)\$\$/g, (_, expr) => `$${expr.replace(/\s+/g, " ").trim()}$`)
+    .replace(/\\\[((?:.|\n)*?)\\\]/g, (_, expr) => `\\(${expr.replace(/\s+/g, " ").trim()}\\)`)
+    .replace(/\s+/g, " ")
+    .trim()
+
   return (
     <ReactMarkdown
       className="block min-w-0 overflow-hidden whitespace-nowrap text-inherit [&_.katex-display]:my-0 [&_.katex-display]:inline-block [&_.katex]:text-inherit [&_p]:inline"
@@ -69,7 +75,7 @@ function InlineMathPreview({ children }) {
         p: ({ children: nodeChildren }) => <span>{nodeChildren}</span>,
       }}
     >
-      {String(children || "")}
+      {preview}
     </ReactMarkdown>
   )
 }
