@@ -1,4 +1,5 @@
 import { renderPageToOCRCanvas } from "./render_submission"
+import { compressStrokeData } from "./stroke_compressor"
 
 const OCR_MIN_RENDERED_WIDTH = 1000
 const OCR_MAX_RENDERED_SIDE = 1400
@@ -148,4 +149,8 @@ export async function exportHandwrittenAnswer({ questionId, pages, width, height
       })),
     },
   }
+}
+
+export async function exportStrokeDataForStorage(strokeData) {
+  return compressStrokeData(strokeData)
 }

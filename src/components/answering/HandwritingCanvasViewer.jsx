@@ -1,9 +1,11 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { Loader2 } from "lucide-react"
 
 import PageNavigator from "@/components/answering/PageNavigator"
 import { drawPageStrokes } from "@/services/handwriting/render_submission"
+import { decompressStrokeData } from "@/services/handwriting/stroke_compressor"
 
 const DEFAULT_WIDTH = 820
 const DEFAULT_HEIGHT = 1060
@@ -36,10 +38,12 @@ export default function HandwritingCanvasViewer({ strokeData }) {
   const paperCanvasRef = useRef(null)
   const committedCanvasRef = useRef(null)
   const [currentPageIndex, setCurrentPageIndex] = useState(0)
-  const width = Number(strokeData?.width) || DEFAULT_WIDTH
-  const height = Number(strokeData?.height) || DEFAULT_HEIGHT
+  const [resolvedStrokeData, setResolvedStrokeData] = useState(null)
+  const [decompressing, setDecompressing] = useState(false)
+  const width = Number(resolvedStrokeData?.width) || DEFAULT_WIDTH
+  const height = Number(resolvedStrokeData?.height) || DEFAULT_HEIGHT
   const pages = useMemo(() => {
-    const sourcePages = Array.isArray(strokeData?.pages) ? strokeData.pages : []
+    const sourcePages = Array.isArray(resolvedStrokeData?.pages) ? resolvedStrokeData.pages : []
     return sourcePages.length > 0
       ? sourcePages.map((page, index) => ({
           ...page,
@@ -47,10 +51,36 @@ export default function HandwritingCanvasViewer({ strokeData }) {
           strokes: page.strokes || [],
         }))
       : []
-  }, [strokeData])
+  }, [resolvedStrokeData])
   const displayedPageIndex = pages.length > 0 ? Math.min(currentPageIndex, pages.length - 1) : 0
   const currentPage = pages[displayedPageIndex] || pages[0]
-  const empty = !strokeData || pages.length === 0 || !hasSavedInk(pages)
+  const empty = !resolvedStrokeData || pages.length === 0 || !hasSavedInk(pages)
+
+  useEffect(() => {
+    let cancelled = false
+    Promise.resolve()
+      .then(async () => {
+        if (!cancelled) setDecompressing(Boolean(strokeData))
+        return decompressStrokeData(strokeData)
+      })
+      .then((nextStrokeData) => {
+        if (!cancelled) {
+          setResolvedStrokeData(nextStrokeData || null)
+          setCurrentPageIndex(0)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setResolvedStrokeData(null)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDecompressing(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [strokeData])
 
   useEffect(() => {
     if (empty || !currentPage) return
@@ -74,6 +104,14 @@ export default function HandwritingCanvasViewer({ strokeData }) {
     drawPaper(paperCtx, width, height)
     drawPageStrokes(committedCtx, currentPage.strokes || [])
   }, [currentPage, empty, height, width])
+
+  if (decompressing) {
+    return (
+      <div className="flex min-h-[360px] items-center justify-center overflow-hidden rounded-[6px] border border-white/[0.06] bg-[#120f0d] px-6 text-[#8f8982]">
+        <Loader2 className="size-6 animate-spin" />
+      </div>
+    )
+  }
 
   if (empty) {
     return (

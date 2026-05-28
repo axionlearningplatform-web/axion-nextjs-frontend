@@ -27,6 +27,7 @@ import SaveQuestionModal from "@/components/favourites/SaveQuestionModal"
 import fetcher from "@/lib/fetcher"
 import { cn } from "@/lib/utils"
 import { subjectIsMathematics } from "@/lib/subjectMath"
+import { exportStrokeDataForStorage } from "@/services/handwriting/answer_export"
 
 const QUESTIONS_API_URL = "/api/questions/"
 const TAGS_API_URL = "/api/questions/tags/"
@@ -1132,7 +1133,7 @@ function AnswerArea({
           const exported = await handwritingRef.current.exportAnswer()
           if (strokeDataHasInk(exported.stroke_data)) {
             responseSubmissionType = "draw"
-            strokeDataToSave = exported.stroke_data
+            strokeDataToSave = await exportStrokeDataForStorage(exported.stroke_data)
           }
         } else if (activeAnswerTab === "type") {
           const trimmedAnswer = typedAnswer.trim()
@@ -1143,7 +1144,7 @@ function AnswerArea({
             const exported = await handwritingRef.current.exportAnswer()
             if (strokeDataHasInk(exported.stroke_data)) {
               responseSubmissionType = "draw"
-              strokeDataToSave = exported.stroke_data
+              strokeDataToSave = await exportStrokeDataForStorage(exported.stroke_data)
             }
           }
         }
