@@ -323,12 +323,14 @@ function prepareMistakeLatex(value) {
 }
 
 function normaliseSillyMistake(item, index) {
+  const stepLatex = prepareMistakeLatex(item?.step_latex || item?.stepLatex)
   if (item?.title) {
     return {
       number: index + 1,
       label: item.title,
       description: item.detail || "",
       latex: prepareMistakeLatex(item.latex),
+      stepLatex,
       score: null,
       maxScore: null,
     }
@@ -338,16 +340,19 @@ function normaliseSillyMistake(item, index) {
     label: item?.label || item?.tag || "",
     description: item?.description || item?.reason || "",
     latex: prepareMistakeLatex(item?.latex),
+    stepLatex,
     score: item?.score ?? null,
     maxScore: item?.maxScore ?? item?.max_score ?? null,
   }
 }
 
 function normaliseKnowledgeGap(item) {
+  const stepLatex = prepareMistakeLatex(item?.step_latex || item?.stepLatex)
   if (item?.title) {
     return {
       label: item.title,
       description: item.detail || "",
+      stepLatex,
       score: null,
       maxScore: null,
     }
@@ -355,9 +360,49 @@ function normaliseKnowledgeGap(item) {
   return {
     label: item?.label || item?.tag || "",
     description: item?.description || item?.hint || "",
+    stepLatex,
     score: item?.score ?? null,
     maxScore: item?.maxScore ?? item?.max_score ?? null,
   }
+}
+
+function matchedTagsForResult(markingResult) {
+  const tags = [
+    ...(Array.isArray(markingResult?.all_matched_tags) ? markingResult.all_matched_tags : []),
+    ...(markingResult?.parts || []).flatMap((part) => part?.matched_tags || []),
+  ]
+  const seen = new Set()
+  return tags.filter((tag) => {
+    const id = tag?.id
+    const name = String(tag?.name || "").trim()
+    if (!id || !name || seen.has(id)) return false
+    seen.add(id)
+    return true
+  })
+}
+
+function TagDiagnosisPanel({ matchedTags }) {
+  if (!matchedTags?.length) return null
+  return (
+    <div className="rounded-[4px] border border-white/[0.06] bg-[#1a1714]">
+      <p className="border-b border-white/[0.06] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#6f6258]">
+        Concepts assessed
+      </p>
+      <div className="flex flex-wrap gap-1.5 px-3 py-2.5">
+        {matchedTags.map((tag) => (
+          <span
+            key={tag.id}
+            className="inline-flex items-center rounded-full border border-[#3b2a22]/60 bg-[#181410] px-2.5 py-1 text-[11px] text-[#9b8f84]"
+          >
+            <span className="mr-1.5 text-[9px] font-bold uppercase tracking-[0.1em] text-[#5b5048]">
+              L{tag.layer || 3}
+            </span>
+            {tag.name}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function SelectionChip({ children, onRemove, muted = false }) {
@@ -997,6 +1042,7 @@ function AnswerArea({
     favourited: false,
     note: "",
   }
+  const matchedTags = matchedTagsForResult(markingResult)
 
   useEffect(() => {
     if (activeTab !== "draw" && questionLocked) {
@@ -1431,6 +1477,7 @@ function AnswerArea({
                     </p>
                   </div>
                 )}
+                <TagDiagnosisPanel matchedTags={matchedTags} />
                 {markingResult.marks_awarded < markingResult.marks_possible &&
                   (markingResult.parts || []).map((part) => {
                     const rawSilly = part.silly_mistakes || []
@@ -1493,6 +1540,16 @@ function AnswerArea({
                                         {item.latex}
                                       </MarkdownMath>
                                     )}
+                                    {item.stepLatex && (
+                                      <div className="mt-1.5 rounded-[3px] border border-[#c8864a]/15 bg-[#c8864a]/05 px-2.5 py-1.5">
+                                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#7a5a40]">
+                                          Your working
+                                        </p>
+                                        <MarkdownMath className="text-[13px] leading-relaxed text-[#dba476] [&_.katex]:text-[#f0d8ba] [&_p]:my-0">
+                                          {item.stepLatex}
+                                        </MarkdownMath>
+                                      </div>
+                                    )}
                                   </div>
                                 </li>
                               ))}
@@ -1528,6 +1585,16 @@ function AnswerArea({
                                     <p className="mt-1 pl-4 text-[12px] leading-relaxed text-[#9b6f6f]">
                                       {item.description}
                                     </p>
+                                  )}
+                                  {item.stepLatex && (
+                                    <div className="mt-1.5 rounded-[3px] border border-white/[0.05] bg-[#1b1713] px-2.5 py-1.5">
+                                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#5b5048]">
+                                        Where this appeared
+                                      </p>
+                                      <MarkdownMath className="text-[13px] leading-relaxed text-[#8f8378] [&_.katex]:text-[#d2c7bd] [&_p]:my-0">
+                                        {item.stepLatex}
+                                      </MarkdownMath>
+                                    </div>
                                   )}
                                 </li>
                               ))}
