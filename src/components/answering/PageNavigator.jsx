@@ -16,7 +16,7 @@ export default function PageNavigator({
   return (
     <aside
       className={cn(
-        "flex select-none gap-2 overflow-x-auto p-3 md:w-28 md:flex-col md:overflow-y-auto",
+        "flex select-none gap-2 overflow-x-auto p-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:w-28 md:flex-col md:overflow-y-auto",
         sticky && "md:fixed md:z-40 md:max-h-[calc(100vh-96px)]"
       )}
       style={
@@ -35,7 +35,7 @@ export default function PageNavigator({
           type="button"
           onClick={() => onSelectPage(index)}
           className={cn(
-            "group relative flex h-16 min-w-20 items-center justify-center rounded-[8px] border px-2 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors md:min-w-0",
+            "group relative flex h-16 shrink-0 basis-16 min-w-20 items-center justify-center rounded-[8px] border px-2 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors md:min-w-0 md:basis-16",
             currentPageIndex === index
               ? "border-[#d49a71]/55 bg-[#d49a71]/14 text-[#efbd94]"
               : "border-white/[0.06] bg-[#1a1714] text-[#6f6861] hover:border-[#8b5e42]/55 hover:text-[#d8c4b0]"
@@ -63,7 +63,7 @@ export default function PageNavigator({
         <button
           type="button"
           onClick={onAddPage}
-          className="inline-flex h-16 min-w-20 items-center justify-center gap-1.5 rounded-[8px] border border-dashed border-white/[0.09] text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6f6861] transition-colors hover:border-[#8b5e42]/55 hover:text-[#d8c4b0] md:min-w-0"
+          className="inline-flex h-16 shrink-0 basis-16 min-w-20 items-center justify-center gap-1.5 rounded-[8px] border border-dashed border-white/[0.09] text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6f6861] transition-colors hover:border-[#8b5e42]/55 hover:text-[#d8c4b0] md:min-w-0 md:basis-16"
         >
           <Plus className="size-3.5" />
           Add
