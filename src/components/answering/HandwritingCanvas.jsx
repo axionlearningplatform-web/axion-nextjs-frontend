@@ -377,6 +377,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   const predCanvasRef = useRef(null)      // RAF predicted ink
   const activeCanvasRef = useRef(null)    // pointer events (transparent)
   const handwritingShellRef = useRef(null)
+  const navigatorColumnRef = useRef(null)
   const canvasWrapperRef = useRef(null)
 
   // ── Cached 2D contexts — avoid repeated getContext on pointermove ─────────
@@ -689,9 +690,9 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
       if (rect.width === 0 && rect.height === 0) return
       setToolbarRightOffset(window.innerWidth - rect.right + 16)
 
-      const shell = handwritingShellRef.current
-      if (shell) {
-        setNavigatorLeftOffset(shell.getBoundingClientRect().left)
+      const navigatorColumn = navigatorColumnRef.current
+      if (navigatorColumn) {
+        setNavigatorLeftOffset(navigatorColumn.getBoundingClientRect().left)
       }
 
       if (window.innerWidth < 768) {
@@ -703,7 +704,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
 
     const ro = new ResizeObserver(updateControlOffsets)
     ro.observe(wrapper)
-    if (handwritingShellRef.current) ro.observe(handwritingShellRef.current)
+    if (navigatorColumnRef.current) ro.observe(navigatorColumnRef.current)
     window.addEventListener("resize", updateControlOffsets, { passive: true })
 
     return () => {
@@ -744,9 +745,9 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
       if (rect.width === 0 && rect.height === 0) return
 
       setToolbarRightOffset(window.innerWidth - rect.right + 16)
-      const shell = handwritingShellRef.current
-      if (shell) {
-        setNavigatorLeftOffset(shell.getBoundingClientRect().left)
+      const navigatorColumn = navigatorColumnRef.current
+      if (navigatorColumn) {
+        setNavigatorLeftOffset(navigatorColumn.getBoundingClientRect().left)
       }
       if (window.innerWidth < 768) {
         setToolbarSticky(false)
@@ -1433,7 +1434,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
       className="overflow-hidden rounded-[6px] border border-white/[0.06] bg-[#120f0d]"
     >
       <div className="flex min-h-[640px] flex-col md:flex-row">
-        <div className="shrink-0 md:w-28">
+        <div ref={navigatorColumnRef} className="shrink-0 md:w-28">
           <PageNavigator
             currentPageIndex={currentPageIndex}
             leftOffset={navigatorLeftOffset}

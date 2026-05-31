@@ -16,7 +16,7 @@ export default function PageNavigator({
   return (
     <aside
       className={cn(
-        "flex select-none gap-2 overflow-x-auto border-b border-white/[0.06] bg-[#14100d] p-3 md:w-28 md:flex-col md:overflow-y-auto md:border-b-0 md:border-r",
+        "flex select-none gap-2 overflow-x-auto p-3 md:w-28 md:flex-col md:overflow-y-auto",
         sticky && "md:fixed md:z-40 md:max-h-[calc(100vh-96px)]"
       )}
       style={
