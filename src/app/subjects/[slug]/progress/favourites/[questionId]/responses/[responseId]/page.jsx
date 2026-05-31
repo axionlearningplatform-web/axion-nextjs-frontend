@@ -138,9 +138,23 @@ function MarkingResultDetails({ result }) {
           const hasSilly = sillyMistakes.length > 0
           const hasGaps = knowledgeGaps.length > 0
           const criteriaFeedback = String(part.criteria_feedback || "").trim()
+          const showPartHeader = (result.parts || []).length > 1 || part.label !== "question"
           if (!criteriaFeedback && !hasSilly && !hasGaps && !part.matched_solution && !part.matched_concept) return null
           return (
-            <div key={part.label} className="grid gap-3">
+            <div
+              key={part.label}
+              className={showPartHeader ? "grid gap-3 rounded-[4px] border border-white/[0.06] bg-[#15120f] p-3" : "grid gap-3"}
+            >
+              {showPartHeader && (
+                <div className="flex items-center justify-between gap-3 border-b border-white/[0.05] pb-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8f8378]">
+                    Part {part.label}
+                  </p>
+                  <p className="text-[12px] text-[#dba476]">
+                    {part.marks_awarded}/{part.marks_possible}
+                  </p>
+                </div>
+              )}
               {part.matched_solution && (
                 <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#d49a71]">
                   Marked via: {part.matched_solution}

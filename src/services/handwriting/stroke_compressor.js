@@ -76,9 +76,10 @@ async function compressToBase64(value) {
 
   const stream = new CompressionStream("deflate")
   const writer = stream.writable.getWriter()
-  await writer.write(new TextEncoder().encode(value))
-  await writer.close()
-  const compressed = await new Response(stream.readable).arrayBuffer()
+  const compressedPromise = new Response(stream.readable).arrayBuffer()
+  writer.write(new TextEncoder().encode(value))
+  writer.close()
+  const compressed = await compressedPromise
   return bytesToBase64(new Uint8Array(compressed))
 }
 
@@ -89,9 +90,10 @@ async function decompressFromBase64(value) {
 
   const stream = new DecompressionStream("deflate")
   const writer = stream.writable.getWriter()
-  await writer.write(base64ToBytes(value))
-  await writer.close()
-  return new Response(stream.readable).text()
+  const textPromise = new Response(stream.readable).text()
+  writer.write(base64ToBytes(value))
+  writer.close()
+  return textPromise
 }
 
 function isLegacyStrokeData(payload) {
