@@ -352,6 +352,7 @@ function normaliseKnowledgeGap(item) {
     return {
       label: item.title,
       description: item.detail || "",
+      latex: prepareMistakeLatex(item.latex),
       stepLatex,
       score: null,
       maxScore: null,
@@ -360,6 +361,7 @@ function normaliseKnowledgeGap(item) {
   return {
     label: item?.label || item?.tag || "",
     description: item?.description || item?.hint || "",
+    latex: prepareMistakeLatex(item?.latex),
     stepLatex,
     score: item?.score ?? null,
     maxScore: item?.maxScore ?? item?.max_score ?? null,
@@ -1478,8 +1480,7 @@ function AnswerArea({
                   </div>
                 )}
                 <TagDiagnosisPanel matchedTags={matchedTags} />
-                {markingResult.marks_awarded < markingResult.marks_possible &&
-                  (markingResult.parts || []).map((part) => {
+                {(markingResult.parts || []).map((part) => {
                     const rawSilly = part.silly_mistakes || []
                     const rawGaps = part.knowledge_gaps || []
                     const sillymistakes = rawSilly.map(normaliseSillyMistake)
@@ -1585,6 +1586,11 @@ function AnswerArea({
                                     <p className="mt-1 pl-4 text-[12px] leading-relaxed text-[#9b6f6f]">
                                       {item.description}
                                     </p>
+                                  )}
+                                  {item.latex && (
+                                    <MarkdownMath className="mt-2 rounded-[3px] border border-[#b24a4a]/15 bg-[#120f0d]/70 px-2.5 py-2 text-[13px] leading-relaxed text-[#d8b0b0] [&_.katex]:text-[#efb8b8] [&_p]:my-0">
+                                      {item.latex}
+                                    </MarkdownMath>
                                   )}
                                   {item.stepLatex && (
                                     <div className="mt-1.5 rounded-[3px] border border-white/[0.05] bg-[#1b1713] px-2.5 py-1.5">
