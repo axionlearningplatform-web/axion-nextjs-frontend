@@ -3,7 +3,7 @@ const DEFAULT_HEIGHT = 1060
 const PEN_COLOR = "#e8d6c4"
 const PEN_WIDTH = 4.4
 const ERASER_WIDTH = 48
-const RDP_EPSILON = 1.5
+const RDP_EPSILON = 0.45
 
 const TOOL_TO_FLAG = {
   pen: 0,
@@ -51,6 +51,46 @@ function rdp(points, epsilon = RDP_EPSILON) {
   }
 
   return [points[0], points[end]]
+}
+
+function pointBounds(points) {
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  points.forEach((point) => {
+    minX = Math.min(minX, point.x || 0)
+    minY = Math.min(minY, point.y || 0)
+    maxX = Math.max(maxX, point.x || 0)
+    maxY = Math.max(maxY, point.y || 0)
+  })
+  return {
+    width: maxX - minX,
+    height: maxY - minY,
+  }
+}
+
+function simplifyPoints(points) {
+  if (!Array.isArray(points) || points.length < 8) return points || []
+
+  const bounds = pointBounds(points)
+  if (Math.hypot(bounds.width, bounds.height) < 10) return points
+
+  const minUsefulPoints = Math.min(
+    points.length,
+    Math.max(8, Math.ceil(points.length * 0.35))
+  )
+  let simplified = rdp(points, RDP_EPSILON)
+
+  if (simplified.length < minUsefulPoints) {
+    simplified = rdp(points, 0.2)
+  }
+
+  if (simplified.length < Math.min(points.length, Math.max(6, Math.ceil(points.length * 0.25)))) {
+    return points
+  }
+
+  return simplified
 }
 
 function bytesToBase64(bytes) {
@@ -106,7 +146,7 @@ function isLegacyStrokeData(payload) {
 }
 
 function compactStroke(stroke) {
-  const points = rdp(stroke.points || [])
+  const points = simplifyPoints(stroke.points || [])
   const flatPoints = []
   points.forEach((point) => {
     flatPoints.push(
