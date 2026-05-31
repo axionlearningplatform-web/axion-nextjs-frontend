@@ -13,6 +13,8 @@ export default function PageNavigator({
   sticky = false,
   topOffset = 80,
 }) {
+  const maxHeight = `calc(100vh - ${topOffset + 16}px)`
+
   return (
     <aside
       className={cn(
@@ -24,9 +26,9 @@ export default function PageNavigator({
           ? {
               left: `${leftOffset}px`,
               top: `${topOffset}px`,
-              maxHeight: `calc(100vh - ${topOffset + 16}px)`,
+              maxHeight,
             }
-          : undefined
+          : { maxHeight }
       }
     >
       {pages.map((page, index) => (
