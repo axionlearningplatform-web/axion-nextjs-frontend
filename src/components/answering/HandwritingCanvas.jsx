@@ -376,6 +376,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   const inkCanvasRef = useRef(null)       // live ink, APPEND ONLY
   const predCanvasRef = useRef(null)      // RAF predicted ink
   const activeCanvasRef = useRef(null)    // pointer events (transparent)
+  const handwritingShellRef = useRef(null)
   const canvasWrapperRef = useRef(null)
 
   // ── Cached 2D contexts — avoid repeated getContext on pointermove ─────────
@@ -409,6 +410,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   const initialPages = useMemo(() => [createPage(0)], [])
   const pagesRef = useRef(initialPages)
   const currentPageIndexRef = useRef(0)
+  const pageScrollPositionsRef = useRef(new Map())
 
   // ── React UI state (minimal — only triggers re-renders when needed) ───────
   const [pages, setPages] = useState(initialPages)
@@ -419,12 +421,18 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   const [eraserPoint, setEraserPoint] = useState(null)
   const [writingSurfaceActive, setWritingSurfaceActive] = useState(false)
   const [navbarHeight, setNavbarHeight] = useState(64)
+  const [navigatorLeftOffset, setNavigatorLeftOffset] = useState(0)
   const [toolbarRightOffset, setToolbarRightOffset] = useState(16)
   const [toolbarSticky, setToolbarSticky] = useState(false)
 
   const currentPage = pages[currentPageIndex] || pages[0]
   const canUndo = Boolean(currentPage?.history?.length)
   const canRedo = Boolean(currentPage?.redoStack?.length)
+  const floatingControlsTop = navbarHeight + lockedQuestionHeight + 8
+  const floatingControlsHeight =
+    (tool === "stroke-eraser" || tool === "pixel-eraser") && eraserPanelOpen
+      ? 220
+      : 96
 
   const canvasScale = useMemo(() => {
     if (typeof window === "undefined") return 2
@@ -676,24 +684,31 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     const wrapper = canvasWrapperRef.current
     if (!wrapper) return
 
-    const updateRightOffset = () => {
+    const updateControlOffsets = () => {
       const rect = wrapper.getBoundingClientRect()
       if (rect.width === 0 && rect.height === 0) return
       setToolbarRightOffset(window.innerWidth - rect.right + 16)
+
+      const shell = handwritingShellRef.current
+      if (shell) {
+        setNavigatorLeftOffset(shell.getBoundingClientRect().left)
+      }
+
       if (window.innerWidth < 768) {
         setToolbarSticky(false)
       }
     }
 
-    updateRightOffset()
+    updateControlOffsets()
 
-    const ro = new ResizeObserver(updateRightOffset)
+    const ro = new ResizeObserver(updateControlOffsets)
     ro.observe(wrapper)
-    window.addEventListener("resize", updateRightOffset, { passive: true })
+    if (handwritingShellRef.current) ro.observe(handwritingShellRef.current)
+    window.addEventListener("resize", updateControlOffsets, { passive: true })
 
     return () => {
       ro.disconnect()
-      window.removeEventListener("resize", updateRightOffset)
+      window.removeEventListener("resize", updateControlOffsets)
     }
   }, [])
 
@@ -707,19 +722,18 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
       }
       const rect = wrapper.getBoundingClientRect()
       if (rect.width === 0 && rect.height === 0) return
-      // Barrier = navbar bottom + locked question panel height (0 when unlocked).
-      // Toolbar natural position = rect.top + 16 (top-4 offset inside wrapper).
-      // Go sticky when toolbar would be within 8px of the barrier — matching
-      // the 8px gap used in the sticky top position.
-      const barrier = navbarHeight + lockedQuestionHeight
-      setToolbarSticky(rect.top + 16 < barrier + 8)
+      const naturalTop = rect.top + 16
+      const pastTopBarrier = naturalTop < floatingControlsTop
+      const beforeBottomBarrier =
+        rect.bottom > floatingControlsTop + floatingControlsHeight
+      setToolbarSticky(pastTopBarrier && beforeBottomBarrier)
     }
 
     checkSticky()
 
     window.addEventListener("scroll", checkSticky, { passive: true })
     return () => window.removeEventListener("scroll", checkSticky)
-  }, [navbarHeight, lockedQuestionHeight])
+  }, [floatingControlsHeight, floatingControlsTop])
 
   useEffect(() => {
     if (!isVisible) return undefined
@@ -730,11 +744,18 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
       if (rect.width === 0 && rect.height === 0) return
 
       setToolbarRightOffset(window.innerWidth - rect.right + 16)
+      const shell = handwritingShellRef.current
+      if (shell) {
+        setNavigatorLeftOffset(shell.getBoundingClientRect().left)
+      }
       if (window.innerWidth < 768) {
         setToolbarSticky(false)
       } else {
-        const barrier = navbarHeight + lockedQuestionHeight
-        setToolbarSticky(rect.top + 16 < barrier + 8)
+        const naturalTop = rect.top + 16
+        const pastTopBarrier = naturalTop < floatingControlsTop
+        const beforeBottomBarrier =
+          rect.bottom > floatingControlsTop + floatingControlsHeight
+        setToolbarSticky(pastTopBarrier && beforeBottomBarrier)
       }
 
       const activeCanvas = activeCanvasRef.current
@@ -744,7 +765,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
       }
     })
     return () => cancelAnimationFrame(frameId)
-  }, [isVisible, lockedQuestionHeight, navbarHeight])
+  }, [floatingControlsHeight, floatingControlsTop, isVisible])
 
   useEffect(() => () => {
     cancelPredAnimation()
@@ -817,6 +838,38 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
       i === currentPageIndexRef.current ? updater(page) : page
     )
     commitPages(next)
+  }
+
+  function getPageScrollOffset() {
+    const wrapper = canvasWrapperRef.current
+    if (!wrapper || typeof window === "undefined") return 0
+    const wrapperTop = window.scrollY + wrapper.getBoundingClientRect().top
+    return Math.max(0, window.scrollY - wrapperTop)
+  }
+
+  function saveCurrentPageScrollPosition() {
+    pageScrollPositionsRef.current.set(
+      currentPageIndexRef.current,
+      getPageScrollOffset()
+    )
+  }
+
+  function restorePageScrollPosition(pageIndex) {
+    const offset = pageScrollPositionsRef.current.get(pageIndex) || 0
+    requestAnimationFrame(() => {
+      const wrapper = canvasWrapperRef.current
+      if (!wrapper) return
+      const wrapperTop = window.scrollY + wrapper.getBoundingClientRect().top
+      window.scrollTo({ top: wrapperTop + offset, behavior: "auto" })
+    })
+  }
+
+  function selectPage(pageIndex) {
+    if (readOnly || pageIndex === currentPageIndexRef.current) return
+    saveCurrentPageScrollPosition()
+    currentPageIndexRef.current = pageIndex
+    setCurrentPageIndex(pageIndex)
+    restorePageScrollPosition(pageIndex)
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -1317,23 +1370,39 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   // ─────────────────────────────────────────────────────────────────────────
   function addPage() {
     if (readOnly) return
+    saveCurrentPageScrollPosition()
     const next = [...pagesRef.current, createPage(pagesRef.current.length)]
+    const nextIndex = next.length - 1
+    pageScrollPositionsRef.current.set(nextIndex, 0)
     commitPages(next)
-    setCurrentPageIndex(next.length - 1)
+    currentPageIndexRef.current = nextIndex
+    setCurrentPageIndex(nextIndex)
+    restorePageScrollPosition(nextIndex)
   }
 
   function deletePage(pageIndex) {
     if (readOnly) return
     if (pagesRef.current.length <= 1) return
+    saveCurrentPageScrollPosition()
     const next = pagesRef.current
       .filter((_, i) => i !== pageIndex)
       .map((p, i) => ({ ...p, page_number: i + 1 }))
+    const nextScrollPositions = new Map()
+    pageScrollPositionsRef.current.forEach((offset, index) => {
+      if (index < pageIndex) nextScrollPositions.set(index, offset)
+      if (index > pageIndex) nextScrollPositions.set(index - 1, offset)
+    })
+    pageScrollPositionsRef.current = nextScrollPositions
     commitPages(next)
-    setCurrentPageIndex((i) => {
+    const nextIndex = (() => {
+      const i = currentPageIndexRef.current
       if (i === pageIndex) return Math.max(0, pageIndex - 1)
       if (i > pageIndex) return i - 1
       return Math.min(i, next.length - 1)
-    })
+    })()
+    currentPageIndexRef.current = nextIndex
+    setCurrentPageIndex(nextIndex)
+    restorePageScrollPosition(nextIndex)
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -1359,15 +1428,24 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   // Render
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="overflow-hidden rounded-[6px] border border-white/[0.06] bg-[#120f0d]">
+    <div
+      ref={handwritingShellRef}
+      className="overflow-hidden rounded-[6px] border border-white/[0.06] bg-[#120f0d]"
+    >
       <div className="flex min-h-[640px] flex-col md:flex-row">
-        <PageNavigator
-          currentPageIndex={currentPageIndex}
-          onAddPage={addPage}
-          onDeletePage={deletePage}
-          onSelectPage={readOnly ? () => {} : setCurrentPageIndex}
-          pages={pages}
-        />
+        <div className="shrink-0 md:w-28">
+          <PageNavigator
+            currentPageIndex={currentPageIndex}
+            leftOffset={navigatorLeftOffset}
+            onAddPage={addPage}
+            onDeletePage={deletePage}
+            onSelectPage={selectPage}
+            pages={pages}
+            readOnly={readOnly}
+            sticky={toolbarSticky}
+            topOffset={floatingControlsTop}
+          />
+        </div>
         <div
           ref={canvasWrapperRef}
           className="relative flex min-w-0 flex-1 justify-center bg-[#100d0b] p-4 outline-none select-none [-webkit-touch-callout:none] [-webkit-user-drag:none] [-webkit-user-select:none] md:p-6"
