@@ -423,6 +423,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   const [writingSurfaceActive, setWritingSurfaceActive] = useState(false)
   const [navbarHeight, setNavbarHeight] = useState(64)
   const [navigatorLeftOffset, setNavigatorLeftOffset] = useState(0)
+  const [navigatorMaxHeight, setNavigatorMaxHeight] = useState(640)
   const [toolbarRightOffset, setToolbarRightOffset] = useState(16)
   const [toolbarSticky, setToolbarSticky] = useState(false)
 
@@ -692,7 +693,9 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
 
       const navigatorColumn = navigatorColumnRef.current
       if (navigatorColumn) {
-        setNavigatorLeftOffset(navigatorColumn.getBoundingClientRect().left)
+        const navRect = navigatorColumn.getBoundingClientRect()
+        setNavigatorLeftOffset(navRect.left)
+        setNavigatorMaxHeight(Math.max(96, Math.floor(rect.bottom - navRect.top)))
       }
 
       if (window.innerWidth < 768) {
@@ -727,7 +730,14 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
       const pastTopBarrier = naturalTop < floatingControlsTop
       const beforeBottomBarrier =
         rect.bottom > floatingControlsTop + floatingControlsHeight
-      setToolbarSticky(pastTopBarrier && beforeBottomBarrier)
+      const nextSticky = pastTopBarrier && beforeBottomBarrier
+      setToolbarSticky(nextSticky)
+
+      const navigatorColumn = navigatorColumnRef.current
+      const navTop = nextSticky
+        ? floatingControlsTop
+        : navigatorColumn?.getBoundingClientRect().top ?? rect.top
+      setNavigatorMaxHeight(Math.max(96, Math.floor(rect.bottom - navTop)))
     }
 
     checkSticky()
@@ -747,7 +757,9 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
       setToolbarRightOffset(window.innerWidth - rect.right + 16)
       const navigatorColumn = navigatorColumnRef.current
       if (navigatorColumn) {
-        setNavigatorLeftOffset(navigatorColumn.getBoundingClientRect().left)
+        const navRect = navigatorColumn.getBoundingClientRect()
+        setNavigatorLeftOffset(navRect.left)
+        setNavigatorMaxHeight(Math.max(96, Math.floor(rect.bottom - navRect.top)))
       }
       if (window.innerWidth < 768) {
         setToolbarSticky(false)
@@ -756,7 +768,13 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
         const pastTopBarrier = naturalTop < floatingControlsTop
         const beforeBottomBarrier =
           rect.bottom > floatingControlsTop + floatingControlsHeight
-        setToolbarSticky(pastTopBarrier && beforeBottomBarrier)
+        const nextSticky = pastTopBarrier && beforeBottomBarrier
+        setToolbarSticky(nextSticky)
+        const navigatorColumn = navigatorColumnRef.current
+        const navTop = nextSticky
+          ? floatingControlsTop
+          : navigatorColumn?.getBoundingClientRect().top ?? rect.top
+        setNavigatorMaxHeight(Math.max(96, Math.floor(rect.bottom - navTop)))
       }
 
       const activeCanvas = activeCanvasRef.current
@@ -1438,6 +1456,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
           <PageNavigator
             currentPageIndex={currentPageIndex}
             leftOffset={navigatorLeftOffset}
+            maxHeight={navigatorMaxHeight}
             onAddPage={addPage}
             onDeletePage={deletePage}
             onSelectPage={selectPage}
