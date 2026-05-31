@@ -378,13 +378,15 @@ x + 1 &= 2
 }
 
 function DropdownSection({ title, summary, children, defaultOpen = false }) {
+  const [isOpen, setIsOpen] = useState(defaultOpen)
   const summaryText = summary != null ? String(summary) : ""
   return (
-    <details
-      className="group overflow-hidden rounded-[8px] border border-[#3b2a22]/55 bg-[#181410]"
-      open={defaultOpen}
-    >
-      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-[13px] font-semibold tracking-[0.01em] text-[#c4b5a8] transition-colors hover:bg-[#1b1713] [&::-webkit-details-marker]:hidden">
+    <div className="overflow-hidden rounded-[8px] border border-[#3b2a22]/55 bg-[#181410]">
+      <button
+        className="flex w-full cursor-pointer list-none items-center gap-2 px-4 py-3 text-left text-[13px] font-semibold tracking-[0.01em] text-[#c4b5a8] transition-colors hover:bg-[#1b1713]"
+        type="button"
+        onClick={() => setIsOpen((open) => !open)}
+      >
         <span className="min-w-0 flex-1 truncate">{title}</span>
         <span className="flex shrink-0 items-center gap-2 pl-2 text-[11px] font-normal tracking-[0.04em] text-[#6f6258]">
           <span
@@ -393,11 +395,11 @@ function DropdownSection({ title, summary, children, defaultOpen = false }) {
           >
             {summary}
           </span>
-          <ChevronDown className="size-3.5 shrink-0 text-[#77716b] transition-transform group-open:rotate-180" />
+          <ChevronDown className={cn("size-3.5 shrink-0 text-[#77716b] transition-transform", isOpen && "rotate-180")} />
         </span>
-      </summary>
-      <div className="border-t border-[#3b2a22]/55 p-4">{children}</div>
-    </details>
+      </button>
+      {isOpen && <div className="border-t border-[#3b2a22]/55 p-4">{children}</div>}
+    </div>
   )
 }
 
@@ -695,6 +697,16 @@ function selectedLayer3TagCount(selectedIds = [], tags = []) {
   return tags.filter((tag) => selectedSet.has(tag.id) && tag.layer === 3 && isTaxonomyTag(tag)).length
 }
 
+function selectedTaxonomyCoversLayers(selectedIds = [], tags = [], requiredLayers = [1, 2]) {
+  const selectedSet = new Set(selectedIds)
+  const layers = new Set(
+    tags
+      .filter((tag) => selectedSet.has(tag.id) && isTaxonomyTag(tag))
+      .map((tag) => tag.layer)
+  )
+  return requiredLayers.every((layer) => layers.has(layer))
+}
+
 function normalizeSolutionsForState(solutions = [], legacyRequirements = [], legacySampleSolution = "") {
   const rows = Array.isArray(solutions) && solutions.length
     ? solutions
@@ -735,131 +747,6 @@ function solutionsPayload(solutions = []) {
     is_preferred: Boolean(solution.is_preferred),
     sample_solution: solution.sample_solution || "",
   }))
-}
-
-function SolutionPathwaysEditor({
-  allowStructureChange = false,
-  solutions,
-  onChange,
-}) {
-  const displayedSolutions = normalizeSolutionsForState(solutions)
-
-  function updateSolution(solutionId, patch) {
-    onChange(displayedSolutions.map((solution) =>
-      solution.id === solutionId ? { ...solution, ...patch } : solution
-    ))
-  }
-
-  function setPreferred(solutionId) {
-    onChange(displayedSolutions.map((solution) => ({
-      ...solution,
-      is_preferred: solution.id === solutionId,
-    })))
-  }
-
-  function addSolution() {
-    onChange([
-      ...displayedSolutions,
-      emptySolution("", false),
-    ])
-  }
-
-  function deleteSolution(solutionId) {
-    if (displayedSolutions.length <= 1) return
-    const next = displayedSolutions.filter((solution) => solution.id !== solutionId)
-    if (!next.some((solution) => solution.is_preferred) && next[0]) {
-      next[0] = { ...next[0], is_preferred: true }
-    }
-    onChange(next)
-  }
-
-  return (
-    <div className="mt-4 grid gap-3">
-      <div className="flex items-center justify-between gap-3">
-        <SectionTitle>Solution Pathways</SectionTitle>
-        {allowStructureChange && (
-          <Button
-            className="h-8 rounded-[6px] border border-[#3b2a22]/55 bg-transparent px-3 text-[13px] text-[#9a8880] hover:border-[#5a3d2e]/70 hover:bg-transparent hover:text-[#dba476]"
-            type="button"
-            variant="outline"
-            onClick={addSolution}
-          >
-            <Plus className="size-4" />
-            Add alternate solution
-          </Button>
-        )}
-      </div>
-
-      {displayedSolutions.map((solution, index) => {
-        const hasName = Boolean(String(solution.name || "").trim())
-        return (
-          <details
-            className="group overflow-hidden rounded-[8px] border border-[#3b2a22]/55 bg-[#181410]"
-            key={solution.id}
-            open
-          >
-            <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 transition-colors hover:bg-[#181410] [&::-webkit-details-marker]:hidden">
-              <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
-                <span
-                  className={cn(
-                    "size-2.5 shrink-0 rounded-full",
-                    hasName ? "bg-[#342a24]" : "bg-red-400/80"
-                  )}
-                  title={hasName ? "Solution named" : "Solution name required"}
-                />
-                <Input
-                  className={cn(
-                    "h-8 min-w-[200px] max-w-[360px] rounded-[4px] border-[#3b2a22]/55 bg-white/[0.035] text-sm text-[#e5e2e1]",
-                    !hasName && "border-red-400/50"
-                  )}
-                  placeholder="Solution name e.g. Integration by Parts"
-                  value={solution.name}
-                  onClick={(event) => event.stopPropagation()}
-                  onChange={(event) => updateSolution(solution.id, { name: event.target.value })}
-                />
-              </div>
-              <div className="flex shrink-0 items-center gap-1.5 pr-1 sm:gap-2">
-                <button
-                  type="button"
-                  title="Preferred — AI will use this if solution is ambiguous"
-                  className={cn(
-                    "size-4 rounded-full border border-[#4a3428] transition-colors",
-                    solution.is_preferred ? "bg-[#d49a71]" : "bg-[#342a24] hover:bg-[#5a3d2e]"
-                  )}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    setPreferred(solution.id)
-                  }}
-                />
-                {allowStructureChange && (
-                  <Button
-                    className="rounded-full"
-                    size="sm"
-                    type="button"
-                    variant="destructive"
-                    disabled={displayedSolutions.length <= 1}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      deleteSolution(solution.id)
-                    }}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                )}
-                <ChevronDown className="size-4 shrink-0 text-[#a28c83] transition-transform group-open:rotate-180" />
-              </div>
-            </summary>
-
-            <div className="grid gap-3 border-t border-[#3b2a22]/55 p-4">
-              <p className="text-[11px] text-[#6f6258]">
-                Pathway {index + 1}: name the approach students may use for this solution.
-              </p>
-            </div>
-          </details>
-        )
-      })}
-    </div>
-  )
 }
 
 function SolutionSamplePathwaysEditor({ solutions, onChange }) {
@@ -1173,7 +1060,7 @@ function TagTaxonomyPicker({
       )}
       {!showDeep && selectedIds.some((id) => tags.find((tag) => tag.id === id)?.layer === 2) && (
         <p className="rounded-2xl border border-[#3b2a22]/55 bg-[#181410] px-4 py-3 text-sm text-[#a28c83]">
-          Layer 3 concept tags are assigned inside each part.
+          Layer 3 concept tags are optional inside each part.
         </p>
       )}
     </div>
@@ -1579,9 +1466,8 @@ export function QuestionEditor({
     if (!isMcq && (!Number(marks) || Number(marks) < 1)) return "Marks are required."
     if (!importSource.trim()) return "Source is required."
     if (!questionText.trim()) return "Question text is required."
-    if (showTagging && !tagIds.length) return "At least one topic tag is required."
-    if (isMcq && showTagging && selectedLayer3TagCount(tagIds, tags) === 0) {
-      return "Multiple choice questions require a Layer 3 concept tag."
+    if (showTagging && !selectedTaxonomyCoversLayers(tagIds, tags, [1, 2])) {
+      return "Select at least one Layer 1 topic and Layer 2 subtopic."
     }
 
     if (isMcq) {
@@ -1591,17 +1477,6 @@ export function QuestionEditor({
         return "Select the correct multiple choice answer."
       }
       return ""
-    }
-
-    if (taggingMode === "full" && normalizeSolutionsForState(solutions).some((solution) => !String(solution.name || "").trim())) {
-      return "All solution pathways must have a name."
-    }
-    if (taggingMode === "full") {
-      for (const part of parts) {
-        if (normalizeSolutionsForState(part.solutions || []).some((solution) => !String(solution.name || "").trim())) {
-          return `All solution pathways in part (${part.label || "?"}) must have a name.`
-        }
-      }
     }
 
     if (useCriteriaMode) {
@@ -1624,19 +1499,9 @@ export function QuestionEditor({
     if (parts.length) {
       const missingPart = parts.find((part) => !String(part.text || "").trim())
       if (missingPart) return `Question text is required for part (${missingPart.label || "?"}).`
-      const missingSolution = parts.find((part) => (
-        taggingMode === "full"
-          ? normalizeSolutionsForState(part.solutions || []).some((solution) => !String(solution.sample_solution || "").trim())
-          : !String(part.sample_solution || "").trim()
-      ))
-      if (missingSolution) return `Sample solution is required for part (${missingSolution.label || "?"}).`
       return ""
     }
 
-    if (taggingMode === "full" && normalizeSolutionsForState(solutions).some((solution) => !String(solution.sample_solution || "").trim())) {
-      return "Sample solution is required for every solution pathway."
-    }
-    if (taggingMode !== "full" && !sampleSolution.trim()) return "Sample solution is required."
     return ""
   }
 
@@ -2117,18 +1982,6 @@ export function QuestionEditor({
                         </DropdownSection>
                         )}
 
-                        {showTagging && taggingMode === "full" && !isMcq && (
-                          <SolutionPathwaysEditor
-                            solutions={part.solutions || []}
-                            onChange={(value) => {
-                              const next = [...parts]
-                              next[index] = { ...part, solutions: value }
-                              setParts(next)
-                              if (validationMessage) setValidationMessage("")
-                            }}
-                          />
-                        )}
-
                       </div>
                     </details>
                   ))}
@@ -2206,17 +2059,6 @@ export function QuestionEditor({
                         }}
                         showDeep={isMcq || parts.length === 0}
                       />
-                    )}
-                    {taggingMode === "full" && !isMcq && parts.length === 0 && (
-                      <div className="w-full">
-                        <SolutionPathwaysEditor
-                          solutions={solutions}
-                          onChange={(value) => {
-                            setSolutions(value)
-                            if (validationMessage) setValidationMessage("")
-                          }}
-                        />
-                      </div>
                     )}
                   </div>
                 </Field>
