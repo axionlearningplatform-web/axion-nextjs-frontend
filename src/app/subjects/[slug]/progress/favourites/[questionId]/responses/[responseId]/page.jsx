@@ -64,7 +64,13 @@ function prepareMistakeLatex(value) {
   if (raw.includes("$") || raw.startsWith("\\(") || raw.startsWith("\\[") || raw.startsWith("\\begin")) {
     return raw
   }
+  if (!looksLikeMathExcerpt(raw)) return raw
   return `\\(${raw}\\)`
+}
+
+function looksLikeMathExcerpt(value) {
+  const raw = String(value || "")
+  return /\\|[=^_√∫Σπ]|(?:\b(?:sin|cos|tan|cis|log|ln)\b)|(?:\d+\s*[+\-*/]\s*\d+)/i.test(raw)
 }
 
 function normaliseSillyMistake(item, index) {
@@ -74,6 +80,7 @@ function normaliseSillyMistake(item, index) {
       label: item.title,
       description: item.detail || "",
       latex: prepareMistakeLatex(item.latex),
+      latexIsMath: looksLikeMathExcerpt(item.latex),
       score: null,
       maxScore: null,
     }
@@ -83,6 +90,7 @@ function normaliseSillyMistake(item, index) {
     label: item?.label || item?.tag || "",
     description: item?.description || item?.reason || "",
     latex: prepareMistakeLatex(item?.latex),
+    latexIsMath: looksLikeMathExcerpt(item?.latex),
     score: item?.score ?? null,
     maxScore: item?.maxScore ?? item?.max_score ?? null,
   }
@@ -94,6 +102,7 @@ function normaliseKnowledgeGap(item) {
       label: item.title,
       description: item.detail || "",
       latex: prepareMistakeLatex(item.latex),
+      latexIsMath: looksLikeMathExcerpt(item.latex),
       score: null,
       maxScore: null,
     }
@@ -102,6 +111,7 @@ function normaliseKnowledgeGap(item) {
     label: item?.label || item?.tag || "",
     description: item?.description || item?.hint || item?.reason || "",
     latex: prepareMistakeLatex(item?.latex),
+    latexIsMath: looksLikeMathExcerpt(item?.latex),
     score: item?.score ?? null,
     maxScore: item?.maxScore ?? item?.max_score ?? null,
   }
@@ -197,9 +207,15 @@ function MarkingResultDetails({ result }) {
                             {item.description}
                           </p>
                           {item.latex && (
-                            <MarkdownMath className="mt-2 rounded-[3px] border border-[#c8864a]/15 bg-[#120f0d]/70 px-2.5 py-2 text-[13px] leading-relaxed text-[#d8c4b0] [&_.katex]:text-[#efd0b2] [&_p]:my-0">
-                              {item.latex}
-                            </MarkdownMath>
+                            item.latexIsMath ? (
+                              <MarkdownMath className="mt-2 rounded-[3px] border border-[#c8864a]/15 bg-[#120f0d]/70 px-2.5 py-2 text-[13px] leading-relaxed text-[#d8c4b0] [&_.katex]:text-[#efd0b2] [&_p]:my-0">
+                                {item.latex}
+                              </MarkdownMath>
+                            ) : (
+                              <p className="mt-2 rounded-[3px] border border-[#c8864a]/15 bg-[#120f0d]/70 px-2.5 py-2 text-[13px] italic leading-relaxed text-[#d8c4b0]">
+                                {item.latex}
+                              </p>
+                            )
                           )}
                         </div>
                       </li>
@@ -233,9 +249,15 @@ function MarkingResultDetails({ result }) {
                           </p>
                         )}
                         {item.latex && (
-                          <MarkdownMath className="mt-2 rounded-[3px] border border-[#b24a4a]/15 bg-[#120f0d]/70 px-2.5 py-2 text-[13px] leading-relaxed text-[#d8b0b0] [&_.katex]:text-[#efb8b8] [&_p]:my-0">
-                            {item.latex}
-                          </MarkdownMath>
+                          item.latexIsMath ? (
+                            <MarkdownMath className="mt-2 rounded-[3px] border border-[#b24a4a]/15 bg-[#120f0d]/70 px-2.5 py-2 text-[13px] leading-relaxed text-[#d8b0b0] [&_.katex]:text-[#efb8b8] [&_p]:my-0">
+                              {item.latex}
+                            </MarkdownMath>
+                          ) : (
+                            <p className="mt-2 rounded-[3px] border border-[#b24a4a]/15 bg-[#120f0d]/70 px-2.5 py-2 text-[13px] italic leading-relaxed text-[#d8b0b0]">
+                              {item.latex}
+                            </p>
+                          )
                         )}
                       </li>
                     ))}
