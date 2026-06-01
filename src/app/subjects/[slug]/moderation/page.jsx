@@ -59,6 +59,25 @@ function flattenSaveErrors(data) {
   return "Could not save — check required fields and taxonomy tags."
 }
 
+function hasLayer3Tag(tagIds = [], tags = []) {
+  const ids = new Set(tagIds || [])
+  return (tags || []).some((tag) => ids.has(tag.id) && tag.layer === 3 && tag.tag_kind !== "microskill")
+}
+
+function publishReadinessMessage(draft, tags) {
+  if (!draft || draft.question_type === "mcq") return ""
+  const parts = draft.parts || []
+  if (parts.length) {
+    const missing = parts.find((part) => !hasLayer3Tag(part.tag_ids || [], tags))
+    if (missing) return `Add at least one Layer 3 concept tag to part ${missing.label || "?"}.`
+    return ""
+  }
+  if (!hasLayer3Tag(draft.tag_ids || [], tags)) {
+    return "Add at least one Layer 3 concept tag before publishing."
+  }
+  return ""
+}
+
 const MODERATION_QUEUE_SEARCH_DEBOUNCE_MS = 260
 
 export default function SubjectModerationPage() {
@@ -185,6 +204,11 @@ export default function SubjectModerationPage() {
     if (!activeId) return
     const body = draft
     if (!body) return
+    const readinessMessage = publishReadinessMessage(body, allTags)
+    if (readinessMessage) {
+      setSaveError(readinessMessage)
+      return
+    }
     setStatus("saving")
     setSaveError("")
     const result = await patchQuestion(activeId, {
