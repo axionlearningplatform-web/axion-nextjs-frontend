@@ -74,6 +74,7 @@ function looksLikeMathExcerpt(value) {
 }
 
 function normaliseSillyMistake(item, index) {
+  const correctLatex = prepareMistakeLatex(item?.correct_latex || item?.correctLatex || item?.correct || item?.c)
   if (item?.title) {
     return {
       number: index + 1,
@@ -81,6 +82,8 @@ function normaliseSillyMistake(item, index) {
       description: item.detail || "",
       latex: prepareMistakeLatex(item.latex),
       latexIsMath: looksLikeMathExcerpt(item.latex),
+      correctLatex,
+      correctLatexIsMath: looksLikeMathExcerpt(correctLatex),
       score: null,
       maxScore: null,
     }
@@ -91,18 +94,23 @@ function normaliseSillyMistake(item, index) {
     description: item?.description || item?.reason || "",
     latex: prepareMistakeLatex(item?.latex),
     latexIsMath: looksLikeMathExcerpt(item?.latex),
+    correctLatex,
+    correctLatexIsMath: looksLikeMathExcerpt(correctLatex),
     score: item?.score ?? null,
     maxScore: item?.maxScore ?? item?.max_score ?? null,
   }
 }
 
 function normaliseKnowledgeGap(item) {
+  const correctLatex = prepareMistakeLatex(item?.correct_latex || item?.correctLatex || item?.correct || item?.c)
   if (item?.title) {
     return {
       label: item.title,
       description: item.detail || "",
       latex: prepareMistakeLatex(item.latex),
       latexIsMath: looksLikeMathExcerpt(item.latex),
+      correctLatex,
+      correctLatexIsMath: looksLikeMathExcerpt(correctLatex),
       score: null,
       maxScore: null,
     }
@@ -112,6 +120,8 @@ function normaliseKnowledgeGap(item) {
     description: item?.description || item?.hint || item?.reason || "",
     latex: prepareMistakeLatex(item?.latex),
     latexIsMath: looksLikeMathExcerpt(item?.latex),
+    correctLatex,
+    correctLatexIsMath: looksLikeMathExcerpt(correctLatex),
     score: item?.score ?? null,
     maxScore: item?.maxScore ?? item?.max_score ?? null,
   }
@@ -217,6 +227,22 @@ function MarkingResultDetails({ result }) {
                               </p>
                             )
                           )}
+                          {item.correctLatex && (
+                            <div className="mt-1.5 rounded-[3px] border border-emerald-500/15 bg-emerald-500/05 px-2.5 py-1.5">
+                              <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-emerald-500/70">
+                                Should be
+                              </p>
+                              {item.correctLatexIsMath ? (
+                                <MarkdownMath className="text-[13px] leading-relaxed text-emerald-200 [&_.katex]:text-emerald-200 [&_p]:my-0">
+                                  {item.correctLatex}
+                                </MarkdownMath>
+                              ) : (
+                                <p className="text-[13px] leading-relaxed text-emerald-200">
+                                  {item.correctLatex}
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </li>
                     ))}
@@ -258,6 +284,22 @@ function MarkingResultDetails({ result }) {
                               {item.latex}
                             </p>
                           )
+                        )}
+                        {item.correctLatex && (
+                          <div className="mt-1.5 rounded-[3px] border border-emerald-500/15 bg-emerald-500/05 px-2.5 py-1.5">
+                            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-emerald-500/70">
+                              Should be
+                            </p>
+                            {item.correctLatexIsMath ? (
+                              <MarkdownMath className="text-[13px] leading-relaxed text-emerald-200 [&_.katex]:text-emerald-200 [&_p]:my-0">
+                                {item.correctLatex}
+                              </MarkdownMath>
+                            ) : (
+                              <p className="text-[13px] leading-relaxed text-emerald-200">
+                                {item.correctLatex}
+                              </p>
+                            )}
+                          </div>
                         )}
                       </li>
                     ))}
