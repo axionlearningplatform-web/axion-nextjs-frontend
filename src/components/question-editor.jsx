@@ -40,17 +40,24 @@ const emptySolution = (name = "Main Solution", isPreferred = true) => ({
 })
 
 const answerModeOptions = [
-  { value: "numerical", label: "numerical" },
+  { value: "procedural", label: "procedural" },
   { value: "proof", label: "proof" },
-  { value: "explanation", label: "explanation" },
+  { value: "conceptual", label: "conceptual" },
 ]
 
 function defaultAnswerModes(isMathSubject = true) {
-  return isMathSubject ? ["proof"] : ["explanation"]
+  return isMathSubject ? ["proof"] : ["conceptual"]
 }
 
 function normalizeAnswerModes(modes = [], legacyType = "proof", isMathSubject = true) {
-  const aliases = { value: "numerical", numerical: "numerical", proof: "proof", explanation: "explanation" }
+  const aliases = {
+    value: "procedural",
+    numerical: "procedural",
+    procedural: "procedural",
+    proof: "proof",
+    explanation: "conceptual",
+    conceptual: "conceptual",
+  }
   const incoming = Array.isArray(modes) ? modes : []
   const selected = incoming.length ? incoming : [legacyType]
   const seen = new Set()
@@ -66,14 +73,14 @@ function normalizeAnswerModes(modes = [], legacyType = "proof", isMathSubject = 
 }
 
 function legacyAnswerTypeFromModes(modes = []) {
-  if (modes.includes("numerical") && modes.length === 1) return "value"
+  if (modes.includes("procedural") && modes.length === 1) return "value"
   if (modes.includes("proof")) return "proof"
-  if (modes.includes("explanation")) return "explanation"
+  if (modes.includes("conceptual")) return "explanation"
   return "proof"
 }
 
-function hasNumericalMode(modes = []) {
-  return modes.includes("numerical")
+function hasProceduralMode(modes = []) {
+  return modes.includes("procedural")
 }
 
 const emptyPart = (index = 0, answerModes = ["proof"]) => ({
@@ -589,14 +596,14 @@ function AnswerMetadataFields({
           </label>
         ))}
       </div>
-      {hasNumericalMode(modes) && (
+      {hasProceduralMode(modes) && (
         <div className="grid gap-2">
           <RichTextArea
             className="min-h-[82px] px-3 py-2 text-[14px] leading-relaxed text-[#e8e4dc]"
             value={answerValue || ""}
             onValueChange={(value) => onAnswerValueChange?.(value)}
             toolbarHint="LaTeX"
-            placeholder="Final numerical answer or value, with LaTeX if useful..."
+            placeholder="Final procedural answer or value, with LaTeX if useful..."
           />
           {String(answerValue || "").trim() && (
             <div className="rounded-[4px] border border-[#3b2a22]/50 bg-[#181410] px-3 py-2">
@@ -1463,7 +1470,7 @@ export function QuestionEditor({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setAnswerModes(defaults)
     setAnswerType(legacyAnswerTypeFromModes(defaults))
-    setAnswerValue((value) => hasNumericalMode(defaults) ? value : "")
+    setAnswerValue((value) => hasProceduralMode(defaults) ? value : "")
   }, [initialData, isMathSubject])
 
   function updateQuestionType(value) {
@@ -1509,7 +1516,7 @@ export function QuestionEditor({
           : part.sample_solution || "",
         answer_modes: normalizeAnswerModes(part.answer_modes || [], part.answer_type || "proof", isMathSubject),
         answer_type: legacyAnswerTypeFromModes(normalizeAnswerModes(part.answer_modes || [], part.answer_type || "proof", isMathSubject)),
-        answer_value: hasNumericalMode(normalizeAnswerModes(part.answer_modes || [], part.answer_type || "proof", isMathSubject)) ? part.answer_value || "" : "",
+        answer_value: hasProceduralMode(normalizeAnswerModes(part.answer_modes || [], part.answer_type || "proof", isMathSubject)) ? part.answer_value || "" : "",
         use_tag_marking: part.use_tag_marking !== false,
         tag_ids: part.tag_ids || [],
         tag_requirements: (part.tag_ids || []).map((id) => ({ tag_id: id })),
@@ -1533,7 +1540,7 @@ export function QuestionEditor({
       sample_solution: isMcq || parts.length ? "" : includeSolutionPathways ? preferredRootSolution?.sample_solution || "" : sampleSolution,
       answer_modes: isMcq || parts.length ? [] : normalizeAnswerModes(answerModes, answerType, isMathSubject),
       answer_type: isMcq || parts.length ? "proof" : legacyAnswerTypeFromModes(normalizeAnswerModes(answerModes, answerType, isMathSubject)),
-      answer_value: !isMcq && !parts.length && hasNumericalMode(normalizeAnswerModes(answerModes, answerType, isMathSubject)) ? answerValue : "",
+      answer_value: !isMcq && !parts.length && hasProceduralMode(normalizeAnswerModes(answerModes, answerType, isMathSubject)) ? answerValue : "",
       marking_enabled: !isMcq,
       use_tag_marking: useTagMarking,
       mcq_options: isMcq ? normalizeOptionLetters(mcqOptions) : [],
@@ -2008,7 +2015,7 @@ export function QuestionEditor({
                                     ...part,
                                     answer_modes: modes,
                                     answer_type: legacyAnswerTypeFromModes(modes),
-                                    answer_value: hasNumericalMode(modes) ? part.answer_value || "" : "",
+                                    answer_value: hasProceduralMode(modes) ? part.answer_value || "" : "",
                                   }
                                   setParts(next)
                                 }}
@@ -2040,7 +2047,7 @@ export function QuestionEditor({
                                   ...part,
                                   answer_modes: modes,
                                   answer_type: legacyAnswerTypeFromModes(modes),
-                                  answer_value: hasNumericalMode(modes) ? part.answer_value || "" : "",
+                                  answer_value: hasProceduralMode(modes) ? part.answer_value || "" : "",
                                 }
                                 setParts(next)
                               }}
@@ -2157,7 +2164,7 @@ export function QuestionEditor({
                               const modes = normalizeAnswerModes(value, legacyAnswerTypeFromModes(value), isMathSubject)
                               setAnswerModes(modes)
                               setAnswerType(legacyAnswerTypeFromModes(modes))
-                              if (!hasNumericalMode(modes)) setAnswerValue("")
+                              if (!hasProceduralMode(modes)) setAnswerValue("")
                             }}
                             onAnswerValueChange={setAnswerValue}
                           />
@@ -2177,7 +2184,7 @@ export function QuestionEditor({
                             const modes = normalizeAnswerModes(value, legacyAnswerTypeFromModes(value), isMathSubject)
                             setAnswerModes(modes)
                             setAnswerType(legacyAnswerTypeFromModes(modes))
-                            if (!hasNumericalMode(modes)) setAnswerValue("")
+                            if (!hasProceduralMode(modes)) setAnswerValue("")
                           }}
                           onAnswerValueChange={setAnswerValue}
                         />
