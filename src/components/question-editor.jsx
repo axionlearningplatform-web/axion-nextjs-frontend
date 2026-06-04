@@ -39,14 +39,53 @@ const emptySolution = (name = "Main Solution", isPreferred = true) => ({
   sample_solution: "",
 })
 
-const emptyPart = (index = 0) => ({
+const answerModeOptions = [
+  { value: "numerical", label: "numerical" },
+  { value: "proof", label: "proof" },
+  { value: "explanation", label: "explanation" },
+]
+
+function defaultAnswerModes(isMathSubject = true) {
+  return isMathSubject ? ["proof"] : ["explanation"]
+}
+
+function normalizeAnswerModes(modes = [], legacyType = "proof", isMathSubject = true) {
+  const aliases = { value: "numerical", numerical: "numerical", proof: "proof", explanation: "explanation" }
+  const incoming = Array.isArray(modes) ? modes : []
+  const selected = incoming.length ? incoming : [legacyType]
+  const seen = new Set()
+  const normalized = selected
+    .map((mode) => aliases[String(mode || "").toLowerCase()])
+    .filter((mode) => mode && !seen.has(mode) && seen.add(mode))
+    .filter((mode) => isMathSubject || mode !== "proof")
+
+  if (normalized.length) {
+    return answerModeOptions.map((option) => option.value).filter((mode) => normalized.includes(mode))
+  }
+  return defaultAnswerModes(isMathSubject)
+}
+
+function legacyAnswerTypeFromModes(modes = []) {
+  if (modes.includes("numerical") && modes.length === 1) return "value"
+  if (modes.includes("proof")) return "proof"
+  if (modes.includes("explanation")) return "explanation"
+  return "proof"
+}
+
+function hasNumericalMode(modes = []) {
+  return modes.includes("numerical")
+}
+
+const emptyPart = (index = 0, answerModes = ["proof"]) => ({
   id: crypto.randomUUID(),
   label: String.fromCharCode(97 + index),
   text: "",
   marks: 1,
   sample_solution: "",
-  answer_type: "proof",
+  answer_type: legacyAnswerTypeFromModes(answerModes),
+  answer_modes: answerModes,
   answer_value: "",
+  use_tag_marking: true,
   tag_ids: [],
   solutions: [emptySolution()],
   attachments: [],
@@ -515,32 +554,56 @@ function LevelSegmentedControl({ value, onChange }) {
   )
 }
 
-function AnswerMetadataFields({ answerType, answerValue, onAnswerTypeChange, onAnswerValueChange, name = "answer_type" }) {
+function AnswerMetadataFields({
+  answerModes,
+  answerType,
+  answerValue,
+  onAnswerModesChange,
+  onAnswerValueChange,
+  isMathSubject = true,
+}) {
+  const modes = normalizeAnswerModes(answerModes, answerType, isMathSubject)
+  const visibleOptions = answerModeOptions.filter((option) => isMathSubject || option.value !== "proof")
+
+  function toggleMode(mode) {
+    const next = modes.includes(mode)
+      ? modes.filter((item) => item !== mode)
+      : [...modes, mode]
+    onAnswerModesChange?.(normalizeAnswerModes(next, legacyAnswerTypeFromModes(next), isMathSubject))
+  }
+
   return (
     <div className="grid gap-3">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-xs text-[#6f6861]">Answer type:</span>
-        {["proof", "explanation", "value"].map((type) => (
-          <label key={type} className="flex items-center gap-1 text-xs text-[#9b8f84]">
+        <span className="text-xs text-[#6f6861]">Answer modes:</span>
+        {visibleOptions.map((option) => (
+          <label key={option.value} className="flex items-center gap-1 text-xs text-[#9b8f84]">
             <input
-              type="radio"
-              name={name}
-              value={type}
-              checked={(answerType || "proof") === type}
-              onChange={() => onAnswerTypeChange?.(type)}
+              type="checkbox"
+              value={option.value}
+              checked={modes.includes(option.value)}
+              onChange={() => toggleMode(option.value)}
               className="accent-[#c8864a]"
             />
-            {type}
+            {option.label}
           </label>
         ))}
       </div>
-      {answerType === "value" && (
-        <Input
-          value={answerValue || ""}
-          onChange={(event) => onAnswerValueChange?.(event.target.value)}
-          placeholder="Final numerical answer (e.g. x = 3, 42.7)"
-          className="rounded border border-white/[0.08] bg-transparent px-3 py-2 text-sm text-[#e8e4dc] placeholder:text-[#6f5b52]"
-        />
+      {hasNumericalMode(modes) && (
+        <div className="grid gap-2">
+          <RichTextArea
+            className="min-h-[82px] px-3 py-2 text-[14px] leading-relaxed text-[#e8e4dc]"
+            value={answerValue || ""}
+            onValueChange={(value) => onAnswerValueChange?.(value)}
+            toolbarHint="LaTeX"
+            placeholder="Final numerical answer or value, with LaTeX if useful..."
+          />
+          {String(answerValue || "").trim() && (
+            <div className="rounded-[4px] border border-[#3b2a22]/50 bg-[#181410] px-3 py-2">
+              <LatexSegmentPreview value={answerValue} />
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
@@ -550,10 +613,11 @@ function SampleSolutionEditor({
   value,
   onChange,
   answerType = "proof",
+  answerModes = ["proof"],
   answerValue = "",
-  onAnswerTypeChange,
+  onAnswerModesChange,
   onAnswerValueChange,
-  answerTypeName = "answer_type",
+  isMathSubject = true,
   showAnswerMetadata = true,
   compact = false,
 }) {
@@ -584,11 +648,12 @@ function SampleSolutionEditor({
       />
       {showAnswerMetadata && (
         <AnswerMetadataFields
+          answerModes={answerModes}
           answerType={answerType || "proof"}
           answerValue={answerValue || ""}
-          onAnswerTypeChange={onAnswerTypeChange}
+          onAnswerModesChange={onAnswerModesChange}
           onAnswerValueChange={onAnswerValueChange}
-          name={answerTypeName}
+          isMathSubject={isMathSubject}
         />
       )}
       {previewOpen && (
@@ -693,8 +758,8 @@ function isTaxonomyTag(tag) {
 }
 
 function selectedLayer3TagCount(selectedIds = [], tags = []) {
-  const selectedSet = new Set(selectedIds)
-  return tags.filter((tag) => selectedSet.has(tag.id) && tag.layer === 3 && isTaxonomyTag(tag)).length
+  const selectedSet = new Set((selectedIds || []).map((id) => Number(id)).filter(Number.isFinite))
+  return tags.filter((tag) => selectedSet.has(Number(tag.id)) && Number(tag.layer) === 3 && isTaxonomyTag(tag)).length
 }
 
 function selectedTaxonomyCoversLayers(selectedIds = [], tags = [], requiredLayers = [1, 2]) {
@@ -1253,6 +1318,7 @@ export function QuestionEditor({
   const [questionText, setQuestionText] = useState("")
   const [sampleSolution, setSampleSolution] = useState("")
   const [answerType, setAnswerType] = useState("proof")
+  const [answerModes, setAnswerModes] = useState(["proof"])
   const [answerValue, setAnswerValue] = useState("")
   const [tikzCode, setTikzCode] = useState("")
   const [diagramSvg, setDiagramSvg] = useState("")
@@ -1292,7 +1358,7 @@ export function QuestionEditor({
   const { data: tags = [] } = useSWR(tagsUrl, fetcher)
   const selectedTags = tags.filter((tag) => tagIds.includes(tag.id))
   const sourcePlaceholder = `e.g. HSC ${subject || lockedSubject?.name || "Chemistry"} 2025`
-  const useCriteriaMode = !isMathSubject && !useTagMarking
+  const useCriteriaMode = !useTagMarking
 
   const effectiveMarks = isMcq
     ? 1
@@ -1312,7 +1378,13 @@ export function QuestionEditor({
     setLevel(initialData.level || "exam_practice")
     setQuestionText(initialData.question_text || "")
     setSampleSolution(initialData.sample_solution || "")
-    setAnswerType(initialData.answer_type || "proof")
+    const initialAnswerModes = normalizeAnswerModes(
+      initialData.answer_modes || [],
+      initialData.answer_type || "proof",
+      subjectIsMathematics({ name: initialData.subject || "" })
+    )
+    setAnswerModes(initialAnswerModes)
+    setAnswerType(legacyAnswerTypeFromModes(initialAnswerModes))
     setAnswerValue(initialData.answer_value || "")
     const incomingTikzVisuals = initialData.stem_tikz_visuals?.length
       ? initialData.stem_tikz_visuals
@@ -1337,8 +1409,18 @@ export function QuestionEditor({
         text: part.text || "",
         marks: Number(part.marks || 1),
         sample_solution: part.sample_solution || "",
-        answer_type: part.answer_type || "proof",
+        answer_modes: normalizeAnswerModes(
+          part.answer_modes || [],
+          part.answer_type || "proof",
+          subjectIsMathematics({ name: initialData.subject || "" })
+        ),
+        answer_type: legacyAnswerTypeFromModes(normalizeAnswerModes(
+          part.answer_modes || [],
+          part.answer_type || "proof",
+          subjectIsMathematics({ name: initialData.subject || "" })
+        )),
         answer_value: part.answer_value || "",
+        use_tag_marking: part.use_tag_marking !== false,
         tag_ids: part.tag_ids || [],
         solutions: normalizeSolutionsForState(part.solutions || [], part.tag_requirements || [], part.sample_solution || ""),
         attachments: part.attachments || [],
@@ -1374,6 +1456,15 @@ export function QuestionEditor({
     setSubject(lockedSubject.name || "")
     setSubjectId(lockedSubject.id ? String(lockedSubject.id) : "")
   }, [lockedSubject])
+
+  useEffect(() => {
+    if (initialData) return
+    const defaults = defaultAnswerModes(isMathSubject)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAnswerModes(defaults)
+    setAnswerType(legacyAnswerTypeFromModes(defaults))
+    setAnswerValue((value) => hasNumericalMode(defaults) ? value : "")
+  }, [initialData, isMathSubject])
 
   function updateQuestionType(value) {
     if (value === questionType) return
@@ -1416,14 +1507,16 @@ export function QuestionEditor({
         sample_solution: includeSolutionPathways
           ? (normalizeSolutionsForState(part.solutions || []).find((solution) => solution.is_preferred) || normalizeSolutionsForState(part.solutions || [])[0])?.sample_solution || ""
           : part.sample_solution || "",
-        answer_type: part.answer_type || "proof",
-        answer_value: part.answer_type === "value" ? part.answer_value || "" : "",
+        answer_modes: normalizeAnswerModes(part.answer_modes || [], part.answer_type || "proof", isMathSubject),
+        answer_type: legacyAnswerTypeFromModes(normalizeAnswerModes(part.answer_modes || [], part.answer_type || "proof", isMathSubject)),
+        answer_value: hasNumericalMode(normalizeAnswerModes(part.answer_modes || [], part.answer_type || "proof", isMathSubject)) ? part.answer_value || "" : "",
+        use_tag_marking: part.use_tag_marking !== false,
         tag_ids: part.tag_ids || [],
         tag_requirements: (part.tag_ids || []).map((id) => ({ tag_id: id })),
         solutions: includeSolutionPathways ? solutionsPayload(part.solutions || []) : [],
         attachments: part.attachments || [],
         tikz_visuals: part.tikz_visuals || [],
-        marking_criteria: useCriteriaMode
+        marking_criteria: part.use_tag_marking === false
           ? normalizeCriteriaRows(
               criteriaRowCount(part.marks, part.marking_criteria),
               part.marking_criteria || []
@@ -1438,8 +1531,9 @@ export function QuestionEditor({
           ? normalizeCriteriaRows(criteriaRowCount(marks, rootMarkingCriteria), rootMarkingCriteria)
           : [],
       sample_solution: isMcq || parts.length ? "" : includeSolutionPathways ? preferredRootSolution?.sample_solution || "" : sampleSolution,
-      answer_type: isMcq || parts.length ? "proof" : answerType,
-      answer_value: !isMcq && !parts.length && answerType === "value" ? answerValue : "",
+      answer_modes: isMcq || parts.length ? [] : normalizeAnswerModes(answerModes, answerType, isMathSubject),
+      answer_type: isMcq || parts.length ? "proof" : legacyAnswerTypeFromModes(normalizeAnswerModes(answerModes, answerType, isMathSubject)),
+      answer_value: !isMcq && !parts.length && hasNumericalMode(normalizeAnswerModes(answerModes, answerType, isMathSubject)) ? answerValue : "",
       marking_enabled: !isMcq,
       use_tag_marking: useTagMarking,
       mcq_options: isMcq ? normalizeOptionLetters(mcqOptions) : [],
@@ -1479,21 +1573,20 @@ export function QuestionEditor({
       return ""
     }
 
-    if (useCriteriaMode) {
-      if (parts.length) {
-        for (const part of parts) {
-          const need = criteriaRowCount(part.marks, part.marking_criteria)
-          const crits = normalizeCriteriaRows(need, part.marking_criteria || [])
-          if (crits.some((c) => !String(c.text || "").trim())) {
-            return `Marking criteria required for every mark in part (${part.label || "?"}).`
-          }
+    if (parts.length) {
+      for (const part of parts) {
+        if (part.use_tag_marking !== false) continue
+        const need = criteriaRowCount(part.marks, part.marking_criteria)
+        const crits = normalizeCriteriaRows(need, part.marking_criteria || [])
+        if (crits.some((c) => !String(c.text || "").trim())) {
+          return `Marking criteria required for every mark in part (${part.label || "?"}).`
         }
-      } else {
+      }
+    } else if (useCriteriaMode) {
         const crits = normalizeCriteriaRows(criteriaRowCount(marks, rootMarkingCriteria), rootMarkingCriteria)
         if (crits.some((c) => !String(c.text || "").trim())) {
           return "Marking criteria required for every mark."
         }
-      }
     }
 
     if (parts.length) {
@@ -1509,7 +1602,7 @@ export function QuestionEditor({
     if (!onDraftChange) return
     onDraftChange(payload())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject, subjectId, marks, questionType, level, questionText, sampleSolution, answerType, answerValue, tikzCode, diagramSvg, tikzVisuals, importSource, parts, attachments, tagIds, solutions, tags, rootMarkingCriteria, useTagMarking, mcqOptions, correctOption, shuffleOptions, explanation])
+  }, [subject, subjectId, marks, questionType, level, questionText, sampleSolution, answerType, answerModes, answerValue, tikzCode, diagramSvg, tikzVisuals, importSource, parts, attachments, tagIds, solutions, tags, rootMarkingCriteria, useTagMarking, mcqOptions, correctOption, shuffleOptions, explanation])
 
   return (
     <div className={cn("grid gap-8", !hidePreview && "lg:grid-cols-2")}>
@@ -1759,7 +1852,7 @@ export function QuestionEditor({
   className="h-8 rounded-[6px] border border-[#3b2a22]/55 bg-transparent px-3 text-[13px] text-[#9a8880] hover:bg-transparent hover:border-[#5a3d2e]/70 hover:text-[#dba476]"
   type="button"
   variant="outline"
-  onClick={() => setParts([...parts, emptyPart(parts.length)])}
+  onClick={() => setParts([...parts, emptyPart(parts.length, defaultAnswerModes(isMathSubject))])}
 >
   <Plus className="size-4" />
   Add Part
@@ -1770,7 +1863,6 @@ export function QuestionEditor({
                     <details
                       className="group overflow-hidden rounded-[8px] border border-[#3b2a22]/55 bg-[#181410]"
                       key={part.id}
-                      open
                     >
                       <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 transition-colors hover:bg-[#181410] [&::-webkit-details-marker]:hidden">
                         <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
@@ -1894,15 +1986,39 @@ export function QuestionEditor({
                           defaultOpen={!normalizeSolutionsForState(part.solutions || []).some((solution) => String(solution.sample_solution || "").trim())}
                         >
                           {taggingMode === "full" ? (
-                            <SolutionSamplePathwaysEditor
-                              solutions={part.solutions || []}
-                              onChange={(value) => {
-                                const next = [...parts]
-                                next[index] = { ...part, solutions: value }
-                                setParts(next)
-                                if (validationMessage) setValidationMessage("")
-                              }}
-                            />
+                            <div className="grid gap-3">
+                              <SolutionSamplePathwaysEditor
+                                solutions={part.solutions || []}
+                                onChange={(value) => {
+                                  const next = [...parts]
+                                  next[index] = { ...part, solutions: value }
+                                  setParts(next)
+                                  if (validationMessage) setValidationMessage("")
+                                }}
+                              />
+                              <AnswerMetadataFields
+                                answerModes={normalizeAnswerModes(part.answer_modes || [], part.answer_type || "proof", isMathSubject)}
+                                answerType={part.answer_type || "proof"}
+                                answerValue={part.answer_value || ""}
+                                isMathSubject={isMathSubject}
+                                onAnswerModesChange={(value) => {
+                                  const modes = normalizeAnswerModes(value, legacyAnswerTypeFromModes(value), isMathSubject)
+                                  const next = [...parts]
+                                  next[index] = {
+                                    ...part,
+                                    answer_modes: modes,
+                                    answer_type: legacyAnswerTypeFromModes(modes),
+                                    answer_value: hasNumericalMode(modes) ? part.answer_value || "" : "",
+                                  }
+                                  setParts(next)
+                                }}
+                                onAnswerValueChange={(value) => {
+                                  const next = [...parts]
+                                  next[index] = { ...part, answer_value: value }
+                                  setParts(next)
+                                }}
+                              />
+                            </div>
                           ) : (
                             <SampleSolutionEditor
                               compact
@@ -1914,14 +2030,17 @@ export function QuestionEditor({
                                 if (validationMessage) setValidationMessage("")
                               }}
                               answerType={part.answer_type || "proof"}
+                              answerModes={normalizeAnswerModes(part.answer_modes || [], part.answer_type || "proof", isMathSubject)}
                               answerValue={part.answer_value || ""}
-                              answerTypeName={`answer_type_${index}`}
-                              onAnswerTypeChange={(value) => {
+                              isMathSubject={isMathSubject}
+                              onAnswerModesChange={(value) => {
+                                const modes = normalizeAnswerModes(value, legacyAnswerTypeFromModes(value), isMathSubject)
                                 const next = [...parts]
                                 next[index] = {
                                   ...part,
-                                  answer_type: value,
-                                  answer_value: value === "value" ? part.answer_value || "" : "",
+                                  answer_modes: modes,
+                                  answer_type: legacyAnswerTypeFromModes(modes),
+                                  answer_value: hasNumericalMode(modes) ? part.answer_value || "" : "",
                                 }
                                 setParts(next)
                               }}
@@ -1934,7 +2053,28 @@ export function QuestionEditor({
                           )}
                         </DropdownSection>
 
-                        {useCriteriaMode && (
+                        {showTagging && taggingMode === "full" && (
+                          <label className="flex items-center gap-3 rounded-[6px] border border-[#3b2a22]/55 bg-[#15110f] p-3 text-sm text-[#9b8f84]">
+                            <input
+                              type="checkbox"
+                              checked={part.use_tag_marking !== false}
+                              onChange={(event) => {
+                                const next = [...parts]
+                                next[index] = { ...part, use_tag_marking: event.target.checked }
+                                setParts(next)
+                              }}
+                              className="size-4 accent-[#c8864a]"
+                            />
+                            <span>
+                              Use direct marking
+                              <span className="ml-2 text-xs text-[#6f6861]">
+                                (uncheck for criteria marking)
+                              </span>
+                            </span>
+                          </label>
+                        )}
+
+                        {part.use_tag_marking === false && (
                           <DropdownSection
                             title="Marking Criteria"
                             summary={`${(part.marking_criteria || []).filter((c) => String(c.text || "").trim()).length}/${criteriaRowCount(part.marks, part.marking_criteria)}`}
@@ -2000,13 +2140,28 @@ export function QuestionEditor({
                         : !sampleSolution.trim()}
                     >
                       {taggingMode === "full" ? (
-                        <SolutionSamplePathwaysEditor
-                          solutions={solutions}
-                          onChange={(value) => {
-                            setSolutions(value)
-                            if (validationMessage) setValidationMessage("")
-                          }}
-                        />
+                        <div className="grid gap-3">
+                          <SolutionSamplePathwaysEditor
+                            solutions={solutions}
+                            onChange={(value) => {
+                              setSolutions(value)
+                              if (validationMessage) setValidationMessage("")
+                            }}
+                          />
+                          <AnswerMetadataFields
+                            answerModes={answerModes}
+                            answerType={answerType}
+                            answerValue={answerValue}
+                            isMathSubject={isMathSubject}
+                            onAnswerModesChange={(value) => {
+                              const modes = normalizeAnswerModes(value, legacyAnswerTypeFromModes(value), isMathSubject)
+                              setAnswerModes(modes)
+                              setAnswerType(legacyAnswerTypeFromModes(modes))
+                              if (!hasNumericalMode(modes)) setAnswerValue("")
+                            }}
+                            onAnswerValueChange={setAnswerValue}
+                          />
+                        </div>
                       ) : (
                         <SampleSolutionEditor
                           value={sampleSolution}
@@ -2015,11 +2170,14 @@ export function QuestionEditor({
                             if (validationMessage) setValidationMessage("")
                           }}
                           answerType={answerType}
+                          answerModes={answerModes}
                           answerValue={answerValue}
-                          answerTypeName="answer_type_question"
-                          onAnswerTypeChange={(value) => {
-                            setAnswerType(value)
-                            if (value !== "value") setAnswerValue("")
+                          isMathSubject={isMathSubject}
+                          onAnswerModesChange={(value) => {
+                            const modes = normalizeAnswerModes(value, legacyAnswerTypeFromModes(value), isMathSubject)
+                            setAnswerModes(modes)
+                            setAnswerType(legacyAnswerTypeFromModes(modes))
+                            if (!hasNumericalMode(modes)) setAnswerValue("")
                           }}
                           onAnswerValueChange={setAnswerValue}
                         />
@@ -2064,7 +2222,7 @@ export function QuestionEditor({
                 </Field>
                 )}
 
-                {showTagging && taggingMode === "full" && !isMathSubject && !isMcq && (
+                {showTagging && taggingMode === "full" && !isMcq && parts.length === 0 && (
                   <label className="mt-4 flex items-center gap-3 rounded-2xl border border-[#3b2a22]/55 bg-[#181410] p-4 text-sm text-[#9b8f84]">
                     <input
                       id="use_tag_marking"
@@ -2130,7 +2288,11 @@ export function QuestionEditor({
         <PreviewPanel
           attachments={attachments}
           hints={[]}
-          markingCriteria={[]}
+          markingCriteria={
+            !isMcq && parts.length === 0 && useCriteriaMode
+              ? normalizeCriteriaRows(criteriaRowCount(marks, rootMarkingCriteria), rootMarkingCriteria)
+              : []
+          }
           marks={effectiveMarks}
           parts={isMcq ? [] : parts}
           questionText={questionText}

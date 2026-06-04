@@ -77,16 +77,17 @@ function InlineMathPreview({ children }) {
     .trim()
 
   return (
-    <ReactMarkdown
-      className="block min-w-0 overflow-hidden whitespace-nowrap text-inherit [&_.katex-display]:my-0 [&_.katex-display]:inline-block [&_.katex]:text-inherit [&_p]:inline"
-      remarkPlugins={[remarkMath]}
-      rehypePlugins={[rehypeKatex]}
-      components={{
-        p: ({ children: nodeChildren }) => <span>{nodeChildren}</span>,
-      }}
-    >
-      {preview}
-    </ReactMarkdown>
+    <span className="block min-w-0 overflow-hidden whitespace-nowrap text-inherit [&_.katex-display]:my-0 [&_.katex-display]:inline-block [&_.katex]:text-inherit [&_p]:inline">
+      <ReactMarkdown
+        remarkPlugins={[remarkMath]}
+        rehypePlugins={[rehypeKatex]}
+        components={{
+          p: ({ children: nodeChildren }) => <span>{nodeChildren}</span>,
+        }}
+      >
+        {preview}
+      </ReactMarkdown>
+    </span>
   )
 }
 
