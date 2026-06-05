@@ -158,8 +158,9 @@ function MarkingResultDetails({ result }) {
           const hasSilly = sillyMistakes.length > 0
           const hasGaps = knowledgeGaps.length > 0
           const criteriaFeedback = String(part.criteria_feedback || "").trim()
+          const successFeedback = String(part.success_feedback || "").trim()
           const showPartHeader = (result.parts || []).length > 1 || part.label !== "question"
-          if (!criteriaFeedback && !hasSilly && !hasGaps && !part.matched_solution && !part.matched_concept) return null
+          if (!successFeedback && !criteriaFeedback && !hasSilly && !hasGaps && !part.matched_solution && !part.matched_concept) return null
           return (
             <div
               key={part.label}
@@ -183,6 +184,11 @@ function MarkingResultDetails({ result }) {
               {part.matched_concept && (
                 <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#d49a71]">
                   Concept: {part.matched_concept}
+                </p>
+              )}
+              {successFeedback && (
+                <p className="rounded-[3px] border border-white/[0.05] bg-[#120f0d] px-3 py-2 text-[13px] leading-relaxed text-[#b7aca1]">
+                  {successFeedback}
                 </p>
               )}
 
