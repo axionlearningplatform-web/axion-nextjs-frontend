@@ -400,6 +400,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   const velocityRef = useRef(0)
   const predictedPointsRef = useRef([])
   const lastEraserPointRef = useRef(null)
+  const lastEraserToolRef = useRef("stroke-eraser")
   // Maps stroke id → setTimeout timer id for pending live stroke-eraser deletions
   const pendingEraserDeletionsRef = useRef(new Map())
 
@@ -441,13 +442,47 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     return Math.min(Math.max(window.devicePixelRatio || 2, 2), 3)
   }, [])
 
+  const pulseToolHaptic = useCallback(() => {
+    navigator.vibrate?.(8)
+  }, [])
+
   const selectTool = useCallback((nextTool) => {
     if (readOnly) return
     if (nextTool === "stroke-eraser" || nextTool === "pixel-eraser") {
+      lastEraserToolRef.current = nextTool
       setEraserPanelOpen(true)
     }
     setTool(nextTool)
   }, [readOnly])
+
+  const togglePenAndLastEraser = useCallback(() => {
+    if (readOnly) return
+    setTool((currentTool) => {
+      const nextTool =
+        currentTool === "pen" ? lastEraserToolRef.current : "pen"
+      if (nextTool === "stroke-eraser" || nextTool === "pixel-eraser") {
+        setEraserPanelOpen(true)
+      }
+      pulseToolHaptic()
+      return nextTool
+    })
+  }, [pulseToolHaptic, readOnly])
+
+  const handlePenAuxToolToggle = useCallback((event) => {
+    const pointerType = event.pointerType || event.nativeEvent?.pointerType
+    const isPenAuxButton =
+      pointerType === "pen" &&
+      (event.button === 2 ||
+        event.button === 5 ||
+        event.buttons === 2 ||
+        event.buttons === 32)
+
+    if (!isPenAuxButton) return false
+    event.preventDefault()
+    event.stopPropagation()
+    togglePenAndLastEraser()
+    return true
+  }, [togglePenAndLastEraser])
 
   const cancelPredAnimation = useCallback(() => {
     if (predRafIdRef.current != null) {
@@ -825,11 +860,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     function onKey(e) {
       if (e.key === "e" || e.key === "E") {
         e.preventDefault()
-        selectTool(
-          tool === "stroke-eraser" || tool === "pixel-eraser"
-            ? "pen"
-            : "stroke-eraser"
-        )
+        togglePenAndLastEraser()
       }
       if (e.key === "p" || e.key === "P") {
         e.preventDefault()
@@ -842,7 +873,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [onToggleQuestionLock, selectTool, tool, writingSurfaceActive])
+  }, [onToggleQuestionLock, selectTool, togglePenAndLastEraser, writingSurfaceActive])
 
   // ─────────────────────────────────────────────────────────────────────────
   // Page state helpers
@@ -994,6 +1025,11 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
     e.preventDefault()
   }
 
+  function handleCanvasContextMenu(e) {
+    if (handlePenAuxToolToggle(e)) return
+    stopDefault(e)
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // POINTER HANDLERS — absolute hot path
@@ -1005,6 +1041,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
   function startStroke(event) {
     if (readOnly) return
     if (!activeCanvasRef.current) return
+    if (handlePenAuxToolToggle(event)) return
     // Reject finger/touch input — only pen and mouse create ink.
     if (event.pointerType === "touch") return
     // Palm rejection — wide touch contacts are palms
@@ -1469,7 +1506,7 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
         <div
           ref={canvasWrapperRef}
           className="relative flex min-w-0 flex-1 justify-center bg-[#100d0b] p-4 outline-none select-none [-webkit-touch-callout:none] [-webkit-user-drag:none] [-webkit-user-select:none] md:p-6"
-          onContextMenu={stopDefault}
+          onContextMenu={handleCanvasContextMenu}
           onDragStart={stopDefault}
           onPointerEnter={() => {
             setWritingSurfaceActive(true)
@@ -1555,7 +1592,8 @@ const HandwritingCanvas = forwardRef(function HandwritingCanvas(
                     ? "none"
                     : "crosshair",
               }}
-              onContextMenu={stopDefault}
+              onAuxClick={handlePenAuxToolToggle}
+              onContextMenu={handleCanvasContextMenu}
               onDragStart={stopDefault}
               onPointerCancel={finishStroke}
               onPointerDown={startStroke}
