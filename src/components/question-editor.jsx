@@ -1367,6 +1367,7 @@ export function QuestionEditor({
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [validationMessage, setValidationMessage] = useState("")
   const preMcqMarksRef = useRef("1")
+  const lastDraftPayloadRef = useRef("")
 
   const showTagging = taggingMode !== "hidden"
   const isMcq = questionType === "mcq"
@@ -1639,7 +1640,11 @@ export function QuestionEditor({
 
   useEffect(() => {
     if (!onDraftChange) return
-    onDraftChange(payload())
+    const nextPayload = payload()
+    const nextPayloadKey = JSON.stringify(nextPayload)
+    if (lastDraftPayloadRef.current === nextPayloadKey) return
+    lastDraftPayloadRef.current = nextPayloadKey
+    onDraftChange(nextPayload)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subject, subjectId, marks, questionType, level, questionText, sampleSolution, answerType, answerModes, answerValue, tikzCode, diagramSvg, tikzVisuals, importSource, parts, attachments, tagIds, solutions, tags, rootMarkingCriteria, useTagMarking, mcqOptions, correctOption, shuffleOptions, explanation])
 

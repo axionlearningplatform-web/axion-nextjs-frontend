@@ -137,6 +137,16 @@ function manualFlags(candidate) {
   ].filter(Boolean)
 }
 
+function formatDebugCost(value) {
+  const number = Number(value || 0)
+  if (!Number.isFinite(number)) return "$0.000000"
+  return `$${number.toFixed(6)}`
+}
+
+function formatDebugNumber(value) {
+  return new Intl.NumberFormat().format(Number(value || 0))
+}
+
 function readFileAsBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -278,9 +288,15 @@ export default function QuestionImportPage() {
   }, [candidates, lockedSubject])
 
   const updateDraft = useCallback((nextDraft) => {
-    setDraft(nextDraft)
-    setCandidates((items) =>
-      items.map((item, index) =>
+    const nextDraftKey = JSON.stringify(nextDraft || {})
+    setDraft((currentDraft) =>
+      JSON.stringify(currentDraft || {}) === nextDraftKey ? currentDraft : nextDraft
+    )
+    setCandidates((items) => {
+      const activeItem = items[activeIndex]
+      if (!activeItem || JSON.stringify(activeItem.draft || {}) === nextDraftKey) return items
+
+      return items.map((item, index) =>
         index === activeIndex
           ? {
               ...item,
@@ -288,7 +304,7 @@ export default function QuestionImportPage() {
             }
           : item
       )
-    )
+    })
   }, [activeIndex])
 
   const updateActiveCandidate = useCallback((updates) => {
@@ -378,7 +394,7 @@ export default function QuestionImportPage() {
 
     const payload = {
       source_type: sourceMode,
-      parser_mode: "hybrid",
+      parser_mode: "pipeline",
       import_instructions: importInstructions,
       import_source: importSource,
       content: sourceMode === "paste" ? pastedContent : "",
@@ -605,7 +621,7 @@ export default function QuestionImportPage() {
               <CardTitle className="font-serif text-[22px] font-medium text-[#d8cfc6]">Import Source</CardTitle>
               {candidates.length > 0 && (
                 <p className="mt-1 text-[12px] tracking-[0.02em] text-[#6f6258]">
-                  Parsed {candidates.length} candidate questions locally.
+                  Parsed {candidates.length} candidate questions with the scraper pipeline.
                 </p>
               )}
               {parseMetadata?.parser_mode && (
@@ -613,6 +629,34 @@ export default function QuestionImportPage() {
                   Parser: {parseMetadata.parser_mode}
                   {parseMetadata.llm_model ? ` · ${parseMetadata.llm_model}` : ""}
                 </p>
+              )}
+              {parseMetadata?.scraper_cost_debug && (
+                <div className="mt-3 max-w-3xl rounded-[6px] border border-[#3b2a22]/55 bg-black/20 p-3 font-mono text-[11px] leading-relaxed text-[#9f938b]">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-[#d8cfc6]">
+                    <span>cost {formatDebugCost(parseMetadata.scraper_cost_debug.total_estimated_cost_usd)}</span>
+                    <span>input {formatDebugNumber(parseMetadata.scraper_cost_debug.input_tokens)}</span>
+                    <span>output {formatDebugNumber(parseMetadata.scraper_cost_debug.output_tokens)}</span>
+                    <span>cached {formatDebugNumber(parseMetadata.scraper_cost_debug.cached_input_tokens)}</span>
+                    <span>total {formatDebugNumber(parseMetadata.scraper_cost_debug.total_tokens)}</span>
+                  </div>
+                  <div className="mt-2 grid gap-1">
+                    {(parseMetadata.scraper_cost_debug.calls || []).map((call, index) => (
+                      <div key={`${call.operation || "call"}-${index}`} className="truncate">
+                        {index + 1}. {call.provider}/{call.operation} · {call.model} · {call.status === "failed" ? "FAILED · " : ""}in {formatDebugNumber(call.input_tokens)} · out {formatDebugNumber(call.output_tokens)} · cached {formatDebugNumber(call.cached_input_tokens)} · total {formatDebugNumber(call.total_tokens)} · img {formatDebugNumber(call.image_count)} · {formatDebugCost(call.estimated_cost_usd)}{call.error ? ` · ${call.error}` : ""}
+                      </div>
+                    ))}
+                  </div>
+                  {parseMetadata.ai_fallbacks?.length > 0 && (
+                    <div className="mt-2 border-t border-[#3b2a22]/55 pt-2 text-amber-200/90">
+                      <div>fallbacks</div>
+                      {parseMetadata.ai_fallbacks.map((fallback, index) => (
+                        <div key={`${fallback.stage || "fallback"}-${index}`} className="truncate">
+                          {index + 1}. {fallback.stage}{fallback.page ? ` p${fallback.page}` : ""} · {fallback.reason}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
             {candidates.length > 0 && (
@@ -739,15 +783,15 @@ export default function QuestionImportPage() {
                     }
                     onClick={parseImportSource}
                   >
-                    {status === "parsing" ? "Understanding..." : "Parse Locally"}
+                    {status === "parsing" ? "Running pipeline..." : "Parse Questions"}
                   </Button>
                 </div>
               </div>
             </CardContent>
           )}
-          {parseMetadata?.llm_warning && (
+          {parseMetadata?.answer_matching_warning && (
             <div className="mx-6 mb-6 rounded-2xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
-              Ollama was not used: {parseMetadata.llm_warning}
+              Answer matching warning: {parseMetadata.answer_matching_warning}
             </div>
           )}
         </Card>
