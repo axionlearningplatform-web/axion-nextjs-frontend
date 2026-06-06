@@ -106,6 +106,7 @@ const emptyTikzVisual = (index = 0) => ({
   name: `Visual ${index + 1}`,
   code: "",
   svg: "",
+  alt_description: "",
 })
 
 const emptyMcqOption = (index = 0) => ({
@@ -727,7 +728,7 @@ function TikzVisualsEditor({ visuals, onChange }) {
                 size="sm"
                 type="button"
                 variant="outline"
-                onClick={() => updateVisual(index, { code: "", svg: "" })}
+                onClick={() => updateVisual(index, { code: "", svg: "", alt_description: "" })}
               >
                 Clear editor
               </Button>
@@ -748,6 +749,22 @@ function TikzVisualsEditor({ visuals, onChange }) {
               value={visual.code || ""}
               onChange={(event) => updateVisual(index, { code: event.target.value, svg: "" })}
             />
+            <div className="grid gap-2">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a6d63]">
+                Alt description {visual.code?.trim() ? <span className="text-[#d58a64]">*</span> : null}
+              </label>
+              <Textarea
+                className="min-h-[86px] rounded-2xl border-[#3b2a22]/55 bg-white/[0.035] p-4 text-sm leading-relaxed text-[#e5e2e1] focus-visible:ring-[#ffb595]/40"
+                placeholder="Describe the diagram for marking, e.g. structural formula CH3-C(CH3)(Cl)-CH(OH)-C(=O)-O-CH2-CH3."
+                value={visual.alt_description || ""}
+                onChange={(event) => updateVisual(index, { alt_description: event.target.value })}
+              />
+              {visual.code?.trim() && !visual.alt_description?.trim() ? (
+                <p className="text-xs text-[#d58a64]">
+                  Required when TikZ code is added. This is sent to the marker as diagram context.
+                </p>
+              ) : null}
+            </div>
           </div>
         </details>
       ))}
@@ -767,6 +784,12 @@ function isTaxonomyTag(tag) {
 function selectedLayer3TagCount(selectedIds = [], tags = []) {
   const selectedSet = new Set((selectedIds || []).map((id) => Number(id)).filter(Number.isFinite))
   return tags.filter((tag) => selectedSet.has(Number(tag.id)) && Number(tag.layer) === 3 && isTaxonomyTag(tag)).length
+}
+
+function hasTikzVisualMissingAltDescription(visuals = []) {
+  return (visuals || []).some((visual) => (
+    String(visual?.code || "").trim() && !String(visual?.alt_description || "").trim()
+  ))
 }
 
 function selectedTaxonomyCoversLayers(selectedIds = [], tags = [], requiredLayers = [1, 2]) {
@@ -1570,6 +1593,9 @@ export function QuestionEditor({
     if (showTagging && !selectedTaxonomyCoversLayers(tagIds, tags, [1, 2])) {
       return "Select at least one Layer 1 topic and Layer 2 subtopic."
     }
+    if (hasTikzVisualMissingAltDescription(tikzVisuals)) {
+      return "Add an alt description for every TikZ visual."
+    }
 
     if (isMcq) {
       const filledOptions = normalizeOptionLetters(mcqOptions).filter((option) => String(option.text || "").trim())
@@ -1581,6 +1607,12 @@ export function QuestionEditor({
     }
 
     if (parts.length) {
+      const partMissingDiagramDescription = parts.find((part) =>
+        hasTikzVisualMissingAltDescription(part.tikz_visuals || [])
+      )
+      if (partMissingDiagramDescription) {
+        return `Add an alt description for every TikZ visual in part (${partMissingDiagramDescription.label || "?"}).`
+      }
       for (const part of parts) {
         if (part.use_tag_marking !== false) continue
         const need = criteriaRowCount(part.marks, part.marking_criteria)
