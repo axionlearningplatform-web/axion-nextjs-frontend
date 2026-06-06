@@ -159,6 +159,36 @@ function readFileAsBase64(file) {
   })
 }
 
+function parsePageSectionsText(value) {
+  return String(value || "")
+    .split(/[\n;]+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line, index) => {
+      const rangeMatch = line.match(/(\d+)\s*(?:-|–|—|to)\s*(\d+)|\b(\d+)\b/i)
+      if (!rangeMatch) return null
+
+      const startPage = Number(rangeMatch[1] || rangeMatch[3])
+      const endPage = Number(rangeMatch[2] || rangeMatch[3])
+      if (!Number.isFinite(startPage) || !Number.isFinite(endPage)) return null
+
+      let questionType = "auto"
+      if (/\b(mcq|multiple\s*choice)\b/i.test(line)) {
+        questionType = "mcq"
+      } else if (/\b(saq|short\s*answer|free\s*response|written)\b/i.test(line)) {
+        questionType = "saq"
+      }
+
+      return {
+        start_page: Math.min(startPage, endPage),
+        end_page: Math.max(startPage, endPage),
+        question_type: questionType,
+        label: line || `Section ${index + 1}`,
+      }
+    })
+    .filter(Boolean)
+}
+
 function parseErrorMessage(data) {
   if (!data) return "Import parsing failed."
 
@@ -218,6 +248,7 @@ export default function QuestionImportPage() {
   const [importSource, setImportSource] = useState("")
   const [sourceUrl, setSourceUrl] = useState("")
   const [file, setFile] = useState(null)
+  const [pageSectionsText, setPageSectionsText] = useState("")
   const [sourceCollapsed, setSourceCollapsed] = useState(false)
   const [candidates, setCandidates] = useState([])
   const [candidateSearch, setCandidateSearch] = useState("")
@@ -413,6 +444,7 @@ export default function QuestionImportPage() {
 
       payload.filename = file.name
       payload.file_base64 = await readFileAsBase64(file)
+      payload.page_sections = parsePageSectionsText(pageSectionsText)
     }
 
     let response
@@ -638,6 +670,9 @@ export default function QuestionImportPage() {
                     <span>output {formatDebugNumber(parseMetadata.scraper_cost_debug.output_tokens)}</span>
                     <span>cached {formatDebugNumber(parseMetadata.scraper_cost_debug.cached_input_tokens)}</span>
                     <span>total {formatDebugNumber(parseMetadata.scraper_cost_debug.total_tokens)}</span>
+                    <span>pages {formatDebugNumber(parseMetadata.pages_processed)}/{formatDebugNumber(parseMetadata.pages_total)}</span>
+                    <span>discarded {formatDebugNumber(parseMetadata.pages_discarded)}</span>
+                    <span>sections {formatDebugNumber(parseMetadata.page_sections?.length)}</span>
                   </div>
                   <div className="mt-2 grid gap-1">
                     {(parseMetadata.scraper_cost_debug.calls || []).map((call, index) => (
@@ -729,16 +764,28 @@ export default function QuestionImportPage() {
                   )}
 
                   {sourceMode === "file" && (
-                    <Field className="mt-4">
-                      <FieldLabel className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a6d63]">File</FieldLabel>
-                      <Input
-                        type="file"
-                        accept=".pdf,.tex,.txt,.md,.docx,application/pdf"
-                        className="h-10 rounded-[6px] border border-[#3b2a22]/55 bg-white/[0.035] px-4 text-[14px] text-[#e5e2e1] file:text-[#dba476] focus-visible:border-[#7c573a]/60 focus-visible:ring-0"
-                        disabled={candidates.length > 0}
-                        onChange={(event) => setFile(event.target.files?.[0] || null)}
-                      />
-                    </Field>
+                    <div className="mt-4 grid gap-4">
+                      <Field>
+                        <FieldLabel className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a6d63]">File</FieldLabel>
+                        <Input
+                          type="file"
+                          accept=".pdf,.tex,.txt,.md,.docx,application/pdf"
+                          className="h-10 rounded-[6px] border border-[#3b2a22]/55 bg-white/[0.035] px-4 text-[14px] text-[#e5e2e1] file:text-[#dba476] focus-visible:border-[#7c573a]/60 focus-visible:ring-0"
+                          disabled={candidates.length > 0}
+                          onChange={(event) => setFile(event.target.files?.[0] || null)}
+                        />
+                      </Field>
+                      <Field>
+                        <FieldLabel className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a6d63]">Page Sections</FieldLabel>
+                        <Textarea
+                          className="min-h-[92px] rounded-[8px] border border-[#3b2a22]/55 bg-white/[0.035] p-4 font-mono text-[13px] leading-relaxed text-[#e5e2e1] placeholder:text-[#4f4945] focus-visible:border-[#7c573a]/60 focus-visible:ring-0"
+                          disabled={candidates.length > 0}
+                          placeholder={"1-3 mcq\n4-5 saq\n9-13 saq"}
+                          value={pageSectionsText}
+                          onChange={(event) => setPageSectionsText(event.target.value)}
+                        />
+                      </Field>
+                    </div>
                   )}
 
                   {sourceMode === "url" && (
@@ -774,16 +821,10 @@ export default function QuestionImportPage() {
                   <Button
                     type="button"
                     className="ml-auto mt-4 h-10 w-fit rounded-[6px] border border-[#7c573a]/55 bg-[#1e1511] px-6 text-[13px] font-semibold uppercase tracking-[0.04em] text-[#dba476] transition-colors hover:border-[#c8864a]/65 hover:bg-[#261a12] hover:text-[#f0c99e] disabled:opacity-40"
-                    disabled={
-                      status === "parsing" ||
-                      candidates.length > 0 ||
-                      (sourceMode === "paste" && !pastedContent.trim()) ||
-                      (sourceMode === "url" && !sourceUrl.trim()) ||
-                      (sourceMode === "file" && !file)
-                    }
+                    disabled
                     onClick={parseImportSource}
                   >
-                    {status === "parsing" ? "Running pipeline..." : "Parse Questions"}
+                    Scraper Paused
                   </Button>
                 </div>
               </div>
